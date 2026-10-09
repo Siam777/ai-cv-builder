@@ -58,6 +58,10 @@ test("every template keeps section order, hidden content and stable fact identif
     "modern",
     "compact",
     "creative",
+    "tech",
+    "executive",
+    "timeline",
+    "minimalist",
   ] as const) {
     doc.presentation.template = template;
     assert.deepEqual(layoutBlocks(doc), before);
@@ -134,4 +138,25 @@ test("storage saves and reloads, rejects stale writes/deletes, and isolates vari
   assert.equal((await repo.list()).length, 2);
   await repo.remove(original.id, next.revision);
   assert.equal((await repo.list()).length, 1);
+});
+
+test("presentation schema validates reading direction and defaults to ltr", () => {
+  const doc = createDocument(true);
+  assert.equal(doc.presentation.direction, "ltr");
+
+  const rtlDoc = {
+    ...doc,
+    presentation: {
+      ...doc.presentation,
+      direction: "rtl" as const,
+    },
+  };
+  const parsed = parseBackup(JSON.stringify(rtlDoc));
+  assert.equal(parsed.presentation.direction, "rtl");
+
+  // Invalid direction rejected
+  assert.equal(
+    presentationSchema.safeParse({ ...doc.presentation, direction: "vertical" }).success,
+    false,
+  );
 });

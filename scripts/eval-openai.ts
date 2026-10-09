@@ -1,4 +1,4 @@
-import nextEnv from "@next/env";
+import { loadEnvConfig } from "@next/env";
 import { createDocument } from "../src/lib/document";
 import {
   generateRewrite,
@@ -8,7 +8,7 @@ import {
 } from "../src/lib/server/openai-provider";
 
 async function main() {
-  nextEnv.loadEnvConfig(process.cwd());
+  loadEnvConfig(process.cwd());
   if (!openAIConfigured())
     throw new Error(
       "Set OPENAI_API_KEY privately in .env.local before running live evaluations.",

@@ -205,11 +205,13 @@ test("design switching persists without changing facts; hidden mobile editor pag
   await expect(page.getByRole("status")).toHaveText("Saved on this device");
   await page.reload();
   await page.getByRole("button", { name: "Design & templates" }).click();
+  const lastTemplate = templates.at(-1)!;
   await expect(
-    page.getByRole("button", { name: "Creative template", exact: true }),
+    page.getByRole("button", { name: `${lastTemplate.name} template`, exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Resume font")).toHaveValue("humanist");
   await expect(page.getByLabel("Accent color")).toHaveValue("rust");
+  await page.getByRole("button", { name: "Close design dialog" }).click();
   await page.locator("summary").click();
   const downloading = page.waitForEvent("download");
   await page
@@ -234,4 +236,35 @@ test("design switching persists without changing facts; hidden mobile editor pag
     path: "test-results/design-mobile.png",
     fullPage: true,
   });
+});
+
+test("RTL reading direction adjusts layout and preview styles", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore an example" }).click();
+  await ready(page);
+
+  // Default is LTR
+  await expect(page.locator(".paginated-resume")).toHaveAttribute("dir", "ltr");
+  await expect(page.locator(".paginated-resume")).not.toHaveClass(/rtl/);
+
+  // Open Design & templates panel
+  await page.getByRole("button", { name: "Design & templates" }).click();
+  await expect(page.getByLabel("Reading direction")).toHaveValue("ltr");
+
+  // Switch to RTL
+  await page.getByLabel("Reading direction").selectOption("rtl");
+  await ready(page);
+
+  // Check preview attributes
+  await expect(page.locator(".paginated-resume")).toHaveAttribute("dir", "rtl");
+  await expect(page.locator(".paginated-resume")).toHaveClass(/rtl/);
+  await expect(page.locator(".page-sheet").first()).toHaveAttribute("dir", "rtl");
+
+  // Switch back to LTR
+  await page.getByLabel("Reading direction").selectOption("ltr");
+  await ready(page);
+  await expect(page.locator(".paginated-resume")).toHaveAttribute("dir", "ltr");
+  await expect(page.locator(".paginated-resume")).not.toHaveClass(/rtl/);
 });

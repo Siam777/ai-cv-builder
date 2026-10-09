@@ -8,8 +8,13 @@ Project skills live in .agents/skills/:
 - resume-builder-product: document model, editor, persistence, imports, and feature planning.
 - resume-builder-ai: evidence-grounded chatbot, AI proposals, and job tailoring.
 - resume-builder-templates: resume layouts, pagination, and exports.
+- resume-builder-editor-ux: modern interactive editor, studio decomposition, keyboard bullet flow, and bidirectional preview sync.
+- resume-builder-career-vault: Master Career Vault, job tailoring engine, evidence matching, and Google XYZ impact coach.
+- resume-builder-ats-linter: deterministic content heuristics, ATS plain-text diagnostic inspector, and public grader lead magnet.
+- resume-builder-monetization: SaaS pricing tiers, Stripe Checkout, subscription lifecycle webhooks, and entitlement gating.
 
 Read the relevant SKILL.md when working on its area. These skills guide development; they are not runtime chatbot prompts. Start implementation from the current PLAN.md and preserve unrelated work.
+
 
 The app uses Next.js App Router and TypeScript. Run `npm run typecheck`, `npm test`, and `npm run build` for implementation changes; run `npm run test:e2e` for affected editor flows. See README.md for browser setup. Never treat later-phase features as available in the local editor.
 

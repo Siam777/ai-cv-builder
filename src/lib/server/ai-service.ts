@@ -15,6 +15,7 @@ import {
   PROMPT_VERSION,
 } from "./openai-provider";
 import { HttpError } from "./http";
+import { logOperation } from "./logger";
 
 const conflict = () =>
   new HttpError(
@@ -179,8 +180,32 @@ export async function requestRewrite(
       ],
     });
     if (saved.rowsAffected !== 1) throw conflict();
+    logOperation({
+      level: "info",
+      event: "ai_proposal_generated",
+      ownerId: owner,
+      documentId: doc.id,
+      revision: doc.revision,
+      durationMs: Date.now() - now,
+      statusCode: 200,
+      metadata: {
+        model: openAIModel(),
+        promptVersion: PROMPT_VERSION,
+        hasOperation: proposal.operations.length > 0,
+        questionCount: proposal.questions.length,
+      },
+    });
     return proposal;
   } catch (error) {
+    logOperation({
+      level: "warn",
+      event: "ai_proposal_failed",
+      ownerId: owner,
+      documentId: input.documentId,
+      revision: input.revision,
+      durationMs: Date.now() - now,
+      errorCode: error instanceof HttpError ? error.code : "INTERNAL_ERROR",
+    });
     await client.execute({
       sql: "UPDATE ai_requests SET status='failed' WHERE owner_id=? AND id=? AND status='generating'",
       args: [owner, input.requestId],
@@ -216,6 +241,12 @@ export async function decideProposal(
         args: [owner, id],
       });
       await tx.commit();
+      logOperation({
+        level: "info",
+        event: "ai_proposal_rejected",
+        ownerId: owner,
+        documentId: row.resume_id ? String(row.resume_id) : undefined,
+      });
       return { rejected: true };
     }
     const saved = (
@@ -248,6 +279,13 @@ export async function decideProposal(
       args: [next.revision, owner, id],
     });
     await tx.commit();
+    logOperation({
+      level: "info",
+      event: "ai_proposal_accepted",
+      ownerId: owner,
+      documentId: row.resume_id ? String(row.resume_id) : undefined,
+      revision: next.revision,
+    });
     return { document: next, alreadyApplied: false };
   } finally {
     tx.close();

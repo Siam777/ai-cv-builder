@@ -32,12 +32,37 @@ export function presentationStyle(p: Presentation): CSSProperties {
     "--body-size": `${p.fontSize}pt`,
     "--leading": densities[p.density].lineHeight,
     "--section-gap": `${densities[p.density].gap}pt`,
+    direction: p.direction ?? "ltr",
   } as CSSProperties;
 }
 export function presentationClass(p: Presentation) {
-  return `template-${p.template}${p.template === "creative" && p.sidebar ? " with-sidebar" : ""}`;
+  const rtlClass = p.direction === "rtl" ? " rtl" : "";
+  return `template-${p.template}${p.template === "creative" && p.sidebar ? " with-sidebar" : ""}${rtlClass}`;
 }
-export function ResumeBlock({ block }: { block: LayoutBlock }) {
+export function ResumeBlock({
+  block,
+  onSelect,
+}: {
+  block: LayoutBlock;
+  onSelect?: (block: LayoutBlock) => void;
+}) {
+  if (block.kind === "photo") {
+    return (
+      <div
+        className="resume-block block-photo"
+        data-block-id={block.id}
+        data-block-group={block.group}
+        onClick={onSelect ? () => onSelect(block) : undefined}
+      >
+        <img
+          src={block.text}
+          alt="Applicant Profile Photo"
+          className="resume-avatar-img"
+        />
+      </div>
+    );
+  }
+
   const Tag =
     block.kind === "name"
       ? "h1"
@@ -48,9 +73,22 @@ export function ResumeBlock({ block }: { block: LayoutBlock }) {
           : "p";
   return (
     <Tag
-      className={`resume-block block-${block.kind}${block.continued ? " continued" : ""}`}
+      className={`resume-block block-${block.kind}${block.continued ? " continued" : ""}${onSelect ? " interactive-block" : ""}`}
       data-block-id={block.id}
       data-block-group={block.group}
+      onClick={onSelect ? () => onSelect(block) : undefined}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onKeyDown={
+        onSelect
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(block);
+              }
+            }
+          : undefined
+      }
     >
       {block.href ? (
         <a data-block-text href={block.href}>
@@ -62,9 +100,16 @@ export function ResumeBlock({ block }: { block: LayoutBlock }) {
     </Tag>
   );
 }
+
 export type PreviewHandle = { prepare: () => Promise<void> };
-export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
-  function ResumePreview({ doc }, ref) {
+export const ResumePreview = forwardRef<
+  PreviewHandle,
+  {
+    doc: ResumeDocument;
+    onBlockClick?: (block: LayoutBlock) => void;
+    showWatermark?: boolean;
+  }
+>(function ResumePreview({ doc, onBlockClick, showWatermark = false }, ref) {
     const blocks = useMemo(() => layoutBlocks(doc), [doc]);
     const measurement = useRef<HTMLDivElement>(null);
     const stage = useRef<HTMLDivElement>(null);
@@ -73,13 +118,38 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
       pages: LayoutBlock[][];
     } | null>(null);
     const [failure, setFailure] = useState("");
-    const [scale, setScale] = useState(0.65);
+    const [autoScale, setAutoScale] = useState(0.65);
+    const [zoomMode, setZoomMode] = useState<"auto" | number>("auto");
+    const scale = zoomMode === "auto" ? autoScale : zoomMode;
     const [fontRevision, setFontRevision] = useState(0);
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
       setMounted(true);
     }, []);
     const metrics = pageMetrics(doc.presentation);
+
+    function handleZoomIn() {
+      setZoomMode((prev) => {
+        const current = prev === "auto" ? autoScale : prev;
+        return Math.min(1.75, Math.round((current + 0.15) * 100) / 100);
+      });
+    }
+
+    function handleZoomOut() {
+      setZoomMode((prev) => {
+        const current = prev === "auto" ? autoScale : prev;
+        return Math.max(0.35, Math.round((current - 0.15) * 100) / 100);
+      });
+    }
+
+    function handleZoomReset() {
+      setZoomMode("auto");
+    }
+
+    function handleZoom100() {
+      setZoomMode(1.0);
+    }
+
     const readiness = useMemo(() => {
       let finish!: (error?: string) => void;
       const promise = new Promise<string | undefined>((resolve) => {
@@ -102,7 +172,7 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
       const observer = new ResizeObserver((entries) => {
         const width = entries[0].contentRect.width;
         if (width > 0)
-          setScale(Math.min(1, width / ((metrics.width * 96) / 25.4)));
+          setAutoScale(Math.min(1, width / ((metrics.width * 96) / 25.4)));
       });
       observer.observe(element);
       return () => observer.disconnect();
@@ -155,17 +225,65 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
           } as CSSProperties
         }
       >
-        <p className="pagination-status no-print" aria-live="polite">
-          {failure ||
-            (pending
-              ? "Preparing pages…"
-              : `${pages.length} ${pages.length === 1 ? "page" : "pages"} · ${doc.presentation.pageSize}`)}
-        </p>
+        <div className="preview-stage-header no-print">
+          <p className="pagination-status" aria-live="polite">
+            {failure ||
+              (pending
+                ? "Preparing pages…"
+                : `${pages.length} ${pages.length === 1 ? "page" : "pages"} · ${doc.presentation.pageSize}`)}
+          </p>
+          <div className="preview-zoom-bar" role="toolbar" aria-label="Preview zoom controls">
+            <button
+              type="button"
+              className="zoom-btn"
+              onClick={handleZoomOut}
+              disabled={scale <= 0.35}
+              title="Zoom out"
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+            <span className="zoom-percentage" title="Current preview zoom">
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              type="button"
+              className="zoom-btn"
+              onClick={handleZoomIn}
+              disabled={scale >= 1.75}
+              title="Zoom in"
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+            {zoomMode !== "auto" && (
+              <button
+                type="button"
+                className="zoom-btn-text"
+                onClick={handleZoomReset}
+                title="Fit to container width"
+              >
+                Fit
+              </button>
+            )}
+            {Math.abs(scale - 1.0) > 0.05 && (
+              <button
+                type="button"
+                className="zoom-btn-text"
+                onClick={handleZoom100}
+                title="Actual 100% print size"
+              >
+                100%
+              </button>
+            )}
+          </div>
+        </div>
         {mounted &&
           createPortal(
             <div
               className={`layout-measure ${presentationClass(doc.presentation)}`}
               style={presentationStyle(doc.presentation)}
+              dir={doc.presentation.direction ?? "ltr"}
               aria-hidden="true"
               inert
             >
@@ -179,6 +297,7 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
           )}
         <article
           className={`paginated-resume ${presentationClass(doc.presentation)}`}
+          dir={doc.presentation.direction ?? "ltr"}
           aria-label="Resume preview"
           aria-busy={pending}
           data-pagination-ready={!pending && !failure}
@@ -189,12 +308,24 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
               key={i}
               style={{ height: ((metrics.height * 96) / 25.4) * scale }}
             >
-              <div className="page-sheet" data-page={i + 1}>
+              <div className="page-sheet" data-page={i + 1} dir={doc.presentation.direction ?? "ltr"}>
                 <div className="page-content">
                   {page.map((block) => (
-                    <ResumeBlock key={block.id} block={block} />
+                    <ResumeBlock
+                      key={block.id}
+                      block={block}
+                      onSelect={onBlockClick}
+                    />
                   ))}
                 </div>
+                {showWatermark && (
+                  <div
+                    className="page-watermark print-watermark-footer"
+                    aria-hidden="true"
+                  >
+                    Created with AI CV Builder
+                  </div>
+                )}
                 <div className="page-number" aria-hidden="true">
                   {i + 1} / {pages.length}
                 </div>
@@ -211,3 +342,4 @@ export const ResumePreview = forwardRef<PreviewHandle, { doc: ResumeDocument }>(
     );
   },
 );
+

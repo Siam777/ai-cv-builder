@@ -51,3 +51,30 @@ export const verification = sqliteTable("verification", {
   createdAt: date("createdAt"),
   updatedAt: date("updatedAt"),
 });
+
+export const subscriptions = sqliteTable("subscriptions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  planId: text("plan_id").notNull(), // 'free' | 'job_hunter_monthly' | 'job_hunter_weekly' | 'lifetime'
+  status: text("status").notNull(), // 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete'
+  currentPeriodEnd: integer("current_period_end"),
+  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const subscriptionUsage = sqliteTable("subscription_usage", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  periodMonth: text("period_month").notNull(), // 'YYYY-MM'
+  tailoredResumesGenerated: integer("tailored_resumes_generated").default(0),
+  aiBulletRewrites: integer("ai_bullet_rewrites").default(0),
+});
+

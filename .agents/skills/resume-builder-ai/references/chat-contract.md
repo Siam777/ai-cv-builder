@@ -23,7 +23,26 @@ Use a validated structured proposal such as:
 
 This illustrates a contract, not proof that the example assertion is supported. Define allowlisted operations with schemas, length bounds, target-ID checks, ownership checks, and operation-count limits. Resolve IDs against the current document on the server. Do not accept arbitrary JSON paths, HTML, SQL, or executable model output. Keep template selection and content edits as distinct operation types.
 
+For inline contextual magic bars, deliver the proposal payload with pre-computed text diff tokens so the UI can render in-place visual additions/deletions immediately with `Tab` (accept) or `Esc` (dismiss).
+
 Validate syntax and targets first, then factual support. If a proposal includes an unsupported metric, title, credential, or skill, return a question or remove the unsupported claim before presenting an applicable proposal. A second model review can help but is not a guarantee. Keep acceptance explicit and reversible.
+
+## Google XYZ Impact Coach contract
+
+When a bullet lacks measurable outcomes:
+1. Detect whether the bullet satisfies *"Accomplished [X], as measured by [Y], by doing [Z]"*.
+2. If outcome [Y] is missing, ask a single direct clarifying question:
+   ```json
+   {
+     "type": "clarificationQuestion",
+     "entryId": "exp-1",
+     "bulletId": "bullet-2",
+     "question": "You mentioned optimizing Redis caching. What was the measurable impact on latency or throughput? (e.g. reduced P99 latency by 35%)",
+     "suggestedMetricKinds": ["latency", "cost", "scale", "throughput"]
+   }
+   ```
+3. When the candidate provides the metric, synthesize the verified XYZ bullet and return an atomic `replaceBullet` proposal with the user's input cited in `evidenceIds`.
+
 
 ## Tailoring and audit
 

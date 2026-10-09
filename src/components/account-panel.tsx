@@ -98,13 +98,30 @@ export function AccountPanel({
           <h2>Keep your next chapter close.</h2>
           <p>Choose where your resumes are saved.</p>
         </div>
-        <button
-          onClick={onClose}
-          disabled={working}
-          aria-label="Close account settings"
-        >
-          ×
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {typeof window !== "undefined" && window.location.pathname !== "/profile" && (
+            <a
+              href="/profile"
+              style={{
+                fontSize: "11px",
+                color: "var(--green)",
+                fontWeight: 600,
+                textDecoration: "underline",
+                padding: "4px 8px",
+              }}
+              title="Open dedicated profile page"
+            >
+              Full Profile Page ↗
+            </a>
+          )}
+          <button
+            onClick={onClose}
+            disabled={working}
+            aria-label="Close account settings"
+          >
+            ×
+          </button>
+        </div>
       </div>
       {error && (
         <p className="account-error" role="alert">

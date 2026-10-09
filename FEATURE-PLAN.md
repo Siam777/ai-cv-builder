@@ -22,10 +22,13 @@ Manual editing, local IndexedDB persistence, independent named variants, undo, a
 
 ## Next release
 
+- Decomposed modular editor (`EditorSidebar`, `SectionEditor`, `BulletList`, `EditorHeader`) with continuous scroll, bidirectional preview sync, and inline contextual AI magic bar (see `resume-builder-editor-ux`).
+- Existing PDF/DOCX resume cold-start onboarding with text extraction and staged preview review.
+- Master Career Vault architecture separating immutable candidate records from targeted resume variants (see `resume-builder-career-vault`).
+- 1-Click Job Tailoring engine with heuristic requirement extraction, transparent coverage scoring, gap analysis, and Google XYZ Impact Coach.
+- Deterministic ATS writing linter (active verbs, metrics, length), ATS plain-text diagnostic tab with reading-order checks, and public ATS grader lead magnet (see `resume-builder-ats-linter`).
+- Commercial monetization with Stripe Checkout, subscription lifecycle webhooks, Job Hunter Pass, Lifetime Pass, and watermark export controls (see `resume-builder-monetization`).
 - DOCX, standalone HTML, Markdown, cover letters, version history, and reusable custom sections.
-- Expanded writing audit rules; no score may imply a prediction of hiring outcomes.
-- Richer skills taxonomy with versioned synonym mapping; assess current ESCO/O*NET data terms, regional coverage, and maintenance before adopting either.
-- Existing PDF/DOCX resume import, with extraction preview and explicit handling of unsupported layouts or scanned PDFs.
 - Localization and tested RTL templates. Keyboard operation, screen-reader semantics, and Unicode content are first-release requirements.
 
 ## Enterprise, when required
@@ -50,15 +53,32 @@ Implement in this order: canonical document and editor; local persistence and va
 After installation, invoke them in a task containing your application repository:
 
 ```text
-Use $resume-builder-product to implement the first usable editor, canonical document, and named resume variants in this project.
+Use $resume-builder-product to implement the canonical document, persistence, cold-start imports, and feature boundaries.
 ```
 
 ```text
-Use $resume-builder-ai to add a chatbot that proposes evidence-grounded resume edits with accept/reject and undo.
+Use $resume-builder-editor-ux to decompose the studio monolith, add keyboard-driven bullet editing, bidirectional preview sync, and inline AI diff chips.
 ```
 
 ```text
-Use $resume-builder-templates to add Classic, Modern, Compact, and Creative templates with live preview and verified PDF export.
+Use $resume-builder-career-vault to build the Master Career Vault, 1-click job tailoring engine, evidence matching, and Google XYZ coach.
+```
+
+```text
+Use $resume-builder-ats-linter to implement real-time bullet linting, ATS plain-text extraction diagnostics, reading-order audits, and the lead magnet grader.
+```
+
+```text
+Use $resume-builder-monetization to integrate Stripe Checkout, subscription webhooks, tiered entitlements, and export watermark enforcement.
+```
+
+```text
+Use $resume-builder-ai to add an evidence-grounded chatbot and server AI proposals with atomic accept/reject and anti-hallucination verification.
+```
+
+```text
+Use $resume-builder-templates to add Classic, Modern, Compact, and Creative templates with live preview, ATS diagnostic checks, and verified exports.
 ```
 
 These skills guide Codex while developing the application. The application's chatbot still needs its own runtime prompts, validation, model connection, and tests.
+

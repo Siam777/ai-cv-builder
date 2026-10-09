@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createDocument,
   duplicateDocument,
-  labels,
-  newEntry,
   parseBackup,
   toPlainText,
-  uid,
   documentSchema,
-  type Entry,
+  uid,
+  newEntry,
   type ResumeDocument,
 } from "@/lib/document";
 import { createRepository } from "@/lib/repository";
@@ -20,66 +18,64 @@ import { templates } from "@/lib/presentation";
 import { AccountPanel } from "./account-panel";
 import { AIPanel } from "./ai-panel";
 import type { Proposal } from "@/lib/ai-proposals";
+import type { LayoutBlock } from "@/lib/layout";
 import {
   accountRequest,
   createCloudRepository,
   transferLocalResumes,
 } from "@/lib/cloud-repository";
 import type { AccountUser } from "@/lib/cloud-contract";
+import { EditorHeader } from "./editor/EditorHeader";
+import { DocumentToolbar } from "./editor/DocumentToolbar";
+import { EditorSidebar } from "./editor/EditorSidebar";
+import { SectionEditor } from "./editor/SectionEditor";
+import {
+  ColdStartImporter,
+} from "./editor/ColdStartImporter";
+import {
+  ImportReviewModal,
+  type StagedImportData,
+} from "./editor/ImportReviewModal";
+import { parseTextToResume } from "@/lib/importers/text-resume-parser";
+import {
+  parseLinkedInArchive,
+  isLinkedInCsv,
+} from "@/lib/importers/linkedin-importer";
+import { JobTailorModal } from "./vault/JobTailorModal";
+import { CoverLetterModal } from "./vault/CoverLetterModal";
+import { VersionHistoryModal } from "./editor/VersionHistoryModal";
+import { AddSectionModal } from "./editor/AddSectionModal";
+import { AtsReadinessPanel } from "./editor/AtsReadinessPanel";
+import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
+import { PricingModal } from "./billing/PricingModal";
+import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
+import { DemoResumesModal } from "./editor/DemoResumesModal";
+import type { PlanId } from "@/lib/billing-plans";
+import type { FocusTarget, SaveState } from "./editor/types";
+import type { ExportFormat } from "./editor/DocumentToolbar";
+import { exportToMarkdown } from "@/lib/exporters/markdown-exporter";
+import { exportToStandaloneHtml } from "@/lib/exporters/html-exporter";
+import { exportToDocx } from "@/lib/exporters/docx-exporter";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
-type SaveState =
-  | "Loading"
-  | "Saved on this device"
-  | "Unsaved changes"
-  | "Saving…"
-  | "Save failed";
-function download(content: string, name: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+function download(content: string | Uint8Array | BlobPart, name: string, type: string) {
+  const blob =
+    content instanceof Blob
+      ? content
+      : new Blob([content as any], { type });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
+  a.style.display = "none";
   a.href = url;
   a.download = name;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function Field({
-  label,
-  value,
-  onChange,
-  multiline = false,
-  placeholder,
-  maxLength = 20000,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  multiline?: boolean;
-  placeholder?: string;
-  maxLength?: number;
-}) {
-  const labelId = useId();
-  return (
-    <label className="field">
-      <span id={labelId}>{label}</span>
-      {multiline ? (
-        <textarea
-          aria-labelledby={labelId}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          maxLength={maxLength}
-          rows={4}
-        />
-      ) : (
-        <input
-          aria-labelledby={labelId}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          maxLength={maxLength}
-        />
-      )}
-    </label>
-  );
+  setTimeout(() => {
+    if (a.parentNode) {
+      a.parentNode.removeChild(a);
+    }
+    URL.revokeObjectURL(url);
+  }, 2000);
 }
 
 export function ResumeStudio() {
@@ -93,11 +89,41 @@ export function ResumeStudio() {
   const [showDesign, setShowDesign] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [showAiGen, setShowAiGen] = useState(false);
+  const [showDemoGallery, setShowDemoGallery] = useState(false);
+  const [showTailor, setShowTailor] = useState(false);
+  const [showAts, setShowAts] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isSubscriber, setIsSubscriber] = useState(false);
+  const [currentPlanId, setCurrentPlanId] = useState<PlanId>("free");
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
   const preview = useRef<PreviewHandle>(null);
   const [undoCount, setUndoCount] = useState(0);
   const [mobileTab, setMobileTab] = useState("editor");
-  const [staged, setStaged] = useState<ResumeDocument | null>(null);
+  const [staged, setStaged] = useState<StagedImportData | null>(null);
+  const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+
+  const isModalActive = Boolean(
+    showDesign ||
+    showAccount ||
+    showAI ||
+    showAiGen ||
+    showDemoGallery ||
+    showTailor ||
+    showAts ||
+    showPricing ||
+    showCoverLetter ||
+    showHistory ||
+    showAddSection ||
+    showShortcuts ||
+    staged
+  );
+  useBodyScrollLock(isModalActive);
+
   const repository = useRef<ReturnType<typeof createRepository> | null>(null);
   const current = useRef<ResumeDocument | null>(null);
   const revisions = useRef(new Map<string, number>());
@@ -118,9 +144,11 @@ export function ResumeStudio() {
     change.current = 0;
     savedChange.current = 0;
     setSectionId("contact");
+    setFocusTarget(null);
     setError("");
     setStatus("Saved on this device");
   }
+
   useEffect(() => {
     let active = true;
     repository.current = createRepository();
@@ -149,6 +177,46 @@ export function ResumeStudio() {
       window.removeEventListener("beforeunload", warn);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("billing=success")) {
+      setNotice(
+        "🎉 Congratulations! Your Job Hunter Pass is active. Watermark-free exports and AI Job Tailoring are unlocked.",
+      );
+      window.history.replaceState({}, "", window.location.pathname);
+      setIsSubscriber(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!cloudUser) {
+      setIsSubscriber(false);
+      setCurrentPlanId("free");
+      return;
+    }
+    let active = true;
+    fetch("/api/billing/subscription")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return;
+        if (data?.subscription?.isSubscriber) {
+          setIsSubscriber(true);
+          setCurrentPlanId(data.subscription.planId || "job_hunter_monthly");
+        } else {
+          setIsSubscriber(false);
+          setCurrentPlanId("free");
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setIsSubscriber(false);
+          setCurrentPlanId("free");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [cloudUser]);
 
   async function flush() {
     clearTimeout(timer.current);
@@ -185,6 +253,7 @@ export function ResumeStudio() {
     chain.current = task;
     return task;
   }
+
   function update(mutator: (draft: ResumeDocument) => void, record = true) {
     if (!current.current) return;
     const before = current.current;
@@ -209,6 +278,129 @@ export function ResumeStudio() {
       void flush().catch(() => {});
     }, 450);
   }
+
+  function handleUndo() {
+    const old = history.current.pop();
+    if (old) update((d) => Object.assign(d, old), false);
+  }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (showShortcuts) {
+          e.preventDefault();
+          setShowShortcuts(false);
+          return;
+        }
+        if (showPricing) {
+          e.preventDefault();
+          setShowPricing(false);
+          return;
+        }
+        if (showAts) {
+          e.preventDefault();
+          setShowAts(false);
+          return;
+        }
+        if (showTailor) {
+          e.preventDefault();
+          setShowTailor(false);
+          return;
+        }
+        if (showCoverLetter) {
+          e.preventDefault();
+          setShowCoverLetter(false);
+          return;
+        }
+        if (showHistory) {
+          e.preventDefault();
+          setShowHistory(false);
+          return;
+        }
+        if (showAddSection) {
+          e.preventDefault();
+          setShowAddSection(false);
+          return;
+        }
+        if (showAccount) {
+          e.preventDefault();
+          setShowAccount(false);
+          return;
+        }
+        if (showDemoGallery) {
+          e.preventDefault();
+          setShowDemoGallery(false);
+          return;
+        }
+        if (showAI) {
+          e.preventDefault();
+          setShowAI(false);
+          return;
+        }
+        if (staged) {
+          e.preventDefault();
+          setStaged(null);
+          return;
+        }
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+
+      // Global Undo: Ctrl+Z or Cmd+Z when NOT typing inside an editable field
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.key.toLowerCase() === "z" &&
+        !e.shiftKey
+      ) {
+        const isAnyModalOpen =
+          showAccount ||
+          showAI ||
+          showTailor ||
+          showAts ||
+          showPricing ||
+          showCoverLetter ||
+          showHistory ||
+          showAddSection ||
+          showShortcuts ||
+          !!staged;
+
+        if (!isEditable && !isAnyModalOpen) {
+          e.preventDefault();
+          handleUndo();
+          return;
+        }
+      }
+
+      // '?' (Shift + /) toggles the Keyboard Shortcuts Modal when NOT typing in an editable field
+      if (e.key === "?" && !isEditable) {
+        e.preventDefault();
+        setShowShortcuts((prev) => !prev);
+        return;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    showShortcuts,
+    showPricing,
+    showAts,
+    showTailor,
+    showCoverLetter,
+    showHistory,
+    showAddSection,
+    showAccount,
+    showAI,
+    staged,
+  ]);
+
   async function action(work: () => Promise<void>) {
     setBusy(true);
     setNotice("");
@@ -221,12 +413,14 @@ export function ResumeStudio() {
       setBusy(false);
     }
   }
+
   async function addDocument(next: ResumeDocument) {
     const saved = await repository.current!.save(next, null);
     revisions.current.set(saved.id, saved.revision);
     setDocuments((list) => [saved, ...list]);
     select(saved);
   }
+
   async function switchWorkspace(user: AccountUser | null, save = true) {
     if (save) await flush();
     const next = user ? createCloudRepository(user.id) : createRepository();
@@ -248,6 +442,7 @@ export function ResumeStudio() {
     setStatus("Saved on this device");
     if (list.length) select(list[0]);
   }
+
   async function verifyExport() {
     if (cloudUser && current.current) {
       const saved = await createCloudRepository(cloudUser.id).get(
@@ -259,6 +454,7 @@ export function ResumeStudio() {
         );
     }
   }
+
   async function prepareAI() {
     await flush();
     if (!current.current || !cloudUser)
@@ -269,6 +465,7 @@ export function ResumeStudio() {
         revisions.current.get(current.current.id) ?? current.current.revision,
     };
   }
+
   async function acceptAI(proposal: Proposal) {
     const before = await prepareAI();
     if (
@@ -296,32 +493,127 @@ export function ResumeStudio() {
     setError("");
     setStatus("Saved on this device");
   }
-  function checkedExport(format: "json" | "txt") {
+
+  function checkedExport(format: ExportFormat) {
     void action(async () => {
       await verifyExport();
-      exportFile(format);
+      await exportFile(format);
     });
   }
-  function exportFile(format: "json" | "txt") {
+
+  async function exportFile(format: ExportFormat) {
     if (!current.current) return;
     const latest = {
       ...current.current,
       revision: revisions.current.get(current.current.id) ?? 0,
     };
-    const name =
-      latest.name.replace(/[^\p{L}\p{N} _-]/gu, "").slice(0, 100) || "resume";
-    download(
-      format === "json" ? JSON.stringify(latest, null, 2) : toPlainText(latest),
-      `${name}.${format}`,
-      format === "json" ? "application/json" : "text/plain;charset=utf-8",
-    );
+    const cleanName =
+      latest.name
+        .replace(/[^\p{L}\p{N} _-]/gu, "")
+        .trim()
+        .replace(/\s+/g, "_")
+        .slice(0, 100) || "resume";
+
+    const watermark = !isSubscriber;
+
+    if (format === "json") {
+      download(
+        JSON.stringify(latest, null, 2),
+        `${cleanName}.json`,
+        "application/json",
+      );
+      setNotice("Resume JSON backup exported.");
+    } else if (format === "txt") {
+      download(
+        toPlainText(latest),
+        `${cleanName}.txt`,
+        "text/plain;charset=utf-8",
+      );
+      setNotice("Plain-text resume exported.");
+    } else if (format === "md") {
+      download(
+        exportToMarkdown(latest),
+        `${cleanName}.md`,
+        "text/markdown;charset=utf-8",
+      );
+      setNotice("Markdown resume exported.");
+    } else if (format === "html") {
+      download(
+        exportToStandaloneHtml(latest, { showWatermark: watermark }),
+        `${cleanName}.html`,
+        "text/html;charset=utf-8",
+      );
+      setNotice("Standalone HTML resume exported.");
+    } else if (format === "docx") {
+      const docxBytes = exportToDocx(latest, { showWatermark: watermark });
+      download(
+        docxBytes,
+        `${cleanName}.docx`,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+      setNotice("Word document (.docx) exported.");
+    } else if (format === "pdf") {
+      try {
+        setStatus("Saving…");
+        setNotice("Generating PDF…");
+        const res = await fetch("/api/resumes/export-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ document: latest }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || `PDF export failed with status ${res.status}`);
+        }
+        const blob = await res.blob();
+        download(blob, `${cleanName}.pdf`, "application/pdf");
+        setStatus("Saved on this device");
+        setNotice("PDF downloaded successfully.");
+      } catch (err) {
+        console.error("Server PDF export failed, falling back to print dialog:", err);
+        setError("Direct PDF download failed. Opening print dialog to save as PDF…");
+        await document.fonts.ready;
+        await preview.current?.prepare();
+        window.print();
+      }
+    }
   }
+
   async function stageFile(file?: File) {
     if (!file) return;
     try {
-      if (file.size > 2_000_000)
-        throw new Error("Backup exceeds the 2 MB limit.");
-      setStaged(parseBackup(await file.text()));
+      if (file.size > 5_000_000)
+        throw new Error("Backup exceeds the 5 MB limit.");
+      const text = await file.text();
+      const trimmed = text.trim();
+      const isJson =
+        file.name.endsWith(".json") ||
+        file.type === "application/json" ||
+        (trimmed.startsWith("{") && trimmed.endsWith("}"));
+      if (isJson) {
+        setStaged({
+          document: parseBackup(text),
+          warnings: [],
+          sourceFile: file.name,
+        });
+      } else if (file.name.endsWith(".csv") && isLinkedInCsv(text)) {
+        const parsed = parseLinkedInArchive(
+          { [file.name]: text },
+          file.name.replace(/\.csv$/i, ""),
+        );
+        setStaged({
+          document: parsed.document,
+          warnings: parsed.warnings,
+          sourceFile: file.name,
+        });
+      } else {
+        const parsed = parseTextToResume(text, file.name);
+        setStaged({
+          document: parsed.document,
+          warnings: parsed.warnings,
+          sourceFile: file.name,
+        });
+      }
       setError("");
     } catch (e) {
       setError(
@@ -331,56 +623,72 @@ export function ResumeStudio() {
       );
     }
   }
-  function editEntry(entryId: string, values: Partial<Entry>) {
-    update((d) => {
-      const entry = d.sections
-        .find((s) => s.id === sectionId)!
-        .entries.find((e) => e.id === entryId)!;
-      Object.assign(entry, values);
-    });
+
+  function handlePreviewBlockClick(block: LayoutBlock) {
+    if (
+      ["name", "headline", "location", "email", "phone", "website"].includes(
+        block.id,
+      ) ||
+      block.kind === "name" ||
+      block.kind === "headline" ||
+      block.kind === "contact"
+    ) {
+      setSectionId("contact");
+      setFocusTarget({ sectionId: "contact", field: block.id });
+      setMobileTab("editor");
+      return;
+    }
+
+    for (const s of doc?.sections || []) {
+      if (s.id === block.id) {
+        setSectionId(s.id);
+        setFocusTarget({ sectionId: s.id });
+        setMobileTab("editor");
+        return;
+      }
+      for (const e of s.entries) {
+        for (const b of e.bullets) {
+          if (b.id === block.id) {
+            setSectionId(s.id);
+            setFocusTarget({ sectionId: s.id, entryId: e.id, bulletId: b.id });
+            setMobileTab("editor");
+            return;
+          }
+        }
+        if (
+          e.id === block.group ||
+          `${e.id}-title` === block.id ||
+          `${e.id}-meta` === block.id ||
+          `${e.id}-description` === block.id
+        ) {
+          setSectionId(s.id);
+          setFocusTarget({ sectionId: s.id, entryId: e.id });
+          setMobileTab("editor");
+          return;
+        }
+      }
+    }
   }
-  const activeSection = doc?.sections.find((s) => s.id === sectionId);
+
   const ready = status !== "Loading";
 
   return (
     <div className="studio">
-      <header className="app-header no-print">
-        <a className="brand" href="/" aria-label="AI CV Builder home">
-          <span className="brand-mark">
-            cv<span>·</span>
-          </span>
-          <span>
-            Resume studio<small>AI CV BUILDER</small>
-          </span>
-        </a>
-        <div className="header-right">
-          <button
-            disabled={busy || !ready || showAccount || showAI}
-            onClick={() => setShowAccount(true)}
-          >
-            Account
-          </button>
-          <span className="local-badge">
-            <span /> {cloudUser ? "Account workspace" : "Local workspace"}
-          </span>
-          <span className="avatar" aria-hidden="true">
-            {doc?.contact.name.charAt(0) || "Y"}
-          </span>
-        </div>
-      </header>
-      <div className="workspace-heading no-print">
-        <div>
-          <p className="eyebrow">YOUR NEXT CHAPTER</p>
-          <h1>A little clarity. A stronger resume.</h1>
-          <p>Bring your experience together, one detail at a time.</p>
-        </div>
-        <div className="save-status" role="status">
-          <span className={status === "Save failed" ? "dot failed" : "dot"} />
-          {cloudUser && status === "Saved on this device"
-            ? "Saved to your account"
-            : status}
-        </div>
-      </div>
+      <EditorHeader
+        doc={doc}
+        cloudUser={cloudUser}
+        status={status}
+        busy={busy}
+        ready={ready}
+        showAccount={showAccount}
+        showAI={showAI}
+        onOpenAccount={() => setShowAccount(true)}
+        onOpenAts={() => setShowAts(true)}
+        onOpenPricing={() => setShowPricing(true)}
+        onOpenShortcuts={() => setShowShortcuts(true)}
+        isSubscriber={isSubscriber}
+      />
+
       {showAccount && (
         <AccountPanel
           cloudOwner={cloudUser?.id ?? null}
@@ -411,6 +719,7 @@ export function ResumeStudio() {
           }}
         />
       )}
+
       {showAI && doc && (
         <AIPanel
           key={`${cloudUser?.id ?? "local"}:${doc.id}`}
@@ -419,12 +728,179 @@ export function ResumeStudio() {
           prepare={prepareAI}
           accept={acceptAI}
           onClose={() => setShowAI(false)}
+          onUpdateDocument={update}
         />
       )}
+
+      {showAiGen && (
+        <AiCvGeneratorModal
+          currentDoc={doc}
+          busy={busy}
+          onApplyResume={(generated) => {
+            void action(async () => {
+              await addDocument(generated);
+              setShowAiGen(false);
+            });
+          }}
+          onClose={() => setShowAiGen(false)}
+        />
+      )}
+
+      {showDemoGallery && (
+        <DemoResumesModal
+          isOpen={showDemoGallery}
+          onClose={() => setShowDemoGallery(false)}
+          onSelectDemo={(demoDoc) => {
+            void action(async () => {
+              await addDocument(demoDoc);
+              setShowDemoGallery(false);
+            });
+          }}
+        />
+      )}
+
+      {showTailor && doc && (
+        <JobTailorModal
+          doc={doc}
+          busy={busy}
+          onApplyTailoredVariant={(tailored) => {
+            void action(async () => {
+              await addDocument(tailored);
+              setShowTailor(false);
+            });
+          }}
+          onClose={() => setShowTailor(false)}
+        />
+      )}
+
+      {showAts && doc && (
+        <AtsReadinessPanel
+          doc={doc}
+          onAddSkill={(skill) => {
+            update((draft) => {
+              let skillSec = draft.sections.find((s) => s.type === "skills");
+              if (!skillSec) {
+                skillSec = {
+                  id: uid(),
+                  type: "skills",
+                  label: "Skills",
+                  visible: true,
+                  entries: [],
+                };
+                draft.sections.push(skillSec);
+              }
+              if (skillSec.entries.length === 0) {
+                skillSec.entries.push({
+                  ...newEntry(),
+                  title: "Core Competencies",
+                  bullets: [{ id: uid(), text: skill }],
+                });
+              } else {
+                const alreadyExists = skillSec.entries.some((e) =>
+                  e.bullets.some((b) => b.text.toLowerCase().trim() === skill.toLowerCase().trim()) ||
+                  e.description.toLowerCase().includes(skill.toLowerCase().trim()),
+                );
+                if (!alreadyExists) {
+                  skillSec.entries[0].bullets.push({
+                    id: uid(),
+                    text: skill,
+                  });
+                }
+              }
+            });
+          }}
+          onNavigateToIssue={(issue) => {
+            if (issue.sectionId) setSectionId(issue.sectionId);
+            if (issue.sectionId || issue.bulletId || issue.entryId) {
+              setFocusTarget({
+                sectionId: issue.sectionId || "contact",
+                entryId: issue.entryId,
+                bulletId: issue.bulletId,
+              });
+            }
+            setShowAts(false);
+          }}
+          onClose={() => setShowAts(false)}
+        />
+      )}
+
+      {showPricing && (
+        <PricingModal
+          cloudUser={cloudUser}
+          currentPlanId={currentPlanId}
+          onOpenAccount={() => {
+            setShowPricing(false);
+            setShowAccount(true);
+          }}
+          onClose={() => setShowPricing(false)}
+        />
+      )}
+
+      {showCoverLetter && doc && (
+        <CoverLetterModal
+          doc={doc}
+          busy={busy}
+          onClose={() => setShowCoverLetter(false)}
+          onDownloadFile={(content, filename, mime) => {
+            download(content, filename, mime);
+          }}
+        />
+      )}
+
+      {showHistory && doc && (
+        <VersionHistoryModal
+          doc={doc}
+          busy={busy}
+          onRestore={(restored) => {
+            update((d) => Object.assign(d, restored));
+          }}
+          onForkVariant={(forked) => {
+            void action(async () => {
+              await addDocument(forked);
+            });
+          }}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      {showAddSection && doc && (
+        <AddSectionModal
+          isOpen={showAddSection}
+          onClose={() => setShowAddSection(false)}
+          onAddSection={(newSec) => {
+            update((d) => {
+              d.sections.push(newSec);
+            });
+            setSectionId(newSec.id);
+          }}
+          existingSections={doc.sections}
+          allDocuments={documents}
+        />
+      )}
+
+      {showShortcuts && (
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+      )}
+
+      {showDesign && doc && (
+        <DesignPanel
+          doc={doc}
+          disabled={busy}
+          onChange={(settings) =>
+            update((d) => {
+              Object.assign(d.presentation, settings);
+            })
+          }
+          onClose={() => setShowDesign(false)}
+          onOpenDemoGallery={() => setShowDemoGallery(true)}
+        />
+      )}
+
       <fieldset
         className="workspace-body"
-        disabled={showAccount || showAI}
-        inert={showAccount || showAI}
+        style={{ display: showAccount ? "none" : undefined }}
+        disabled={showAccount || showAI || showTailor || showAts || showPricing || showCoverLetter || showHistory || showAddSection || showShortcuts}
+        inert={showAccount || showAI || showTailor || showAts || showPricing || showCoverLetter || showHistory || showAddSection || showShortcuts}
       >
         {error && (
           <div className="alert no-print" role="alert">
@@ -450,7 +926,7 @@ export function ResumeStudio() {
         )}
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".json,.csv,text/csv,application/json"
           ref={fileInput}
           hidden
           aria-label="Import JSON backup"
@@ -460,39 +936,23 @@ export function ResumeStudio() {
           }}
         />
         {staged && (
-          <section
-            className="import-review no-print"
-            aria-label="Review backup"
-          >
-            <div>
-              <p className="eyebrow">REVIEW BACKUP</p>
-              <h2>{staged.name}</h2>
-              <p>
-                {staged.sections.length} sections ·{" "}
-                {staged.sections.reduce((n, s) => n + s.entries.length, 0)}{" "}
-                entries. Restore as an independent resume, or replace the active
-                resume with undo available.
-              </p>
-            </div>
-            <div className="button-row">
-              <button
-                disabled={busy}
-                className="primary"
-                onClick={() => {
-                  void action(async () => {
-                    await addDocument(duplicateDocument(staged, staged.name));
-                    setStaged(null);
-                  });
-                }}
-              >
-                Restore as new
-              </button>
-              {doc && (
-                <button
-                  disabled={busy}
-                  onClick={() => {
+          <ImportReviewModal
+            staged={staged}
+            hasActiveDoc={!!doc}
+            busy={busy}
+            onRestoreAsNew={() => {
+              void action(async () => {
+                await addDocument(
+                  duplicateDocument(staged.document, staged.document.name),
+                );
+                setStaged(null);
+              });
+            }}
+            onReplaceActive={
+              doc
+                ? () => {
                     void action(async () => {
-                      const imported = structuredClone(staged);
+                      const imported = structuredClone(staged.document);
                       update((d) => {
                         d.contact = imported.contact;
                         d.sections = imported.sections;
@@ -501,14 +961,11 @@ export function ResumeStudio() {
                       setStaged(null);
                       await flush();
                     });
-                  }}
-                >
-                  Replace active content
-                </button>
-              )}
-              <button onClick={() => setStaged(null)}>Cancel</button>
-            </div>
-          </section>
+                  }
+                : undefined
+            }
+            onCancel={() => setStaged(null)}
+          />
         )}
         {!doc ? (
           <main className="welcome no-print">
@@ -519,7 +976,7 @@ export function ResumeStudio() {
               <br />a thoughtful introduction.
             </h2>
             <p>
-              Start with a blank page or explore a fictional example.
+              Start with a blank page, upload your current resume, or explore a fictional example.
               <br />
               {cloudUser
                 ? "Your resumes are saved in your account."
@@ -550,6 +1007,15 @@ export function ResumeStudio() {
                 Restore a backup
               </button>
             </div>
+
+            <ColdStartImporter
+              disabled={!ready || busy}
+              onStaged={(data) => setStaged(data)}
+              onError={(err) => setError(err)}
+              onOpenAiGenerator={() => setShowAiGen(true)}
+              onOpenDemoGallery={() => setShowDemoGallery(true)}
+            />
+
             <p className="privacy-note">
               No account required. No resume data is sent to an AI provider.
               <br />
@@ -559,133 +1025,54 @@ export function ResumeStudio() {
           </main>
         ) : (
           <>
-            <div className="document-toolbar no-print">
-              <div className="document-picker">
-                <label htmlFor="resume-select">RESUME</label>
-                <select
-                  id="resume-select"
-                  value={doc.id}
-                  disabled={busy}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    void action(async () => {
-                      const list = await repository.current!.list();
-                      const next = list.find((d) => d.id === id);
-                      if (!next)
-                        throw new Error(
-                          "This resume is no longer available. Reload the workspace.",
-                        );
-                      list.forEach((d) =>
-                        revisions.current.set(d.id, d.revision),
-                      );
-                      setDocuments(list);
-                      select(next);
-                    });
-                  }}
-                >
-                  {documents.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="button-row">
-                <button
-                  disabled={busy}
-                  onClick={() => {
-                    void action(() => addDocument(createDocument()));
-                  }}
-                >
-                  + New
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => {
-                    void action(() =>
-                      addDocument(duplicateDocument(current.current!)),
+            <DocumentToolbar
+              doc={doc}
+              documents={documents}
+              busy={busy}
+              undoCount={undoCount}
+              showDesign={showDesign}
+              onSelectDocument={(id) => {
+                void action(async () => {
+                  const list = await repository.current!.list();
+                  const next = list.find((d) => d.id === id);
+                  if (!next)
+                    throw new Error(
+                      "This resume is no longer available. Reload the workspace.",
                     );
-                  }}
-                >
-                  Duplicate
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  Import JSON
-                </button>
-                <button
-                  disabled={busy || !undoCount}
-                  onClick={() => {
-                    const old = history.current.pop();
-                    if (old) update((d) => Object.assign(d, old), false);
-                  }}
-                >
-                  ↶ Undo
-                </button>
-                <button
-                  aria-expanded={showDesign}
-                  aria-controls="design-panel"
-                  onClick={() => setShowDesign((value) => !value)}
-                >
-                  Design & templates
-                </button>
-                <button disabled={busy} onClick={() => setShowAI(true)}>
-                  AI bullet assistant
-                </button>
-                <details
-                  className="export-menu"
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest("button"))
-                      e.currentTarget.open = false;
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.currentTarget.open = false;
-                      e.currentTarget.querySelector("summary")?.focus();
-                    }
-                  }}
-                >
-                  <summary>
-                    Export <span>↓</span>
-                  </summary>
-                  <div>
-                    <button
-                      onClick={() => {
-                        void action(async () => {
-                          await verifyExport();
-                          await document.fonts.ready;
-                          await preview.current?.prepare();
-                          window.print();
-                        });
-                      }}
-                    >
-                      Print / Save as PDF
-                    </button>
-                    <button onClick={() => checkedExport("txt")}>
-                      Plain text (.txt)
-                    </button>
-                    <button onClick={() => checkedExport("json")}>
-                      Backup (.json)
-                    </button>
-                  </div>
-                </details>
-              </div>
-            </div>
-            {showDesign && (
-              <div id="design-panel">
-                <DesignPanel
-                  doc={doc}
-                  disabled={busy}
-                  onChange={(settings) =>
-                    update((d) => {
-                      Object.assign(d.presentation, settings);
-                    })
-                  }
-                />
-              </div>
-            )}
+                  list.forEach((d) => revisions.current.set(d.id, d.revision));
+                  setDocuments(list);
+                  select(next);
+                });
+              }}
+              onNew={() => {
+                void action(() => addDocument(createDocument()));
+              }}
+              onDuplicate={() => {
+                void action(() =>
+                  addDocument(duplicateDocument(current.current!)),
+                );
+              }}
+              onImportClick={() => fileInput.current?.click()}
+              onUndo={handleUndo}
+              onToggleDesign={() => setShowDesign((val) => !val)}
+              onOpenAI={() => setShowAI(true)}
+              onOpenAiGenerator={() => setShowAiGen(true)}
+              onOpenDemoGallery={() => setShowDemoGallery(true)}
+              onOpenAts={() => setShowAts(true)}
+              onOpenTailor={() => setShowTailor(true)}
+              onOpenCoverLetter={() => setShowCoverLetter(true)}
+              onOpenHistory={() => setShowHistory(true)}
+              onPrint={() => {
+                void action(async () => {
+                  await verifyExport();
+                  await document.fonts.ready;
+                  await preview.current?.prepare();
+                  window.print();
+                });
+              }}
+              onExport={checkedExport}
+            />
+
             <div className="mobile-tabs no-print">
               <button
                 aria-pressed={mobileTab === "editor"}
@@ -700,449 +1087,57 @@ export function ResumeStudio() {
                 Preview resume
               </button>
             </div>
+
             <main className={`editor-layout show-${mobileTab}`}>
-              <aside className="section-nav no-print">
-                <p className="eyebrow">BUILD YOUR RESUME</p>
-                <button
-                  className={sectionId === "contact" ? "selected" : ""}
-                  onClick={() => setSectionId("contact")}
-                >
-                  <span>01</span> Personal details <span>↗</span>
-                </button>
-                {doc.sections.map((s, i) => (
-                  <button
-                    key={s.id}
-                    className={sectionId === s.id ? "selected" : ""}
-                    onClick={() => setSectionId(s.id)}
-                  >
-                    <span>{String(i + 2).padStart(2, "0")}</span>
-                    <span className="nav-label">
-                      {s.label || labels[s.type]}
-                    </span>
-                    {!s.visible && <span title="Hidden">○</span>}
-                  </button>
-                ))}
-                <div className="sidebar-note">
-                  <span>✧</span>
-                  <strong>Make it yours.</strong>
-                  <p>
-                    Keep your story clear, specific, and true to your
-                    experience.
-                  </p>
-                </div>
-                <p className="local-note">
-                  {cloudUser
-                    ? "Saved in your account."
-                    : "Saved in this browser."}
-                  <br />
-                  Back up before changing devices.
-                </p>
-              </aside>
-              <section
-                className="editor-panel no-print"
-                aria-label="Resume editor"
-              >
-                <fieldset disabled={busy}>
-                  {sectionId === "contact" ? (
-                    <>
-                      <div className="panel-heading">
-                        <p className="eyebrow">THE INTRODUCTION</p>
-                        <h2>Personal details</h2>
-                        <p>Make it easy for your next team to find you.</p>
-                      </div>
-                      <Field
-                        label="Resume name"
-                        value={doc.name}
-                        maxLength={200}
-                        onChange={(v) =>
-                          update((d) => {
-                            d.name = v || "Untitled resume";
-                          })
-                        }
-                      />
-                      <div className="form-divider" />
-                      <Field
-                        label="Full name"
-                        value={doc.contact.name}
-                        placeholder="e.g. Alex Morgan"
-                        onChange={(v) =>
-                          update((d) => {
-                            d.contact.name = v;
-                          })
-                        }
-                      />
-                      <Field
-                        label="Professional headline"
-                        value={doc.contact.headline}
-                        placeholder="e.g. Product designer"
-                        onChange={(v) =>
-                          update((d) => {
-                            d.contact.headline = v;
-                          })
-                        }
-                      />
-                      <div className="field-grid">
-                        <Field
-                          label="Email"
-                          value={doc.contact.email}
-                          placeholder="you@example.com"
-                          onChange={(v) =>
-                            update((d) => {
-                              d.contact.email = v;
-                            })
-                          }
-                        />
-                        <Field
-                          label="Phone"
-                          value={doc.contact.phone}
-                          placeholder="+1 (555) 000-0000"
-                          onChange={(v) =>
-                            update((d) => {
-                              d.contact.phone = v;
-                            })
-                          }
-                        />
-                      </div>
-                      <Field
-                        label="Location"
-                        value={doc.contact.location}
-                        placeholder="City, Country"
-                        onChange={(v) =>
-                          update((d) => {
-                            d.contact.location = v;
-                          })
-                        }
-                      />
-                      <Field
-                        label="Website or portfolio"
-                        value={doc.contact.website}
-                        placeholder="yourwebsite.com"
-                        onChange={(v) =>
-                          update((d) => {
-                            d.contact.website = v;
-                          })
-                        }
-                      />
-                      <div className="editor-tip">
-                        <span>✦</span>
-                        <p>
-                          A city and country are usually enough. Include the
-                          contact details you want to share.
-                        </p>
-                      </div>
-                      <button
-                        className="danger-link"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Delete “${doc.name}” from ${cloudUser ? "your account" : "this browser"}? Export a backup first if you need to keep it.`,
-                            )
-                          )
-                            void action(async () => {
-                              await repository.current!.remove(
-                                doc.id,
-                                revisions.current.get(doc.id)!,
-                              );
-                              const list = await repository.current!.list();
-                              setDocuments(list);
-                              if (list.length) select(list[0]);
-                              else {
-                                current.current = null;
-                                setDoc(null);
-                              }
-                            });
-                        }}
-                      >
-                        Delete this resume
-                      </button>
-                    </>
-                  ) : (
-                    activeSection && (
-                      <>
-                        <div className="panel-heading">
-                          <p className="eyebrow">YOUR EXPERIENCE</p>
-                          <h2>{labels[activeSection.type]}</h2>
-                          <p>
-                            {activeSection.type === "summary"
-                              ? "A short introduction to the work you do best."
-                              : "Add the details that tell your story."}
-                          </p>
-                        </div>
-                        <Field
-                          label="Section heading"
-                          value={activeSection.label}
-                          onChange={(v) =>
-                            update((d) => {
-                              d.sections.find(
-                                (s) => s.id === sectionId,
-                              )!.label = v;
-                            })
-                          }
-                        />
-                        <div className="section-controls">
-                          <label className="checkbox">
-                            <input
-                              type="checkbox"
-                              checked={activeSection.visible}
-                              onChange={(e) =>
-                                update((d) => {
-                                  d.sections.find(
-                                    (s) => s.id === sectionId,
-                                  )!.visible = e.target.checked;
-                                })
-                              }
-                            />
-                            Show in resume
-                          </label>
-                          <div className="button-row">
-                            {([-1, 1] as const).map((delta) => (
-                              <button
-                                key={delta}
-                                aria-label={
-                                  delta === -1
-                                    ? "Move section up"
-                                    : "Move section down"
-                                }
-                                disabled={
-                                  doc.sections.indexOf(activeSection) + delta <
-                                    0 ||
-                                  doc.sections.indexOf(activeSection) + delta >=
-                                    doc.sections.length
-                                }
-                                onClick={() =>
-                                  update((d) => {
-                                    const index = d.sections.findIndex(
-                                      (s) => s.id === sectionId,
-                                    );
-                                    [
-                                      d.sections[index],
-                                      d.sections[index + delta],
-                                    ] = [
-                                      d.sections[index + delta],
-                                      d.sections[index],
-                                    ];
-                                  })
-                                }
-                              >
-                                {delta === -1 ? "↑" : "↓"}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {!activeSection.entries.length && (
-                          <div className="empty-section">
-                            <span>+</span>
-                            <p>No entries yet. Start with one detail.</p>
-                          </div>
-                        )}
-                        {activeSection.entries.map((entry, index) => (
-                          <div className="entry-card" key={entry.id}>
-                            <div className="entry-toolbar">
-                              <strong>
-                                {String(index + 1).padStart(2, "0")} /{" "}
-                                {entry.title || "New entry"}
-                              </strong>
-                              <div className="button-row">
-                                {([-1, 1] as const).map((delta) => (
-                                  <button
-                                    key={delta}
-                                    aria-label={
-                                      delta === -1
-                                        ? "Move entry up"
-                                        : "Move entry down"
-                                    }
-                                    disabled={
-                                      index + delta < 0 ||
-                                      index + delta >=
-                                        activeSection.entries.length
-                                    }
-                                    onClick={() =>
-                                      update((d) => {
-                                        const entries = d.sections.find(
-                                          (s) => s.id === sectionId,
-                                        )!.entries;
-                                        [
-                                          entries[index],
-                                          entries[index + delta],
-                                        ] = [
-                                          entries[index + delta],
-                                          entries[index],
-                                        ];
-                                      })
-                                    }
-                                  >
-                                    {delta === -1 ? "↑" : "↓"}
-                                  </button>
-                                ))}
-                                <button
-                                  aria-label="Remove entry"
-                                  onClick={() =>
-                                    update((d) => {
-                                      const s = d.sections.find(
-                                        (s) => s.id === sectionId,
-                                      )!;
-                                      s.entries = s.entries.filter(
-                                        (e) => e.id !== entry.id,
-                                      );
-                                    })
-                                  }
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            </div>
-                            {activeSection.type !== "summary" && (
-                              <Field
-                                label={
-                                  activeSection.type === "experience"
-                                    ? "Job title"
-                                    : activeSection.type === "education"
-                                      ? "Degree or qualification"
-                                      : "Title"
-                                }
-                                value={entry.title}
-                                onChange={(v) =>
-                                  editEntry(entry.id, { title: v })
-                                }
-                              />
-                            )}
-                            {[
-                              "experience",
-                              "education",
-                              "certifications",
-                              "projects",
-                            ].includes(activeSection.type) && (
-                              <>
-                                <Field
-                                  label="Organization"
-                                  value={entry.organization}
-                                  onChange={(v) =>
-                                    editEntry(entry.id, { organization: v })
-                                  }
-                                />
-                                <Field
-                                  label="Location"
-                                  value={entry.location}
-                                  onChange={(v) =>
-                                    editEntry(entry.id, { location: v })
-                                  }
-                                />
-                                <div className="field-grid">
-                                  <Field
-                                    label="Start date (YYYY or YYYY-MM)"
-                                    value={entry.start}
-                                    maxLength={7}
-                                    placeholder="2022-03"
-                                    onChange={(v) =>
-                                      editEntry(entry.id, { start: v })
-                                    }
-                                  />
-                                  <Field
-                                    label="End date (YYYY or YYYY-MM)"
-                                    value={entry.end}
-                                    maxLength={7}
-                                    placeholder="2024-06"
-                                    onChange={(v) =>
-                                      editEntry(entry.id, { end: v })
-                                    }
-                                  />
-                                </div>
-                                <label className="checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={entry.current}
-                                    onChange={(e) =>
-                                      editEntry(entry.id, {
-                                        current: e.target.checked,
-                                      })
-                                    }
-                                  />
-                                  Currently here
-                                </label>
-                              </>
-                            )}
-                            <Field
-                              label={
-                                activeSection.type === "summary"
-                                  ? "Professional summary"
-                                  : "Description"
-                              }
-                              value={entry.description}
-                              multiline
-                              onChange={(v) =>
-                                editEntry(entry.id, { description: v })
-                              }
-                            />
-                            {entry.bullets.map((bullet, bi) => (
-                              <div className="bullet-field" key={bullet.id}>
-                                <Field
-                                  label={`Bullet ${bi + 1}`}
-                                  value={bullet.text}
-                                  multiline
-                                  onChange={(v) =>
-                                    editEntry(entry.id, {
-                                      bullets: entry.bullets.map((b) =>
-                                        b.id === bullet.id
-                                          ? { ...b, text: v }
-                                          : b,
-                                      ),
-                                    })
-                                  }
-                                />
-                                <button
-                                  aria-label={`Remove bullet ${bi + 1}`}
-                                  onClick={() =>
-                                    editEntry(entry.id, {
-                                      bullets: entry.bullets.filter(
-                                        (b) => b.id !== bullet.id,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              className="text-button"
-                              disabled={entry.bullets.length >= 100}
-                              onClick={() =>
-                                editEntry(entry.id, {
-                                  bullets: [
-                                    ...entry.bullets,
-                                    { id: uid(), text: "" },
-                                  ],
-                                })
-                              }
-                            >
-                              + Add bullet
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          className="add-entry"
-                          disabled={activeSection.entries.length >= 100}
-                          onClick={() =>
-                            update((d) => {
-                              d.sections
-                                .find((s) => s.id === sectionId)!
-                                .entries.push(newEntry());
-                            })
-                          }
-                        >
-                          + Add{" "}
-                          {activeSection.type === "experience"
-                            ? "experience"
-                            : "entry"}
-                        </button>
-                      </>
+              <EditorSidebar
+                doc={doc}
+                sectionId={sectionId}
+                cloudUser={cloudUser}
+                onSelectSection={(id) => setSectionId(id)}
+                onAddSection={() => setShowAddSection(true)}
+              />
+
+              <SectionEditor
+                doc={doc}
+                sectionId={sectionId}
+                busy={busy}
+                cloudUser={cloudUser}
+                focusTarget={focusTarget}
+                onUpdateDocument={(mutator) => update(mutator)}
+                onDeleteSection={(secId) => {
+                  update((d) => {
+                    const idx = d.sections.findIndex((s) => s.id === secId);
+                    if (idx !== -1) {
+                      d.sections.splice(idx, 1);
+                    }
+                  });
+                  setSectionId("contact");
+                }}
+                onDeleteResume={() => {
+                  if (
+                    window.confirm(
+                      `Delete “${doc.name}” from ${cloudUser ? "your account" : "this browser"}? Export a backup first if you need to keep it.`,
                     )
-                  )}
-                </fieldset>
-              </section>
+                  )
+                    void action(async () => {
+                      await repository.current!.remove(
+                        doc.id,
+                        revisions.current.get(doc.id)!,
+                      );
+                      const list = await repository.current!.list();
+                      setDocuments(list);
+                      if (list.length) select(list[0]);
+                      else {
+                        current.current = null;
+                        setDoc(null);
+                      }
+                    });
+                }}
+              />
+
               <section className="preview-panel" aria-label="Live preview">
                 <div className="preview-toolbar no-print">
-                  <div>
+                  <div className="preview-toolbar-left">
                     <span className="eyebrow">LIVE PREVIEW</span>
                     <span className="template-label">
                       {
@@ -1152,27 +1147,42 @@ export function ResumeStudio() {
                       }{" "}
                       <span>✓</span>
                     </span>
-                  </div>
-                  <label>
-                    Page size{" "}
-                    <select
-                      aria-label="Page size"
-                      disabled={busy}
-                      value={doc.presentation.pageSize}
-                      onChange={(e) =>
-                        update((d) => {
-                          d.presentation.pageSize = e.target.value as
-                            "A4" | "Letter";
-                        })
-                      }
+                    <button
+                      type="button"
+                      className="preview-change-style-btn"
+                      onClick={() => setShowDesign(true)}
+                      title="Change template, colors, and typography"
                     >
-                      <option>A4</option>
-                      <option>Letter</option>
-                    </select>
-                  </label>
+                      🎨 Change style
+                    </button>
+                  </div>
+                  {!showDesign && (
+                    <label>
+                      Page size{" "}
+                      <select
+                        aria-label="Page size"
+                        disabled={busy}
+                        value={doc.presentation.pageSize}
+                        onChange={(e) =>
+                          update((d) => {
+                            d.presentation.pageSize = e.target.value as
+                              "A4" | "Letter";
+                          })
+                        }
+                      >
+                        <option>A4</option>
+                        <option>Letter</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
                 <div className="paper-stage">
-                  <ResumePreview doc={doc} ref={preview} />
+                  <ResumePreview
+                    doc={doc}
+                    ref={preview}
+                    onBlockClick={handlePreviewBlockClick}
+                    showWatermark={!isSubscriber}
+                  />
                 </div>
                 <p className="preview-footnote no-print">
                   {
@@ -1186,6 +1196,7 @@ export function ResumeStudio() {
                 </p>
               </section>
             </main>
+
             <footer className="app-footer no-print">
               <span>YOUR STORY, IN YOUR HANDS.</span>
               <span>

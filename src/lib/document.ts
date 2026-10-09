@@ -3,7 +3,7 @@ import { presentationSchema } from "./presentation";
 
 const text = z.string().max(20000);
 const id = z.string().min(1).max(100);
-export const sectionTypes = [
+export const standardSectionTypes = [
   "summary",
   "experience",
   "education",
@@ -11,6 +11,10 @@ export const sectionTypes = [
   "projects",
   "certifications",
   "languages",
+] as const;
+export const sectionTypes = [
+  ...standardSectionTypes,
+  "custom",
 ] as const;
 export type SectionType = (typeof sectionTypes)[number];
 export const labels: Record<SectionType, string> = {
@@ -21,6 +25,7 @@ export const labels: Record<SectionType, string> = {
   projects: "Projects",
   certifications: "Certifications",
   languages: "Languages",
+  custom: "Custom Section",
 };
 const date = z.string().regex(/^(|\d{4}|\d{4}-(0[1-9]|1[0-2]))$/);
 const entrySchema = z.strictObject({
@@ -48,6 +53,7 @@ export const documentSchema = z
       phone: text,
       location: text,
       website: text,
+      photoUrl: z.string().max(2500000).optional(),
     }),
     sections: z
       .array(
@@ -74,8 +80,11 @@ export const documentSchema = z
     }
   });
 export type ResumeDocument = z.infer<typeof documentSchema>;
+export type Section = ResumeDocument["sections"][number];
 export type Entry = z.infer<typeof entrySchema>;
+export type Bullet = Entry["bullets"][number];
 export function uid() {
+
   return crypto.randomUUID();
 }
 export function newEntry(): Entry {
@@ -89,6 +98,18 @@ export function newEntry(): Entry {
     current: false,
     description: "",
     bullets: [],
+  };
+}
+export function createCustomSection(
+  label = "Custom Section",
+  entries: Entry[] = [],
+): Section {
+  return {
+    id: uid(),
+    type: "custom",
+    label: label.trim() || "Custom Section",
+    visible: true,
+    entries,
   };
 }
 export function createDocument(sample = false): ResumeDocument {
@@ -106,7 +127,7 @@ export function createDocument(sample = false): ResumeDocument {
       location: "",
       website: "",
     },
-    sections: sectionTypes.map((type) => ({
+    sections: standardSectionTypes.map((type) => ({
       id: uid(),
       type,
       label: labels[type],

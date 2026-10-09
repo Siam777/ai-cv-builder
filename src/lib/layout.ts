@@ -10,7 +10,8 @@ export type LayoutBlock = {
     | "title"
     | "meta"
     | "paragraph"
-    | "bullet";
+    | "bullet"
+    | "photo";
   text: string;
   href?: string;
   group?: string;
@@ -29,9 +30,16 @@ function safeWebsite(value: string) {
 }
 export function layoutBlocks(doc: ResumeDocument): LayoutBlock[] {
   const c = doc.contact;
-  const blocks: LayoutBlock[] = [
-    { id: "name", kind: "name", text: c.name || "Your name", keepNext: true },
-  ];
+  const blocks: LayoutBlock[] = [];
+  if (c.photoUrl && doc.presentation?.showPhoto !== false) {
+    blocks.push({
+      id: "photo",
+      kind: "photo",
+      text: c.photoUrl,
+      keepNext: true,
+    });
+  }
+  blocks.push({ id: "name", kind: "name", text: c.name || "Your name", keepNext: true });
   if (c.headline)
     blocks.push({
       id: "headline",
