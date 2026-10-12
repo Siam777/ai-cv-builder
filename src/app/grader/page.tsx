@@ -507,8 +507,8 @@ export default function GraderPage() {
             )}
 
             {report.fileDiagnostics && (
-              <details className="report-section">
-                <summary>File diagnostics</summary>
+              <details className="report-section" open>
+                <summary>File diagnostics for your upload</summary>
                 <FileDiagnosticResults report={report.fileDiagnostics} />
               </details>
             )}
