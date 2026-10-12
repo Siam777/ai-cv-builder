@@ -2,6 +2,7 @@ import { handle, json } from "@/lib/server/http";
 import { authorized } from "@/lib/server/auth";
 import { listResumes, receipts } from "@/lib/server/resumes";
 import { database } from "@/lib/server/database";
+import { exportJobReviews } from "@/lib/server/job-review-history";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   return handle(async () => {
@@ -10,6 +11,7 @@ export async function GET(request: Request) {
     try {
       const resumes = await listResumes(user.id, tx);
       const imports = await receipts(user.id, tx);
+      const jobReviews = await exportJobReviews(user.id, tx);
       const aiRequests = (
         await tx.execute({
           sql: "SELECT id,resume_id,base_revision,status,proposal,evidence_snapshot,prompt_version,model,result_revision,created_at,expires_at FROM ai_requests WHERE owner_id=?",
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
         imports,
         aiRequests,
         aiUsage,
+        jobReviews,
       });
     } finally {
       tx.close();

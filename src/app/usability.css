@@ -1,0 +1,260 @@
+/* Editor tasks and scrollable dialogs use the same readable control scale. */
+.editor-taskbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+.editor-taskbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  flex: 1 1 170px;
+  min-height: 68px;
+  padding: 12px 16px;
+}
+.editor-taskbar button span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.studio .bullet-field {
+  align-items: stretch;
+  width: 100%;
+}
+.studio .bullet-main-row {
+  width: 100%;
+}
+.studio .bullet-input-wrapper {
+  flex: 1 1 0;
+  width: 0;
+}
+.studio .bullet-textarea {
+  display: block;
+  min-height: 78px;
+  font-size: 15px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.studio .bullet-drag-handle {
+  cursor: default;
+}
+.inline-ai-trigger-row,
+.inline-ai-chips {
+  flex-wrap: wrap;
+}
+.modal-backdrop {
+  touch-action: pan-y;
+}
+.ai-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  max-height: min(92dvh, 920px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+}
+.ai-panel .modal-header {
+  border-radius: 16px 16px 0 0;
+}
+.ai-panel .modal-header h2 {
+  margin: 0;
+}
+.ai-panel .modal-header p {
+  margin: 6px 0 0;
+}
+.ai-panel-body {
+  padding: 20px 24px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.ai-panel .modal-footer {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+.ai-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  padding-block: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ai-tabs .ai-tab-btn {
+  flex: 1 1 145px;
+  padding: 12px;
+  font-size: 15px;
+  white-space: normal;
+}
+.assistant-mode-note {
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent, #27614c);
+  background: #f3f7f5;
+}
+.assistant-next-step {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.assistant-next-step p {
+  margin-top: 0;
+}
+.selected-bullet {
+  margin: 0;
+  padding: 14px;
+  background: #f4f7f6;
+  border-left: 3px solid #27614c;
+  white-space: pre-wrap;
+}
+.assistant-presets {
+  margin: 10px 0;
+}
+.assistant-progress {
+  padding: 12px;
+  background: #f4f7fa;
+}
+.ai-panel-body label:not(.ai-check),
+.guided-fields label,
+.tailor-input-stage label:not(.ai-check) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.guided-fields {
+  display: grid;
+  gap: 18px;
+}
+.guided-fields :is(input, textarea, select),
+.tailor-input-stage .field-grid :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #b5c5bd;
+  border-radius: 7px;
+  padding: 10px 12px;
+  font: inherit;
+}
+.photo-label {
+  margin: 0;
+  font-size: 17px;
+}
+.photo-label span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.photo-upload-actions {
+  min-width: 0;
+}
+.ai-summary-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ai-summary-card .ai-card-actions {
+  flex-wrap: wrap;
+}
+.ai-prompt-box .interview-input-row {
+  flex-wrap: wrap;
+}
+.interview-input-row input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ai-panel :is(p, li, input, textarea, select),
+.guided-start-modal :is(p, li, input, textarea, select) {
+  font-size: 15px;
+}
+.review-start-note {
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+.review-steps {
+  margin: 0 0 18px;
+  padding-left: 22px;
+  color: var(--muted);
+}
+.review-steps li {
+  margin: 4px 0;
+}
+.ats-modal .tailor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ats-modal .tailor-tabs button {
+  flex: 1 1 140px;
+}
+.modal-card {
+  max-height: min(92dvh, 880px);
+}
+.modal-header {
+  min-width: 0;
+}
+.modal-header > div {
+  min-width: 0;
+}
+.modal-header h2 {
+  overflow-wrap: anywhere;
+}
+.account-dialog-body .account-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.account-dialog-body {
+  overscroll-behavior: contain;
+}
+.action-requirement {
+  flex: 1 0 100%;
+  font-size: 14px;
+  margin: 0;
+  color: var(--muted);
+}
+.modal-card > .button-row {
+  flex-wrap: wrap;
+}
+.tailor-input-stage .checkbox-row {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+}
+.tailor-input-stage .checkbox-row input {
+  width: 18px;
+  flex: 0 0 18px;
+}
+@media (max-width: 520px) {
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .ai-panel,
+  .modal-card {
+    max-height: calc(100dvh - 20px);
+  }
+  .ai-panel-body,
+  .modal-body,
+  .tailor-content,
+  .ats-content {
+    padding: 16px;
+  }
+  .modal-header {
+    padding: 16px;
+  }
+  .ai-panel .modal-footer,
+  .modal-card .modal-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .photo-upload-section {
+    align-items: flex-start;
+  }
+}

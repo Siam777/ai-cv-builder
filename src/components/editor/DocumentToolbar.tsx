@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { ResumeDocument } from "@/lib/document";
 
 export type ExportFormat = "json" | "txt" | "md" | "html" | "docx" | "pdf";
@@ -49,115 +50,228 @@ export function DocumentToolbar({
   onPrint,
   onExport,
 }: DocumentToolbarProps) {
+  const [expanded, setExpanded] = useState(false);
+  const toolsButton = useRef<HTMLButtonElement>(null);
+  const exportMenu = useRef<HTMLDetailsElement>(null);
+
+  function closeExport(restoreFocus = false) {
+    if (!exportMenu.current) return;
+    exportMenu.current.open = false;
+    if (restoreFocus) exportMenu.current.querySelector("summary")?.focus();
+  }
+
   return (
-    <div className="document-toolbar no-print">
-      <div className="document-picker">
-        <label htmlFor="resume-select">RESUME</label>
-        <select
-          id="resume-select"
-          value={doc.id}
-          disabled={busy}
-          onChange={(e) => onSelectDocument(e.target.value)}
-        >
-          {documents.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+    <div className="document-toolbar no-print" aria-label="CV actions">
+      <div className="toolbar-primary">
+        <div className="document-picker">
+          <label htmlFor="resume-select">Resume</label>
+          <select
+            id="resume-select"
+            value={doc.id}
+            disabled={busy}
+            onChange={(e) => onSelectDocument(e.target.value)}
+          >
+            {documents.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="button-row">
+          <button type="button" disabled={busy || !undoCount} onClick={onUndo}>
+            ↶ Undo
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            aria-expanded={showDesign}
+            aria-controls="design-panel"
+            onClick={onToggleDesign}
+          >
+            Design & templates
+          </button>
+          <button
+            type="button"
+            ref={toolsButton}
+            disabled={busy}
+            aria-expanded={expanded}
+            aria-controls="additional-cv-tools"
+            onClick={() => setExpanded(!expanded)}
+          >
+            More tools
+          </button>
+          <details
+            className="export-menu"
+            ref={exportMenu}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                closeExport();
+            }}
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("button"))
+                closeExport(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                closeExport(true);
+              }
+            }}
+          >
+            <summary
+              onClick={(e) => {
+                if (busy) e.preventDefault();
+              }}
+              aria-disabled={busy}
+            >
+              Export <span aria-hidden="true">↓</span>
+            </summary>
+            <div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExport("pdf")}
+              >
+                PDF Document (.pdf)
+              </button>
+              <button type="button" disabled={busy} onClick={onPrint}>
+                Print / Save as PDF
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExport("html")}
+              >
+                Standalone HTML (.html)
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                title="Editable single-column document; decorative rails and photos are omitted. Word may wrap text differently."
+                onClick={() => onExport("docx")}
+              >
+                Word Document (.docx)
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExport("md")}
+              >
+                Markdown (.md)
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExport("txt")}
+              >
+                Plain text (.txt)
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExport("json")}
+              >
+                Backup (.json)
+              </button>
+            </div>
+          </details>
+        </div>
       </div>
-      <div className="button-row">
-        {onOpenDemoGallery && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onOpenDemoGallery}
-            style={{ fontWeight: 600, color: "#1e3a8a", background: "#eff6ff", borderColor: "#bfdbfe" }}
-            title="Test templates with realistic pre-built demo resumes"
-          >
-            📂 Demo CVs
-          </button>
-        )}
-        {onOpenAiGenerator && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onOpenAiGenerator}
-            style={{ fontWeight: 600, color: "#065f46", background: "#ecfdf5", borderColor: "#a7f3d0" }}
-            title="Generate a high-impact, role-tailored resume draft with AI"
-          >
-            ✨ AI Quick-Start
-          </button>
-        )}
-        <button disabled={busy} onClick={onNew}>
-          + New
-        </button>
-        <button disabled={busy} onClick={onDuplicate}>
-          Duplicate
-        </button>
-        <button disabled={busy} onClick={onImportClick}>
-          Import JSON
-        </button>
-        <button disabled={busy || !undoCount} onClick={onUndo}>
-          ↶ Undo
-        </button>
-        <button
-          aria-expanded={showDesign}
-          aria-controls="design-panel"
-          onClick={onToggleDesign}
-        >
-          Design & templates
-        </button>
-        {onOpenAts && (
-          <button disabled={busy} onClick={onOpenAts} title="Analyze role match score, skill gaps, and ATS readiness">
-            📊 Role Benchmark & Gaps
-          </button>
-        )}
-        <button disabled={busy} onClick={onOpenAI}>
-          AI bullet assistant
-        </button>
-        {onOpenTailor && (
-          <button disabled={busy} onClick={onOpenTailor}>
-            🎯 Tailor for job
-          </button>
-        )}
-        {onOpenCoverLetter && (
-          <button disabled={busy} onClick={onOpenCoverLetter}>
-            ✉️ Cover letter
-          </button>
-        )}
-        {onOpenHistory && (
-          <button disabled={busy} onClick={onOpenHistory} title="View checkpoints and version history">
-            ⏱️ History
-          </button>
-        )}
-        <details
-          className="export-menu"
-          onClick={(e) => {
-            if ((e.target as HTMLElement).closest("button")) {
-              e.currentTarget.open = false;
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.currentTarget.open = false;
-              e.currentTarget.querySelector("summary")?.focus();
-            }
-          }}
-        >
-          <summary>
-            Export <span>↓</span>
-          </summary>
-          <div>
-            <button onClick={() => onExport("pdf")}>PDF Document (.pdf)</button>
-            <button onClick={onPrint}>Print / Save as PDF</button>
-            <button onClick={() => onExport("html")}>Standalone HTML (.html)</button>
-            <button onClick={() => onExport("docx")}>Word Document (.docx)</button>
-            <button onClick={() => onExport("md")}>Markdown (.md)</button>
-            <button onClick={() => onExport("txt")}>Plain text (.txt)</button>
-            <button onClick={() => onExport("json")}>Backup (.json)</button>
+      <div
+        id="additional-cv-tools"
+        className="toolbar-tools"
+        hidden={!expanded}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded(false);
+            toolsButton.current?.focus();
+          }
+        }}
+      >
+        <div role="group" aria-label="Manage CV" className="toolbar-tool-group">
+          <h2>Manage CV</h2>
+          <div className="button-row">
+            <button type="button" disabled={busy} onClick={onNew}>
+              + New
+            </button>
+            <button type="button" disabled={busy} onClick={onDuplicate}>
+              Duplicate
+            </button>
+            <button type="button" disabled={busy} onClick={onImportClick}>
+              Import JSON
+            </button>
+            {onOpenHistory && (
+              <button type="button" disabled={busy} onClick={onOpenHistory}>
+                ⏱️ History
+              </button>
+            )}
           </div>
-        </details>
+        </div>
+        <div
+          role="group"
+          aria-label="Writing tools"
+          className="toolbar-tool-group"
+        >
+          <h2>Writing tools</h2>
+          <div className="button-row">
+            {onOpenAts && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onOpenAts}
+                title="Review content findings and confirm a curated role checklist"
+              >
+                📊 Role Benchmark & Gaps
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={onOpenAI}>
+              AI bullet assistant
+            </button>
+            {onOpenTailor && (
+              <button type="button" disabled={busy} onClick={onOpenTailor}>
+                🎯 Tailor for job
+              </button>
+            )}
+            {onOpenCoverLetter && (
+              <button type="button" disabled={busy} onClick={onOpenCoverLetter}>
+                ✉️ Cover letter
+              </button>
+            )}
+          </div>
+        </div>
+        {(onOpenDemoGallery || onOpenAiGenerator) && (
+          <div
+            role="group"
+            aria-label="Fictional examples"
+            className="toolbar-tool-group"
+          >
+            <h2>Fictional examples</h2>
+            <div className="button-row">
+              {onOpenDemoGallery && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onOpenDemoGallery}
+                >
+                  Demo examples
+                </button>
+              )}
+              {onOpenAiGenerator && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onOpenAiGenerator}
+                >
+                  Create practice example
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

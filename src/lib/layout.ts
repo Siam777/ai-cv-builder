@@ -1,4 +1,5 @@
 import { dateRange, type ResumeDocument } from "./document";
+import { templates } from "./presentation";
 
 export type LayoutBlock = {
   id: string;
@@ -17,6 +18,9 @@ export type LayoutBlock = {
   group?: string;
   keepNext?: boolean;
   continued?: boolean;
+  sidebarRow?: number;
+  date?: string;
+  details?: string;
 };
 function safeWebsite(value: string) {
   try {
@@ -31,7 +35,13 @@ function safeWebsite(value: string) {
 export function layoutBlocks(doc: ResumeDocument): LayoutBlock[] {
   const c = doc.contact;
   const blocks: LayoutBlock[] = [];
-  if (c.photoUrl && doc.presentation?.showPhoto !== false) {
+  if (
+    c.photoUrl &&
+    /^data:image\/(?:png|jpeg|webp|svg\+xml)[;,]/i.test(c.photoUrl) &&
+    doc.presentation?.showPhoto !== false &&
+    templates.find((template) => template.id === doc.presentation.template)
+      ?.photoSupported
+  ) {
     blocks.push({
       id: "photo",
       kind: "photo",
@@ -39,7 +49,12 @@ export function layoutBlocks(doc: ResumeDocument): LayoutBlock[] {
       keepNext: true,
     });
   }
-  blocks.push({ id: "name", kind: "name", text: c.name || "Your name", keepNext: true });
+  blocks.push({
+    id: "name",
+    kind: "name",
+    text: c.name || "Your name",
+    keepNext: true,
+  });
   if (c.headline)
     blocks.push({
       id: "headline",
@@ -53,7 +68,15 @@ export function layoutBlocks(doc: ResumeDocument): LayoutBlock[] {
     ["phone", c.phone, `tel:${c.phone.replace(/[^+\d]/g, "")}`],
     ["website", c.website, safeWebsite(c.website)],
   ])
-    if (value) blocks.push({ id: field!, kind: "contact", text: value, href });
+    if (value)
+      blocks.push({
+        id: field!,
+        kind: "contact",
+        text: value,
+        href,
+        sidebarRow:
+          blocks.filter((block) => block.kind === "contact").length + 1,
+      });
   for (const section of doc.sections.filter(
     (s) =>
       s.visible &&
@@ -92,6 +115,10 @@ export function layoutBlocks(doc: ResumeDocument): LayoutBlock[] {
           id: `${group}-meta`,
           kind: "meta",
           text: meta,
+          date: dateRange(entry),
+          details: [entry.organization, entry.location]
+            .filter(Boolean)
+            .join(" · "),
           group,
           keepNext: true,
         });
@@ -125,97 +152,138 @@ export function paginateBlocks(
   capacity: number,
 ): LayoutBlock[][] {
   const elements = Array.from(root.children) as HTMLElement[];
-  const heights = elements.map((el) => el.getBoundingClientRect().height);
   const pages: LayoutBlock[][] = [[]];
-  let used = 0;
+  // Measure each candidate in its own page context. Inline contacts and sidebar
+  // rows share vertical space; summing their individual heights counts it twice.
+  const pageRoot = root.cloneNode(false) as HTMLElement;
+  const emptyRoot = root.cloneNode(false) as HTMLElement;
+  for (const probeRoot of [pageRoot, emptyRoot]) {
+    probeRoot.style.width = `${root.getBoundingClientRect().width}px`;
+    probeRoot.style.height = "auto";
+    probeRoot.style.minHeight = "0";
+    root.parentElement!.append(probeRoot);
+  }
+  type Candidate = {
+    index: number;
+    text?: string;
+    continued?: boolean;
+    firstLines?: boolean;
+  };
+  const nodeFor = (candidate: Candidate) => {
+    const node = elements[candidate.index].cloneNode(true) as HTMLElement;
+    if (
+      candidate.text !== undefined &&
+      candidate.text !== blocks[candidate.index].text
+    )
+      (node.querySelector("[data-block-text]") ?? node).textContent =
+        candidate.text;
+    if (candidate.continued) node.classList.add("continued");
+    if (candidate.firstLines) {
+      node.style.maxHeight = "42px";
+      node.style.overflow = "hidden";
+    }
+    return node;
+  };
+  const measure = (candidates: Candidate[], withCurrent = true) => {
+    const target = withCurrent ? pageRoot : emptyRoot;
+    const nodes = candidates.map(nodeFor);
+    target.append(...nodes);
+    const top = target.getBoundingClientRect().top;
+    const height = Math.max(
+      target.getBoundingClientRect().height,
+      ...Array.from(
+        target.children,
+        (node) => node.getBoundingClientRect().bottom - top,
+      ),
+    );
+    for (const node of nodes) node.remove();
+    return height;
+  };
   const nextPage = () => {
     if (pages.at(-1)!.length) {
       pages.push([]);
-      used = 0;
+      pageRoot.replaceChildren();
     }
   };
-  const add = (block: LayoutBlock, height: number) => {
+  const add = (block: LayoutBlock, candidate: Candidate) => {
     pages.at(-1)!.push(block);
-    used += height;
+    pageRoot.append(nodeFor(candidate));
   };
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-    const height = heights[i];
-    // Keep short entries intact, and headings with the first meaningful lines.
-    let keepHeight = height > capacity ? 42 : height;
-    if (block.group && blocks[i - 1]?.group !== block.group) {
-      let groupHeight = height;
-      for (
-        let j = i + 1;
-        j < blocks.length && blocks[j].group === block.group;
-        j++
-      )
-        groupHeight += heights[j];
-      if (groupHeight <= capacity * 0.45) keepHeight = groupHeight;
-    }
-    if (block.keepNext) {
-      let j = i;
-      let chainHeight = height;
-      while (blocks[j]?.keepNext && j + 1 < blocks.length) {
-        j++;
-        chainHeight += blocks[j].keepNext
-          ? heights[j]
-          : Math.min(heights[j], 42);
+  try {
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      const candidate = { index: i };
+      const height = measure([candidate], false);
+      // Keep short entries intact, and headings with the first meaningful lines.
+      let keep: Candidate[] = [{ index: i, firstLines: height > capacity }];
+      if (block.keepNext) {
+        let j = i;
+        while (blocks[j]?.keepNext && j + 1 < blocks.length) {
+          j++;
+          keep.push({
+            index: j,
+            firstLines:
+              !blocks[j].keepNext || measure([{ index: j }], false) > capacity,
+          });
+        }
       }
-      keepHeight = Math.max(keepHeight, Math.min(chainHeight, capacity));
-    }
-    if (block.kind === "section" && blocks[i + 1]?.group) {
-      const nextGroup = blocks[i + 1].group;
-      let groupHeight = 0;
-      for (
-        let j = i + 1;
-        j < blocks.length && blocks[j].group === nextGroup;
-        j++
+      const groupStart = block.kind === "section" ? i + 1 : i;
+      const group = blocks[groupStart]?.group;
+      if (group && (groupStart !== i || blocks[i - 1]?.group !== group)) {
+        const entry: Candidate[] = [];
+        for (
+          let j = groupStart;
+          j < blocks.length && blocks[j].group === group;
+          j++
+        )
+          entry.push({ index: j });
+        if (measure(entry, false) <= capacity * 0.45) {
+          const together =
+            block.kind === "section" ? [candidate, ...entry] : entry;
+          if (measure(together, false) >= measure(keep, false)) keep = together;
+        }
+      }
+      if (
+        pages.at(-1)!.length &&
+        measure(keep, false) <= capacity &&
+        measure(keep) > capacity
       )
-        groupHeight += heights[j];
-      if (groupHeight <= capacity * 0.45)
-        keepHeight = Math.max(keepHeight, height + groupHeight);
-    }
-    if (used && keepHeight > capacity - used) nextPage();
-    if (height <= capacity - used) {
-      add(block, height);
-      continue;
-    }
-    if (height <= capacity) {
-      nextPage();
-      add(block, height);
-      continue;
-    }
+        nextPage();
+      if (measure([candidate]) <= capacity) {
+        add(block, candidate);
+        continue;
+      }
+      if (height <= capacity) {
+        nextPage();
+        add(block, candidate);
+        continue;
+      }
 
-    const probe = elements[i].cloneNode(true) as HTMLElement;
-    root.append(probe);
-    const content = probe.querySelector("[data-block-text]") ?? probe;
-    const graphemes = Array.from(
-      segmenter.segment(block.text),
-      (s) => s.segment,
-    );
-    let offset = 0;
-    try {
+      const graphemes = Array.from(
+        segmenter.segment(block.text),
+        (s) => s.segment,
+      );
+      let offset = 0;
       while (offset < graphemes.length) {
         let low = 0,
           high = graphemes.length - offset;
-        const available = capacity - used;
         while (low < high) {
           const mid = Math.ceil((low + high) / 2);
-          content.textContent = graphemes.slice(offset, offset + mid).join("");
-          if (probe.getBoundingClientRect().height <= available) low = mid;
+          const text = graphemes.slice(offset, offset + mid).join("");
+          if (measure([{ index: i, text, continued: offset > 0 }]) <= capacity)
+            low = mid;
           else high = mid - 1;
         }
         if (!low) {
-          if (!used)
+          if (!pages.at(-1)!.length)
             throw new Error(
               "This layout cannot fit one line on the page. Choose a smaller font or a denser layout.",
             );
           nextPage();
           continue;
         }
-        // Prefer a nearby word break without sacrificing an entire line for unbroken strings.
+        // Prefer a nearby word break without dropping any source whitespace.
         if (offset + low < graphemes.length) {
           const floor = Math.max(1, low - 35);
           for (let k = low; k >= floor; k--)
@@ -225,7 +293,6 @@ export function paginateBlocks(
             }
         }
         const text = graphemes.slice(offset, offset + low).join("");
-        content.textContent = text;
         add(
           {
             ...block,
@@ -233,14 +300,15 @@ export function paginateBlocks(
             text,
             continued: offset > 0,
           },
-          probe.getBoundingClientRect().height,
+          { index: i, text, continued: offset > 0 },
         );
         offset += low;
         if (offset < graphemes.length) nextPage();
       }
-    } finally {
-      probe.remove();
     }
+    return pages;
+  } finally {
+    pageRoot.remove();
+    emptyRoot.remove();
   }
-  return pages;
 }

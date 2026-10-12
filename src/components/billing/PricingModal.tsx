@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { PLANS, type PlanId } from "@/lib/billing-plans";
 import type { AccountUser } from "@/lib/cloud-contract";
@@ -19,6 +20,7 @@ export function PricingModal({
   onClose,
 }: PricingModalProps) {
   useBodyScrollLock(true);
+  const dialogRef = useModalFocus(onClose);
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const [error, setError] = useState("");
 
@@ -41,7 +43,11 @@ export function PricingModal({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Unable to start checkout session.");
+        throw new Error(
+          data.error === "BILLING_NOT_CONFIGURED"
+            ? "Payments are not configured on this installation. You can keep using the editor."
+            : data.error || "Unable to start checkout session.",
+        );
       }
 
       if (data.url) {
@@ -54,12 +60,19 @@ export function PricingModal({
   }
 
   return (
-    <div className="modal-backdrop no-print" role="dialog" aria-label="Subscription Pricing">
+    <div
+      className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Subscription Pricing"
+    >
       <div className="modal-card pricing-modal">
         <header className="modal-header">
           <div>
-            <p className="eyebrow">ACTIVE JOB HUNTER PASS · PRICING & TIERS</p>
-            <h2>Land interviews faster with evidence-grounded tailoring</h2>
+            <p className="eyebrow">PROPOSED PLANS & CONFIGURED LIMITS</p>
+            <h2>Review plans and current limits</h2>
           </div>
           <button
             type="button"
@@ -72,87 +85,125 @@ export function PricingModal({
         </header>
 
         <div className="pricing-content">
-          {error && <div className="alert" role="alert">{error}</div>}
+          <p className="helper-text">
+            These are proposed paid plans. Payment services and some paid
+            features still need integration and live validation. Device editing
+            includes multiple drafts and twelve current designs. CV downloads
+            require sign-in and verified email.
+          </p>
+          {error && (
+            <div className="alert" role="alert">
+              {error}
+            </div>
+          )}
 
           <div className="pricing-grid">
             {/* Free Tier */}
-            <div className={`pricing-card ${currentPlanId === "free" ? "current" : ""}`}>
+            <div
+              className={`pricing-card ${currentPlanId === "free" ? "current" : ""}`}
+            >
               <div className="card-top">
-                <span className="plan-badge">FREE FOREVER</span>
+                <span className="plan-badge">DEVICE EDITING</span>
                 <h3>Free / Local</h3>
                 <div className="plan-price">
                   <span className="price-val">$0</span>
                 </div>
-                <p className="plan-sub">Perfect for building a baseline resume locally.</p>
+                <p className="plan-sub">
+                  Perfect for building a baseline resume locally.
+                </p>
               </div>
               <ul className="plan-features">
-                <li>✓ 1 active resume variant</li>
+                <li>✓ Multiple independent device drafts</li>
                 <li>✓ Unlimited browser editing & autosave</li>
                 <li>✓ Standard PDF print export (with watermark)</li>
                 <li>✓ Plain-text & JSON backup export</li>
-                <li className="dimmed">✗ 1-Click Job Description Tailoring</li>
+                <li className="dimmed">✓ Local rule-based job tailoring</li>
                 <li className="dimmed">✗ Watermark-free PDF exports</li>
               </ul>
-              <button
-                type="button"
-                disabled
-                className="plan-button outline"
-              >
+              <button type="button" disabled className="plan-button outline">
                 {currentPlanId === "free" ? "Current Plan" : "Included"}
               </button>
             </div>
 
             {/* Job Hunter Monthly - Popular */}
-            <div className={`pricing-card featured ${currentPlanId === "job_hunter_monthly" ? "current" : ""}`}>
-              <div className="popular-ribbon">MOST POPULAR</div>
+            <div
+              className={`pricing-card featured ${currentPlanId === "job_hunter_monthly" ? "current" : ""}`}
+            >
+              <div className="popular-ribbon">MONTHLY PLAN</div>
               <div className="card-top">
-                <span className="plan-badge featured-badge">JOB HUNTER PASS</span>
+                <span className="plan-badge featured-badge">
+                  JOB HUNTER PASS
+                </span>
                 <h3>Monthly Pass</h3>
                 <div className="plan-price">
                   <span className="price-val">$19</span>
                   <span className="price-period">/ month</span>
                 </div>
-                <p className="plan-sub">For active candidates targeting multiple job applications.</p>
+                <p className="plan-sub">
+                  For active candidates targeting multiple job applications.
+                </p>
               </div>
               <ul className="plan-features">
-                <li>✓ <strong>Unlimited</strong> resume variants</li>
-                <li>✓ <strong>1-Click Job Tailoring</strong> (50 tailored apps/mo)</li>
-                <li>✓ <strong>Clean, watermark-free</strong> PDF & DOCX export</li>
-                <li>✓ All 4 designer templates (Classic, Modern, Compact, Creative)</li>
+                <li>
+                  Configured cap:{" "}
+                  <strong>{PLANS.job_hunter_monthly.maxVariants}</strong>{" "}
+                  account variants
+                </li>
+                <li>
+                  Configured cap:{" "}
+                  <strong>
+                    {PLANS.job_hunter_monthly.maxTailoredPerMonth}
+                  </strong>{" "}
+                  tailoring uses/month
+                </li>
+                <li>
+                  ✓ <strong>Clean, watermark-free</strong> PDF & DOCX export
+                </li>
+                <li>Eight current editor designs</li>
                 <li>✓ Master Career Vault & Google XYZ Impact Coach</li>
-                <li>✓ Cancel anytime in 1 click</li>
+                <li>Cancellation flow requires live validation</li>
               </ul>
               <button
                 type="button"
                 className="plan-button primary"
-                disabled={loadingPlan !== null || currentPlanId === "job_hunter_monthly"}
+                disabled={
+                  loadingPlan !== null || currentPlanId === "job_hunter_monthly"
+                }
                 onClick={() => handleCheckout("job_hunter_monthly")}
               >
                 {loadingPlan === "job_hunter_monthly"
                   ? "Redirecting…"
                   : currentPlanId === "job_hunter_monthly"
-                  ? "Active Plan"
-                  : "Upgrade to Job Hunter Pass ↗"}
+                    ? "Active Plan"
+                    : "Upgrade to Job Hunter Pass ↗"}
               </button>
             </div>
 
             {/* Lifetime Pass */}
-            <div className={`pricing-card ${currentPlanId === "lifetime" ? "current" : ""}`}>
+            <div
+              className={`pricing-card ${currentPlanId === "lifetime" ? "current" : ""}`}
+            >
               <div className="card-top">
-                <span className="plan-badge">LIFETIME ACCESS</span>
+                <span className="plan-badge">ONE-TIME PLAN</span>
                 <h3>Power Pass</h3>
                 <div className="plan-price">
                   <span className="price-val">$79</span>
                   <span className="price-period">one-time</span>
                 </div>
-                <p className="plan-sub">For senior professionals maintaining long-term career records.</p>
+                <p className="plan-sub">
+                  For senior professionals maintaining long-term career records.
+                </p>
               </div>
               <ul className="plan-features">
-                <li>✓ <strong>Permanent</strong> Master Career Vault storage</li>
-                <li>✓ <strong>Unlimited</strong> 1-Click Job Tailoring</li>
-                <li>✓ All present & future template families</li>
-                <li>✓ Lifetime clean watermark-free exports</li>
-                <li>✓ Priority AI response queue</li>
+                <li>One-time plan configuration</li>
+                <li>
+                  Configured cap:{" "}
+                  <strong>{PLANS.lifetime.maxTailoredPerMonth}</strong>{" "}
+                  tailoring uses/month
+                </li>
+                <li>Eight current editor designs</li>
+                <li>✓ Watermark-free PDF/DOCX while entitlement is active</li>
+                <li>Provider features await live validation</li>
               </ul>
               <button
                 type="button"
@@ -163,15 +214,17 @@ export function PricingModal({
                 {loadingPlan === "lifetime"
                   ? "Redirecting…"
                   : currentPlanId === "lifetime"
-                  ? "Active Plan"
-                  : "Get Lifetime Pass ↗"}
+                    ? "Active Plan"
+                    : "Review Power Pass ↗"}
               </button>
             </div>
           </div>
         </div>
 
         <div className="button-row">
-          <p className="secure-badge">🔒 256-bit encrypted checkout via Stripe</p>
+          <p className="secure-badge">
+            Checkout requires configured payment services
+          </p>
           <a
             href="/upgrade"
             style={{

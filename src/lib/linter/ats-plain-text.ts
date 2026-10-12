@@ -2,16 +2,18 @@ import type { ResumeDocument } from "../document";
 import { dateRange } from "../document";
 
 export interface AtsAuditResult {
-  readingOrderValid: boolean;
-  hasHazardousTables: boolean;
+  scope: "document_model";
+  artifactStatus: "not_checked";
+  serializedSectionOrderValid: boolean;
+  hasHazardousTables: null;
   hasLigatures: boolean;
   diagnostics: string[];
   plainText: string;
 }
 
 /**
- * Extracts normalized plain text matching the linear extraction algorithms
- * used by enterprise ATS systems (Workday, Taleo, Greenhouse, iCIMS).
+ * Serializes visible document-model content. This does not extract an exported
+ * file or reproduce any applicant tracking system's parser.
  */
 export function extractAtsPlainText(doc: ResumeDocument): string {
   const lines: string[] = [];
@@ -33,7 +35,9 @@ export function extractAtsPlainText(doc: ResumeDocument): string {
   lines.push("");
 
   // 2. Strictly Sequential Sections
-  for (const section of doc.sections.filter((s) => s.visible && s.entries.length > 0)) {
+  for (const section of doc.sections.filter(
+    (s) => s.visible && s.entries.length > 0,
+  )) {
     lines.push(section.label.toUpperCase());
     lines.push("-".repeat(Math.max(20, section.label.length)));
 
@@ -68,35 +72,46 @@ export function auditAtsExtraction(doc: ResumeDocument): AtsAuditResult {
   // Check 1: Applicant name at line 0
   const firstLine = plainText.split("\n")[0] || "";
   if (!firstLine.trim() || firstLine !== doc.contact.name.toUpperCase()) {
-    diagnostics.push("Applicant name is not clearly detected on the first line.");
+    diagnostics.push(
+      "Applicant name is not clearly detected on the first line.",
+    );
   }
 
   // Check 2: Check for font ligatures or problematic non-standard characters
   const ligaturePattern = /[\uFB00-\uFB06]/;
   const hasLigatures = ligaturePattern.test(plainText);
   if (hasLigatures) {
-    diagnostics.push("Text contains Unicode ligatures (e.g. fi/fl) which may fail standard keyword search.");
+    diagnostics.push(
+      "Text contains Unicode ligatures (e.g. fi/fl) which may fail standard keyword search.",
+    );
   }
 
   // Check 3: Reading order integrity
-  const visibleSections = doc.sections.filter((s) => s.visible && s.entries.length > 0);
+  const visibleSections = doc.sections.filter(
+    (s) => s.visible && s.entries.length > 0,
+  );
   let readingOrderValid = true;
 
-  // Verify that all visible sections appear in the extracted text in sequential order
+  // Check only our serialization, including repeated section labels.
   let lastIndex = 0;
   for (const s of visibleSections) {
-    const idx = plainText.indexOf(s.label.toUpperCase());
-    if (idx === -1 || idx < lastIndex) {
+    const heading = `${s.label.toUpperCase()}\n${"-".repeat(Math.max(20, s.label.length))}`;
+    const idx = plainText.indexOf(heading, lastIndex);
+    if (idx === -1) {
       readingOrderValid = false;
-      diagnostics.push(`Section “${s.label}” is out of sequential order or missing in plain text stream.`);
+      diagnostics.push(
+        `Section “${s.label}” is out of sequential order or missing in plain text stream.`,
+      );
       break;
     }
-    lastIndex = idx;
+    lastIndex = idx + heading.length;
   }
 
   return {
-    readingOrderValid,
-    hasHazardousTables: false, // HTML preview uses CSS grid/flexbox without nested layout tables
+    scope: "document_model",
+    artifactStatus: "not_checked",
+    serializedSectionOrderValid: readingOrderValid,
+    hasHazardousTables: null,
     hasLigatures,
     diagnostics,
     plainText,

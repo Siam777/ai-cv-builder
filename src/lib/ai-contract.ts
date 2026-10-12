@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type ResumeDocument } from "./document";
 import { bulletEvidence } from "./ai-proposals";
+import { jobCoachInputSchema } from "./job-coach-contract";
 
 export const generateSchema = z.strictObject({
   requestId: z.uuid(),
@@ -9,6 +10,7 @@ export const generateSchema = z.strictObject({
   bulletId: z.string().min(1).max(100),
   instruction: z.string().trim().min(1).max(1000),
   consent: z.literal(true),
+  job: jobCoachInputSchema.optional(),
 });
 export type GenerateRequest = z.infer<typeof generateSchema>;
 export const draftSchema = z.strictObject({

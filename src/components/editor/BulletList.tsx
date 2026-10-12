@@ -3,7 +3,6 @@
 import { useRef } from "react";
 import type { Bullet } from "@/lib/document";
 import { uid } from "@/lib/document";
-import { Field } from "./Field";
 import { InlineAiMagicBar } from "./InlineAiMagicBar";
 
 export interface BulletListProps {
@@ -11,6 +10,10 @@ export interface BulletListProps {
   onChange: (bullets: Bullet[]) => void;
   disabled?: boolean;
   activeBulletId?: string | null;
+  onWritingAction?: (
+    bulletId: string,
+    action: "improve" | "concise" | "metric",
+  ) => void;
 }
 
 export function BulletList({
@@ -18,13 +21,14 @@ export function BulletList({
   onChange,
   disabled = false,
   activeBulletId,
+  onWritingAction,
 }: BulletListProps) {
-  const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(new Map());
+  const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(
+    new Map(),
+  );
 
   function updateBulletText(bulletId: string, text: string) {
-    onChange(
-      bullets.map((b) => (b.id === bulletId ? { ...b, text } : b)),
-    );
+    onChange(bullets.map((b) => (b.id === bulletId ? { ...b, text } : b)));
   }
 
   function removeBullet(bulletIndex: number) {
@@ -103,7 +107,12 @@ export function BulletList({
     }
 
     // Arrow navigation across bullet boundaries
-    if (e.key === "ArrowUp" && target.selectionStart === 0 && target.selectionEnd === 0 && index > 0) {
+    if (
+      e.key === "ArrowUp" &&
+      target.selectionStart === 0 &&
+      target.selectionEnd === 0 &&
+      index > 0
+    ) {
       e.preventDefault();
       const prevBullet = bullets[index - 1];
       if (prevBullet) {
@@ -147,11 +156,18 @@ export function BulletList({
             data-bullet-id={bullet.id}
           >
             <div className="bullet-main-row">
-              <span className="bullet-drag-handle" title="Use Alt+Up/Down to reorder, Enter for next bullet" aria-hidden="true">
+              <span
+                className="bullet-drag-handle"
+                title="Use Alt+Up/Down to reorder, Enter for next bullet"
+                aria-hidden="true"
+              >
                 •
               </span>
               <div className="bullet-input-wrapper">
-                <label htmlFor={`field-bullet-${bullet.id}`} className="sr-only">
+                <label
+                  htmlFor={`field-bullet-${bullet.id}`}
+                  className="sr-only"
+                >
                   Bullet {bi + 1}
                 </label>
                 <textarea
@@ -162,9 +178,10 @@ export function BulletList({
                   id={`field-bullet-${bullet.id}`}
                   aria-label={`Bullet ${bi + 1}`}
                   className="bullet-textarea"
+                  disabled={disabled}
                   rows={2}
                   value={bullet.text}
-                  placeholder={`Accomplishment ${bi + 1}: Accomplished [X], measured by [Y], by doing [Z]...`}
+                  placeholder="What did you do? Add a result if you can support it."
                   onChange={(e) => updateBulletText(bullet.id, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, bullet, bi)}
                 />
@@ -184,6 +201,14 @@ export function BulletList({
               bulletText={bullet.text}
               disabled={disabled}
               onApplyEdit={(newText) => updateBulletText(bullet.id, newText)}
+              onTriggerAction={
+                onWritingAction
+                  ? (action) => {
+                      if (action !== "match")
+                        onWritingAction(bullet.id, action);
+                    }
+                  : undefined
+              }
             />
           </div>
         );

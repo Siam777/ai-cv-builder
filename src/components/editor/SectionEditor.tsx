@@ -12,6 +12,8 @@ import { saveCustomSectionToLibrary } from "@/lib/custom-sections";
 import type { AccountUser } from "@/lib/cloud-contract";
 import { Field } from "./Field";
 import { BulletList } from "./BulletList";
+import { PhotoUploader } from "./PhotoUploader";
+import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import type { FocusTarget } from "./types";
 
@@ -24,6 +26,10 @@ export interface SectionEditorProps {
   onUpdateDocument: (mutator: (draft: ResumeDocument) => void) => void;
   onDeleteSection?: (sectionId: string) => void;
   onDeleteResume: () => void;
+  onWritingAction?: (
+    bulletId: string | undefined,
+    action: "improve" | "concise" | "metric" | "summary",
+  ) => void;
 }
 
 export function SectionEditor({
@@ -35,6 +41,7 @@ export function SectionEditor({
   onUpdateDocument,
   onDeleteSection,
   onDeleteResume,
+  onWritingAction,
 }: SectionEditorProps) {
   const containerRef = useRef<HTMLElement>(null);
   const [librarySaved, setLibrarySaved] = useState(false);
@@ -48,7 +55,12 @@ export function SectionEditor({
         `[data-bullet-id="${focusTarget.bulletId}"]`,
       );
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+          block: "center",
+        });
         const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>(
           "input, textarea",
         );
@@ -61,10 +73,36 @@ export function SectionEditor({
         `[data-entry-id="${focusTarget.entryId}"]`,
       );
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+          block: "center",
+        });
+        el.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+          "input:not(:disabled), textarea:not(:disabled)",
+        )?.focus();
         el.classList.add("ring-target");
         setTimeout(() => el.classList.remove("ring-target"), 1200);
       }
+    } else if (focusTarget.field === "photo") {
+      const photo =
+        containerRef.current?.querySelector<HTMLElement>("#contact-photo");
+      photo?.scrollIntoView({ block: "center" });
+      photo
+        ?.querySelector<HTMLButtonElement>("button")
+        ?.focus({ preventScroll: true });
+    } else if (
+      focusTarget.field &&
+      ["name", "headline", "email", "phone", "location", "website"].includes(
+        focusTarget.field,
+      )
+    ) {
+      containerRef.current
+        ?.querySelector<HTMLInputElement>(`#contact-${focusTarget.field}`)
+        ?.focus();
+    } else {
+      containerRef.current?.focus();
     }
   }, [focusTarget]);
 
@@ -115,6 +153,7 @@ export function SectionEditor({
       ref={containerRef}
       className="editor-panel no-print"
       aria-label="Resume editor"
+      tabIndex={-1}
       data-section-id={sectionId}
     >
       <fieldset disabled={busy}>
@@ -137,99 +176,42 @@ export function SectionEditor({
             />
             <div className="form-divider" />
 
-            {/* Profile Photo Uploader */}
-            <div className="photo-upload-section">
-              <div className="photo-preview-circle">
-                {doc.contact.photoUrl ? (
-                  <img
-                    src={doc.contact.photoUrl}
-                    alt="Applicant Photo Preview"
-                    className="avatar-thumbnail"
-                  />
-                ) : (
-                  <div className="avatar-placeholder">
-                    {doc.contact.name
-                      ? doc.contact.name
-                          .split(" ")
-                          .map((w) => w[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase()
-                      : "📷"}
-                  </div>
-                )}
-              </div>
-              <div className="photo-upload-actions">
-                <span className="photo-label">Profile Photo (Optional)</span>
-                <p className="photo-hint">
-                  Included in Creative, Modern, Timeline, and Minimalist templates.
-                </p>
-                <div className="photo-buttons-row">
-                  <label className="photo-upload-btn">
-                    <span>{doc.contact.photoUrl ? "Change Photo" : "Upload Photo"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const img = new Image();
-                          img.onload = () => {
-                            const canvas = document.createElement("canvas");
-                            const maxDim = 320;
-                            let w = img.width;
-                            let h = img.height;
-                            if (w > h) {
-                              if (w > maxDim) {
-                                h = Math.round((h * maxDim) / w);
-                                w = maxDim;
-                              }
-                            } else {
-                              if (h > maxDim) {
-                                w = Math.round((w * maxDim) / h);
-                                h = maxDim;
-                              }
-                            }
-                            canvas.width = w;
-                            canvas.height = h;
-                            const ctx = canvas.getContext("2d");
-                            if (ctx) {
-                              ctx.drawImage(img, 0, 0, w, h);
-                              const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-                              onUpdateDocument((d) => {
-                                d.contact.photoUrl = dataUrl;
-                              });
-                            }
-                          };
-                          img.src = event.target?.result as string;
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
-                  {doc.contact.photoUrl && (
-                    <button
-                      type="button"
-                      className="photo-remove-btn"
-                      onClick={() =>
-                        onUpdateDocument((d) => {
-                          d.contact.photoUrl = "";
-                        })
-                      }
-                    >
-                      Remove
-                    </button>
-                  )}
+            <PhotoUploader
+              value={doc.contact.photoUrl || ""}
+              disabled={busy}
+              onChange={(value) =>
+                onUpdateDocument((d) => {
+                  d.contact.photoUrl = value;
+                  d.presentation.showPhoto = Boolean(value);
+                })
+              }
+            />
+            {doc.contact.photoUrl &&
+              !templates.find((t) => t.id === doc.presentation.template)
+                ?.photoSupported && (
+                <div className="assistant-next-step">
+                  <p>
+                    Your current design omits photos. Your uploaded photo is
+                    kept.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateDocument((d) => {
+                        d.presentation.template = "modern";
+                        d.presentation.showPhoto = true;
+                      })
+                    }
+                  >
+                    Use Modern design with photo
+                  </button>
                 </div>
-              </div>
-            </div>
+              )}
             <div className="form-divider" />
 
             <Field
               label="Full name"
+              id="contact-name"
               value={doc.contact.name}
               placeholder="e.g. Alex Morgan"
               onChange={(v) =>
@@ -240,6 +222,7 @@ export function SectionEditor({
             />
             <Field
               label="Professional headline"
+              id="contact-headline"
               value={doc.contact.headline}
               placeholder="e.g. Product designer"
               onChange={(v) =>
@@ -251,6 +234,7 @@ export function SectionEditor({
             <div className="field-grid">
               <Field
                 label="Email"
+                id="contact-email"
                 value={doc.contact.email}
                 placeholder="you@example.com"
                 onChange={(v) =>
@@ -261,6 +245,7 @@ export function SectionEditor({
               />
               <Field
                 label="Phone"
+                id="contact-phone"
                 value={doc.contact.phone}
                 placeholder="+1 (555) 000-0000"
                 onChange={(v) =>
@@ -272,6 +257,7 @@ export function SectionEditor({
             </div>
             <Field
               label="Location"
+              id="contact-location"
               value={doc.contact.location}
               placeholder="City, Country"
               onChange={(v) =>
@@ -282,6 +268,7 @@ export function SectionEditor({
             />
             <Field
               label="Website or portfolio"
+              id="contact-website"
               value={doc.contact.website}
               placeholder="yourwebsite.com"
               onChange={(v) =>
@@ -342,7 +329,9 @@ export function SectionEditor({
                     checked={activeSection.visible}
                     onChange={(e) =>
                       onUpdateDocument((d) => {
-                        const s = d.sections.find((sec) => sec.id === sectionId);
+                        const s = d.sections.find(
+                          (sec) => sec.id === sectionId,
+                        );
                         if (s) s.visible = e.target.checked;
                       })
                     }
@@ -372,7 +361,11 @@ export function SectionEditor({
                       key="save-library"
                       type="button"
                       className="section-tool-btn"
-                      aria-label={librarySaved ? "Saved to library" : "Save section to library"}
+                      aria-label={
+                        librarySaved
+                          ? "Saved to library"
+                          : "Save section to library"
+                      }
                       title="Save section to reusable library"
                       onClick={() => {
                         saveCustomSectionToLibrary(activeSection);
@@ -558,6 +551,7 @@ export function SectionEditor({
                       bullets={entry.bullets}
                       disabled={busy}
                       activeBulletId={focusTarget?.bulletId}
+                      onWritingAction={onWritingAction}
                       onChange={(bullets) => editEntry(entry.id, { bullets })}
                     />
                   )}

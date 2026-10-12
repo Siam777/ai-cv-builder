@@ -3,9 +3,11 @@
 import type { ResumeDocument } from "@/lib/document";
 import type { AccountUser } from "@/lib/cloud-contract";
 import type { SaveState } from "./types";
+import type { MouseEvent } from "react";
 
 export interface EditorHeaderProps {
   doc: ResumeDocument | null;
+  libraryMode?: boolean;
   cloudUser: AccountUser | null;
   status: SaveState;
   busy: boolean;
@@ -13,16 +15,17 @@ export interface EditorHeaderProps {
   showAccount: boolean;
   showAI: boolean;
   onOpenAccount: () => void;
+  onOpenLibrary?: () => void;
   onOpenAts?: () => void;
   onOpenPricing?: () => void;
   onOpenShortcuts?: () => void;
   isSubscriber?: boolean;
+  onNavigate?: (href: string) => void;
 }
-
-import { lintResumeDocument } from "@/lib/linter/ats-linter";
 
 export function EditorHeader({
   doc,
+  libraryMode = false,
   cloudUser,
   status,
   busy,
@@ -30,44 +33,78 @@ export function EditorHeader({
   showAccount,
   showAI,
   onOpenAccount,
+  onOpenLibrary,
   onOpenAts,
   onOpenPricing,
   onOpenShortcuts,
   isSubscriber = false,
+  onNavigate,
 }: EditorHeaderProps) {
-  const atsScore = doc ? lintResumeDocument(doc).score : null;
-
+  function navigate(event: MouseEvent<HTMLAnchorElement>) {
+    if (!onNavigate || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    if (!busy && ready) onNavigate(event.currentTarget.getAttribute("href")!);
+  }
   return (
     <>
       <header className="app-header no-print">
-        <a className="brand" href="/" aria-label="AI CV Builder home">
+        <a className="brand" href="/builder" onClick={navigate} aria-label="AI CV Builder library">
           <span className="brand-mark">
             cv<span>·</span>
           </span>
           <span>
-            Resume studio<small>AI CV BUILDER</small>
+            AI CV Builder<small>Resume studio</small>
           </span>
         </a>
         <nav className="header-nav" aria-label="Main navigation">
-          <a href="/profile" className="header-nav-link" title="Open Profile & Account Page">
+          {onOpenLibrary && (
+            <button disabled={busy || !ready} onClick={onOpenLibrary}>
+              {cloudUser ? "My CVs" : "On this device"}
+            </button>
+          )}
+          <a
+            href="/profile"
+            onClick={navigate}
+            className="header-nav-link"
+            title="Open Profile & Account Page"
+          >
             Profile
           </a>
-          <a href="/upgrade" className="header-nav-link" title="Open Plans & Pricing Page">
+          <a
+            href="/upgrade"
+            onClick={navigate}
+            className="header-nav-link"
+            title="Open Plans & Pricing Page"
+          >
             Pricing
           </a>
-          <a href="/grader" className="header-nav-link" title="Open Free ATS Resume Grader">
-            ATS Grader
+          <a
+            href="/grader"
+            onClick={navigate}
+            className="header-nav-link"
+            title="Open resume content review"
+          >
+            Resume review
           </a>
         </nav>
         <div className="header-right">
-          {doc && onOpenAts && (
+          {onOpenLibrary && (
+            <button
+              className="header-library-shortcut"
+              disabled={busy || !ready || showAccount || showAI}
+              onClick={onOpenLibrary}
+            >
+              My library
+            </button>
+          )}
+          {doc && !libraryMode && onOpenAts && (
             <button
               type="button"
               className="ats-score-pill"
               onClick={onOpenAts}
-              title="Click to view ATS Readiness, Role Benchmark & Skill Gaps"
+              title="Review writing findings and confirm a role checklist"
             >
-              ⚡ {atsScore}% ATS & Role Fit
+              Review writing
             </button>
           )}
           {onOpenPricing && (
@@ -76,7 +113,11 @@ export function EditorHeader({
               className={`pricing-pill${isSubscriber ? " active-pass" : ""}`}
               disabled={busy || !ready}
               onClick={onOpenPricing}
-              title={isSubscriber ? "Job Hunter Pass Active · View Subscription" : "Job Hunter Pass & Pricing"}
+              title={
+                isSubscriber
+                  ? "Job Hunter Pass Active · View Subscription"
+                  : "Job Hunter Pass & Pricing"
+              }
             >
               {isSubscriber ? "⭐ Pass Active" : "⭐ Upgrade"}
             </button>
@@ -112,9 +153,17 @@ export function EditorHeader({
         style={{ display: showAccount ? "none" : undefined }}
       >
         <div>
-          <p className="eyebrow">YOUR NEXT CHAPTER</p>
-          <h1>A little clarity. A stronger resume.</h1>
-          <p>Bring your experience together, one detail at a time.</p>
+          <h1>
+            {libraryMode
+              ? "Your CVs, clearly organized."
+              : doc?.name || "Import your experience."}
+          </h1>
+          <p>
+            {libraryMode
+              ? cloudUser?.email ||
+                "Personal drafts on this device. Demo examples have their own gallery."
+              : "Your details, your wording. Review the saved file before sending."}
+          </p>
         </div>
         <div className="save-status" role="status" aria-live="polite">
           <span className={status === "Save failed" ? "dot failed" : "dot"} />

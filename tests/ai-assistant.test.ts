@@ -22,7 +22,11 @@ test("generateExecutiveSummaries produces 3 grounded summaries citing candidate 
 
   for (const s of summaries) {
     assert.ok(s.text.length > 50, "Summary should have meaningful length");
-    assert.ok(s.wordCount > 10, "Summary word count should be accurate");
+    assert.equal(
+      s.wordCount,
+      s.text.split(/\s+/).filter(Boolean).length,
+      "Summary word count should be accurate",
+    );
     assert.ok(
       s.text.includes("Staff Cloud Architect"),
       "Summary should cite candidate headline",
@@ -44,8 +48,14 @@ test("generateInterviewClarifications identifies bullets without metrics and sug
       current: false,
       description: "",
       bullets: [
-        { id: "b-1", text: "Optimized database queries and API response latency." },
-        { id: "b-2", text: "Built microservices that handled 50k requests per second." }, // Has metric!
+        {
+          id: "b-1",
+          text: "Optimized database queries and API response latency.",
+        },
+        {
+          id: "b-2",
+          text: "Built microservices that handled 50k requests per second.",
+        }, // Has metric!
         { id: "b-3", text: "Helped reduce infrastructure cloud spend." },
       ],
     },
@@ -65,6 +75,53 @@ test("generateInterviewClarifications identifies bullets without metrics and sug
   const q3 = questions.find((q) => q.bulletId === "b-3")!;
   assert.ok(q3);
   assert.equal(q3.suggestedMetricKind, "cost");
+  assert.deepEqual(
+    generateInterviewClarifications(doc, 100, "b-3").map((q) => q.bulletId),
+    ["b-3"],
+  );
+});
+
+test("summary helper abstains on blank CVs and keeps outcomes and negation in context", () => {
+  const blank = createDocument();
+  assert.deepEqual(generateExecutiveSummaries(blank), []);
+  blank.contact.headline = "Support assistant";
+  const experience = blank.sections.find((s) => s.type === "experience")!;
+  experience.entries = [
+    {
+      ...createDocument(true).sections.find((s) => s.type === "experience")!
+        .entries[0],
+      title: "Assistant",
+      organization: "Example Team",
+      bullets: [
+        {
+          id: "limited-source",
+          text: "Assisted with a class report; did not manage staff or production services.",
+        },
+        {
+          id: "metric-source",
+          text: "Reconciled 30 records for a class exercise; no production deployment.",
+        },
+      ],
+    },
+  ];
+  for (const draft of generateExecutiveSummaries(blank)) {
+    assert.doesNotMatch(
+      draft.text,
+      /proven success|deep background|proficient|high-growth|from conception to production/i,
+    );
+    if (draft.text.includes("30"))
+      assert.ok(
+        draft.text.includes("class exercise; no production deployment"),
+      );
+  }
+  experience.visible = false;
+  assert.ok(
+    generateExecutiveSummaries(blank).every(
+      (draft) =>
+        !draft.text.includes("Example Team") &&
+        !draft.text.includes("30 records"),
+    ),
+  );
 });
 
 test("applyInterviewAnswer synthesizes a Google XYZ bullet with candidate metric", () => {
@@ -90,7 +147,10 @@ test("discoverDemonstratedSkills discovers skills mentioned in bullets but not i
       current: false,
       description: "",
       bullets: [
-        { id: "b-1", text: "Deployed containerized services to Kubernetes and configured Docker workflows." },
+        {
+          id: "b-1",
+          text: "Deployed containerized services to Kubernetes and configured Docker workflows.",
+        },
       ],
     },
   ];

@@ -13,32 +13,18 @@ import {
 import { createPortal } from "react-dom";
 import type { ResumeDocument } from "@/lib/document";
 import { layoutBlocks, paginateBlocks, type LayoutBlock } from "@/lib/layout";
+import { pageMetrics } from "@/lib/presentation";
 import {
-  accents,
-  densities,
-  fonts,
-  pageMetrics,
-  type Presentation,
-} from "@/lib/presentation";
+  presentationStyle,
+  presentationClass,
+  pageCapacity,
+  TEMPLATE_RENDER_VERSION,
+} from "@/lib/resume-presentation";
+export {
+  presentationStyle,
+  presentationClass,
+} from "@/lib/resume-presentation";
 
-export function presentationStyle(p: Presentation): CSSProperties {
-  const metrics = pageMetrics(p);
-  return {
-    "--page-width": `${metrics.width}mm`,
-    "--page-height": `${metrics.height}mm`,
-    "--page-margin": `${metrics.margin}mm`,
-    "--accent": accents[p.accent],
-    "--resume-font": fonts[p.font].family,
-    "--body-size": `${p.fontSize}pt`,
-    "--leading": densities[p.density].lineHeight,
-    "--section-gap": `${densities[p.density].gap}pt`,
-    direction: p.direction ?? "ltr",
-  } as CSSProperties;
-}
-export function presentationClass(p: Presentation) {
-  const rtlClass = p.direction === "rtl" ? " rtl" : "";
-  return `template-${p.template}${p.template === "creative" && p.sidebar ? " with-sidebar" : ""}${rtlClass}`;
-}
 export function ResumeBlock({
   block,
   onSelect,
@@ -76,6 +62,11 @@ export function ResumeBlock({
       className={`resume-block block-${block.kind}${block.continued ? " continued" : ""}${onSelect ? " interactive-block" : ""}`}
       data-block-id={block.id}
       data-block-group={block.group}
+      style={
+        block.sidebarRow
+          ? ({ "--sidebar-row": block.sidebarRow } as CSSProperties)
+          : undefined
+      }
       onClick={onSelect ? () => onSelect(block) : undefined}
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
@@ -91,11 +82,30 @@ export function ResumeBlock({
       }
     >
       {block.href ? (
-        <a data-block-text href={block.href}>
+        <a
+          data-block-text
+          dir={block.href.startsWith("tel:") ? "ltr" : "auto"}
+          href={block.href}
+        >
           {block.text}
         </a>
       ) : (
-        <span data-block-text>{block.text}</span>
+        <span data-block-text dir="auto">
+          {block.kind === "meta" &&
+          block.date &&
+          block.text ===
+            [block.details, block.date].filter(Boolean).join(" · ") ? (
+            <>
+              <span>
+                {block.details}
+                {block.details ? " · " : ""}
+              </span>
+              <span className="resume-date">{block.date}</span>
+            </>
+          ) : (
+            block.text
+          )}
+        </span>
       )}
     </Tag>
   );
@@ -110,88 +120,89 @@ export const ResumePreview = forwardRef<
     showWatermark?: boolean;
   }
 >(function ResumePreview({ doc, onBlockClick, showWatermark = false }, ref) {
-    const blocks = useMemo(() => layoutBlocks(doc), [doc]);
-    const measurement = useRef<HTMLDivElement>(null);
-    const stage = useRef<HTMLDivElement>(null);
-    const [result, setResult] = useState<{
-      source: ResumeDocument;
-      pages: LayoutBlock[][];
-    } | null>(null);
-    const [failure, setFailure] = useState("");
-    const [autoScale, setAutoScale] = useState(0.65);
-    const [zoomMode, setZoomMode] = useState<"auto" | number>("auto");
-    const scale = zoomMode === "auto" ? autoScale : zoomMode;
-    const [fontRevision, setFontRevision] = useState(0);
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => {
-      setMounted(true);
-    }, []);
-    const metrics = pageMetrics(doc.presentation);
+  const blocks = useMemo(() => layoutBlocks(doc), [doc]);
+  const measurement = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const [result, setResult] = useState<{
+    source: ResumeDocument;
+    pages: LayoutBlock[][];
+  } | null>(null);
+  const [failure, setFailure] = useState("");
+  const [autoScale, setAutoScale] = useState(0.65);
+  const [zoomMode, setZoomMode] = useState<"auto" | number>("auto");
+  const scale = zoomMode === "auto" ? autoScale : zoomMode;
+  const [fontRevision, setFontRevision] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const metrics = pageMetrics(doc.presentation);
 
-    function handleZoomIn() {
-      setZoomMode((prev) => {
-        const current = prev === "auto" ? autoScale : prev;
-        return Math.min(1.75, Math.round((current + 0.15) * 100) / 100);
-      });
-    }
+  function handleZoomIn() {
+    setZoomMode((prev) => {
+      const current = prev === "auto" ? autoScale : prev;
+      return Math.min(1.75, Math.round((current + 0.15) * 100) / 100);
+    });
+  }
 
-    function handleZoomOut() {
-      setZoomMode((prev) => {
-        const current = prev === "auto" ? autoScale : prev;
-        return Math.max(0.35, Math.round((current - 0.15) * 100) / 100);
-      });
-    }
+  function handleZoomOut() {
+    setZoomMode((prev) => {
+      const current = prev === "auto" ? autoScale : prev;
+      return Math.max(0.35, Math.round((current - 0.15) * 100) / 100);
+    });
+  }
 
-    function handleZoomReset() {
-      setZoomMode("auto");
-    }
+  function handleZoomReset() {
+    setZoomMode("auto");
+  }
 
-    function handleZoom100() {
-      setZoomMode(1.0);
-    }
+  function handleZoom100() {
+    setZoomMode(1.0);
+  }
 
-    const readiness = useMemo(() => {
-      let finish!: (error?: string) => void;
-      const promise = new Promise<string | undefined>((resolve) => {
-        finish = resolve;
-      });
-      return { promise, finish };
-    }, [doc, fontRevision]);
-    useImperativeHandle(
-      ref,
-      () => ({
-        prepare: async () => {
-          const error = await readiness.promise;
-          if (error) throw new Error(error);
-        },
-      }),
-      [readiness],
-    );
-    useEffect(() => {
-      const element = stage.current!;
-      const observer = new ResizeObserver((entries) => {
-        const width = entries[0].contentRect.width;
-        if (width > 0)
-          setAutoScale(Math.min(1, width / ((metrics.width * 96) / 25.4)));
-      });
-      observer.observe(element);
-      return () => observer.disconnect();
-    }, [metrics.width]);
-    useEffect(() => {
-      const loaded = () => setFontRevision((n) => n + 1);
-      document.fonts.addEventListener("loadingdone", loaded);
-      return () => document.fonts.removeEventListener("loadingdone", loaded);
-    }, []);
-    useLayoutEffect(() => {
-      if (!mounted) return;
-      let cancelled = false;
-      setFailure("");
+  const readiness = useMemo(() => {
+    let finish!: (error?: string) => void;
+    const promise = new Promise<string | undefined>((resolve) => {
+      finish = resolve;
+    });
+    return { promise, finish };
+  }, [doc, fontRevision]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      prepare: async () => {
+        const error = await readiness.promise;
+        if (error) throw new Error(error);
+      },
+    }),
+    [readiness],
+  );
+  useEffect(() => {
+    const element = stage.current!;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0].contentRect.width;
+      if (width > 0)
+        setAutoScale(Math.min(1, width / ((metrics.width * 96) / 25.4)));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [metrics.width]);
+  useEffect(() => {
+    const loaded = () => setFontRevision((n) => n + 1);
+    document.fonts.addEventListener("loadingdone", loaded);
+    return () => document.fonts.removeEventListener("loadingdone", loaded);
+  }, []);
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    setFailure("");
+    // Coalesce layout reads while typing, rather than paginate in every keystroke's microtask.
+    const paginationTimer = setTimeout(() => {
       void document.fonts.ready.then(() => {
         if (cancelled || !measurement.current) return;
         try {
           const root = measurement.current;
-          const capacity =
-            ((metrics.height - 2 * metrics.margin - 7) * 96) / 25.4 - 2;
+          const capacity = pageCapacity(doc.presentation);
           const pages = paginateBlocks(blocks, root, capacity);
           setResult({ source: doc, pages });
           requestAnimationFrame(() =>
@@ -205,141 +216,150 @@ export const ResumePreview = forwardRef<
           readiness.finish(message);
         }
       });
-      return () => {
-        cancelled = true;
-        readiness.finish(
-          "The resume changed while pages were being prepared. Try printing again.",
-        );
-      };
-    }, [blocks, doc, metrics.height, metrics.margin, readiness, mounted]);
-    const pages = result?.pages ?? [];
-    const pending = result?.source !== doc;
-    return (
-      <div
-        ref={stage}
-        className="preview-pages"
-        style={
-          {
-            ...presentationStyle(doc.presentation),
-            "--preview-scale": scale,
-          } as CSSProperties
-        }
-      >
-        <div className="preview-stage-header no-print">
-          <p className="pagination-status" aria-live="polite">
-            {failure ||
-              (pending
-                ? "Preparing pages…"
-                : `${pages.length} ${pages.length === 1 ? "page" : "pages"} · ${doc.presentation.pageSize}`)}
-          </p>
-          <div className="preview-zoom-bar" role="toolbar" aria-label="Preview zoom controls">
+    }, 120);
+    return () => {
+      clearTimeout(paginationTimer);
+      cancelled = true;
+      readiness.finish(
+        "The resume changed while pages were being prepared. Try printing again.",
+      );
+    };
+  }, [blocks, doc, metrics.height, metrics.margin, readiness, mounted]);
+  const pages = result?.pages ?? [];
+  const pending = result?.source !== doc;
+  return (
+    <div
+      ref={stage}
+      className="preview-pages"
+      style={
+        {
+          ...presentationStyle(doc.presentation),
+          "--preview-scale": scale,
+        } as CSSProperties
+      }
+    >
+      <div className="preview-stage-header no-print">
+        <p className="pagination-status" aria-live="polite">
+          {failure ||
+            (pending
+              ? "Preparing pages…"
+              : `${pages.length} ${pages.length === 1 ? "page" : "pages"} · ${doc.presentation.pageSize}`)}
+        </p>
+        <div
+          className="preview-zoom-bar"
+          role="toolbar"
+          aria-label="Preview zoom controls"
+        >
+          <button
+            type="button"
+            className="zoom-btn"
+            onClick={handleZoomOut}
+            disabled={scale <= 0.35}
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+          <span className="zoom-percentage" title="Current preview zoom">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            className="zoom-btn"
+            onClick={handleZoomIn}
+            disabled={scale >= 1.75}
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          {zoomMode !== "auto" && (
             <button
               type="button"
-              className="zoom-btn"
-              onClick={handleZoomOut}
-              disabled={scale <= 0.35}
-              title="Zoom out"
-              aria-label="Zoom out"
+              className="zoom-btn-text"
+              onClick={handleZoomReset}
+              title="Fit to container width"
             >
-              −
+              Fit
             </button>
-            <span className="zoom-percentage" title="Current preview zoom">
-              {Math.round(scale * 100)}%
-            </span>
+          )}
+          {Math.abs(scale - 1.0) > 0.05 && (
             <button
               type="button"
-              className="zoom-btn"
-              onClick={handleZoomIn}
-              disabled={scale >= 1.75}
-              title="Zoom in"
-              aria-label="Zoom in"
+              className="zoom-btn-text"
+              onClick={handleZoom100}
+              title="Actual 100% print size"
             >
-              +
+              100%
             </button>
-            {zoomMode !== "auto" && (
-              <button
-                type="button"
-                className="zoom-btn-text"
-                onClick={handleZoomReset}
-                title="Fit to container width"
-              >
-                Fit
-              </button>
-            )}
-            {Math.abs(scale - 1.0) > 0.05 && (
-              <button
-                type="button"
-                className="zoom-btn-text"
-                onClick={handleZoom100}
-                title="Actual 100% print size"
-              >
-                100%
-              </button>
-            )}
-          </div>
+          )}
         </div>
-        {mounted &&
-          createPortal(
+      </div>
+      {mounted &&
+        createPortal(
+          <div
+            className={`layout-measure ${presentationClass(doc.presentation)}`}
+            style={presentationStyle(doc.presentation)}
+            dir={doc.presentation.direction ?? "ltr"}
+            aria-hidden="true"
+            inert
+          >
+            <div ref={measurement} className="page-content">
+              {blocks.map((block) => (
+                <ResumeBlock key={block.id} block={block} />
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
+      <article
+        className={`paginated-resume ${presentationClass(doc.presentation)}`}
+        dir={doc.presentation.direction ?? "ltr"}
+        aria-label="Resume preview"
+        aria-busy={pending}
+        data-pagination-ready={!pending && !failure}
+        data-template-version={TEMPLATE_RENDER_VERSION}
+      >
+        {pages.map((page, i) => (
+          <div
+            className="page-frame"
+            key={i}
+            style={{ height: ((metrics.height * 96) / 25.4) * scale }}
+          >
             <div
-              className={`layout-measure ${presentationClass(doc.presentation)}`}
-              style={presentationStyle(doc.presentation)}
+              className="page-sheet"
+              data-page={i + 1}
               dir={doc.presentation.direction ?? "ltr"}
-              aria-hidden="true"
-              inert
             >
-              <div ref={measurement} className="page-content">
-                {blocks.map((block) => (
-                  <ResumeBlock key={block.id} block={block} />
+              <div className="page-content">
+                {page.map((block) => (
+                  <ResumeBlock
+                    key={block.id}
+                    block={block}
+                    onSelect={onBlockClick}
+                  />
                 ))}
               </div>
-            </div>,
-            document.body,
-          )}
-        <article
-          className={`paginated-resume ${presentationClass(doc.presentation)}`}
-          dir={doc.presentation.direction ?? "ltr"}
-          aria-label="Resume preview"
-          aria-busy={pending}
-          data-pagination-ready={!pending && !failure}
-        >
-          {pages.map((page, i) => (
-            <div
-              className="page-frame"
-              key={i}
-              style={{ height: ((metrics.height * 96) / 25.4) * scale }}
-            >
-              <div className="page-sheet" data-page={i + 1} dir={doc.presentation.direction ?? "ltr"}>
-                <div className="page-content">
-                  {page.map((block) => (
-                    <ResumeBlock
-                      key={block.id}
-                      block={block}
-                      onSelect={onBlockClick}
-                    />
-                  ))}
+              {showWatermark && (
+                <div
+                  className="page-watermark print-watermark-footer"
+                  aria-hidden="true"
+                >
+                  Created with AI CV Builder
                 </div>
-                {showWatermark && (
-                  <div
-                    className="page-watermark print-watermark-footer"
-                    aria-hidden="true"
-                  >
-                    Created with AI CV Builder
-                  </div>
-                )}
-                <div className="page-number" aria-hidden="true">
-                  {i + 1} / {pages.length}
-                </div>
+              )}
+              <div className="page-number" aria-hidden="true">
+                {i + 1} / {pages.length}
               </div>
             </div>
-          ))}
-        </article>
-        {failure && (
-          <p className="alert no-print" role="alert">
-            Could not prepare this layout. {failure}
-          </p>
-        )}
-      </div>
-    );
-  },
-);
-
+          </div>
+        ))}
+      </article>
+      {failure && (
+        <p className="alert no-print" role="alert">
+          Could not prepare this layout. {failure}
+        </p>
+      )}
+    </div>
+  );
+});

@@ -1,5 +1,7 @@
 # AI CV Builder · Comprehensive UI/UX, Templates, AI & Role Analyzer Master Plan
 
+> Historical plan. The [2026-10-10 product quality and launch plan](product-quality-and-launch-plan.md) supersedes conflicting recommendations here. In particular, fixed ATS percentages, personal resumes generated with fictional employers/metrics, and anonymous exports are not accepted launch behavior. This document is not current implementation status; see `../../PLAN.md`.
+
 ## 1. Executive Summary & Problem Diagnosis
 
 Based on the inspection of the live application screenshots, workspace code, and sample templates in the `samples/` directory, several key issues and opportunities have been identified:

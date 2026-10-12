@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { PLANS, type PlanId } from "./entitlements";
+import { HttpError } from "./http";
 
 const stripeKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 
@@ -15,8 +16,7 @@ export const STRIPE_PRICE_IDS: Record<string, string> = {
 };
 
 /**
- * Creates a Stripe Checkout Session or returns a simulated local redirect
- * if live Stripe credentials are not yet configured.
+ * Creates a Stripe Checkout Session only when billing is configured.
  */
 export async function createBillingCheckoutSession(params: {
   userId: string;
@@ -40,11 +40,7 @@ export async function createBillingCheckoutSession(params: {
       (secretKey.startsWith("sk_test_") && Boolean(process.env.STRIPE_PRICE_MONTHLY)));
 
   if (!isRealStripe) {
-    // Development / Local offline simulation mode:
-    // Generate a deterministic simulated checkout callback URL that triggers the mock activation
-    const mockSessionId = `cs_mock_${Date.now()}_${userId}`;
-    const redirectUrl = `${origin}/api/billing/mock-success?session_id=${mockSessionId}&user_id=${userId}&plan_id=${planId}`;
-    return { url: redirectUrl, sessionId: mockSessionId, isMock: true };
+    throw new HttpError(503, "BILLING_NOT_CONFIGURED", "Checkout is not available on this installation. No payment or subscription change was made.");
   }
 
   const priceId = STRIPE_PRICE_IDS[planId];
@@ -64,11 +60,11 @@ export async function createBillingCheckoutSession(params: {
       userId,
       planId,
     },
-    success_url: `${origin}/?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/?billing=canceled`,
+    success_url: `${origin}/builder?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/builder?billing=canceled`,
   });
 
-  return { url: session.url || `${origin}/?billing=error`, sessionId: session.id };
+  return { url: session.url || `${origin}/builder?billing=error`, sessionId: session.id };
 }
 
 /**

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     const result = await createBillingPortalSession({
       stripeCustomerId: sub.stripeCustomerId,
-      returnUrl: origin(),
+      returnUrl: `${origin()}/builder`,
     });
 
     return json({ url: result.url });

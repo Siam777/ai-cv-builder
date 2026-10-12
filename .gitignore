@@ -1,5 +1,8 @@
 node_modules/
 .next/
+.next-e2e/
+.next-q4-build/
+.next-usability-build/
 out/
 coverage/
 test-results/

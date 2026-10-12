@@ -4,6 +4,7 @@ import { documentSchema } from "./document";
 export const userSchema = z.object({
   id: z.string().min(1).max(128),
   email: z.string(),
+  emailVerified: z.boolean().default(false),
 });
 export type AccountUser = z.infer<typeof userSchema>;
 export const saveRequestSchema = z.strictObject({
@@ -34,6 +35,12 @@ export const authRequestSchema = z.discriminatedUnion("action", [
     password: passwordSchema,
   }),
   z.strictObject({ action: z.literal("reset"), email: z.email().max(254) }),
+  z.strictObject({ action: z.literal("verify") }),
+  z.strictObject({
+    action: z.literal("complete-reset"),
+    token: z.string().min(1).max(2048),
+    password: passwordSchema,
+  }),
   z.strictObject({ action: z.literal("signout") }),
 ]);
 export const importReceiptSchema = z.object({

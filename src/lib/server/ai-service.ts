@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { database } from "./database";
 import { getResume, saveResume } from "./resumes";
-import { type GenerateRequest, rewriteContext } from "../ai-contract";
+import {
+  type GenerateRequest,
+  generateSchema,
+  rewriteContext,
+} from "../ai-contract";
+import { createCoachingProposal, JOB_COACH_PROMPT_VERSION } from "../job-coach";
+import { jobCoachContext } from "./job-coach-context";
 import {
   applyReviewedProposal,
   proposalSchema,
@@ -10,6 +16,7 @@ import {
 import { documentSchema } from "../document";
 import {
   generateRewrite,
+  generateJobCoaching,
   openAIConfigured,
   openAIModel,
   PROMPT_VERSION,
@@ -29,7 +36,9 @@ export async function requestRewrite(
   owner: string,
   input: GenerateRequest,
   generator = generateRewrite,
+  coachGenerator = generateJobCoaching,
 ) {
+  input = generateSchema.parse(input);
   const doc = await getResume(owner, input.documentId);
   if (doc.revision !== input.revision) throw conflict();
   try {
@@ -37,6 +46,9 @@ export async function requestRewrite(
   } catch (error) {
     throw new HttpError(400, "AI_CONTEXT", (error as Error).message);
   }
+  const job = input.job
+    ? await jobCoachContext(doc, input.bulletId, input.job)
+    : null;
   const hash = createHash("sha256")
     .update(
       JSON.stringify([
@@ -44,6 +56,7 @@ export async function requestRewrite(
         input.revision,
         input.bulletId,
         input.instruction,
+        ...(input.job ? [input.job] : []),
       ]),
     )
     .digest("hex");
@@ -142,29 +155,45 @@ export async function requestRewrite(
     tx.close();
   }
   try {
-    const draft = await generator(doc, input.bulletId, input.instruction);
+    const draft = job
+      ? await coachGenerator(doc, input.bulletId, input.instruction, job)
+      : await generator(doc, input.bulletId, input.instruction);
+    const promptVersion = job ? JOB_COACH_PROMPT_VERSION : PROMPT_VERSION;
     const target = draft.context.selected;
-    const proposal = proposalSchema.parse({
-      schemaVersion: 1,
-      id: input.requestId,
-      documentId: doc.id,
-      baseRevision: doc.revision,
-      message: draft.message,
-      questions: draft.questions,
-      operations: draft.text
-        ? [
-            {
-              type: "replaceBullet",
-              sectionId: target.sectionId,
-              entryId: target.entryId,
-              bulletId: target.id,
-              before: target.text,
-              text: draft.text,
-              evidenceIds: draft.evidenceIds,
-            },
-          ]
-        : [],
-    });
+    const proposal =
+      "draft" in draft
+        ? createCoachingProposal({
+            doc,
+            job: job!,
+            bulletId: input.bulletId,
+            requestId: input.requestId,
+            draft: draft.draft,
+            assessmentSupport: draft.assessmentSupport,
+            rewriteSupport: draft.rewriteSupport,
+            model: openAIModel(),
+            analyzedAt: new Date().toISOString(),
+          })
+        : proposalSchema.parse({
+            schemaVersion: 1,
+            id: input.requestId,
+            documentId: doc.id,
+            baseRevision: doc.revision,
+            message: draft.message,
+            questions: draft.questions,
+            operations: draft.text
+              ? [
+                  {
+                    type: "replaceBullet",
+                    sectionId: target.sectionId,
+                    entryId: target.entryId,
+                    bulletId: target.id,
+                    before: target.text,
+                    text: draft.text,
+                    evidenceIds: draft.evidenceIds,
+                  },
+                ]
+              : [],
+          });
     reviewProposal(doc, proposal);
     if ((await getResume(owner, doc.id)).revision !== doc.revision)
       throw conflict();
@@ -173,7 +202,7 @@ export async function requestRewrite(
       args: [
         JSON.stringify(proposal),
         JSON.stringify(draft.context.sources),
-        PROMPT_VERSION,
+        promptVersion,
         openAIModel(),
         owner,
         input.requestId,
@@ -190,7 +219,7 @@ export async function requestRewrite(
       statusCode: 200,
       metadata: {
         model: openAIModel(),
-        promptVersion: PROMPT_VERSION,
+        promptVersion,
         hasOperation: proposal.operations.length > 0,
         questionCount: proposal.questions.length,
       },

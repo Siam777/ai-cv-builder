@@ -1,7 +1,8 @@
+import { startSampleResume, openFirstCv, authenticateForExport, verifyTestEmail } from "./helpers";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
-const origin = "http://localhost:3000";
+const origin = (process.env.E2E_ORIGIN || "http://localhost:3100");
 const testIp = () => `192.0.2.${Math.floor(Math.random() * 250) + 1}`;
 const password = "Synthetic-account-password-42";
 async function signup(client: APIRequestContext) {
@@ -11,6 +12,7 @@ async function signup(client: APIRequestContext) {
     data: { action: "signup", email, password },
   });
   expect(response.status(), await response.text()).toBe(200);
+  await verifyTestEmail(client, email);
   const session = await (await client.get("/api/account")).json();
   expect(session.user.email).toBe(email);
   return {
@@ -269,15 +271,16 @@ test("account UI explicitly copies local resumes and returns to local after dele
   page,
 }) => {
   await page.setExtraHTTPHeaders({ "x-forwarded-for": testIp() });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Explore an example" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved on this device");
+  await page.goto("/builder");
+  await startSampleResume(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await page.getByRole("button", { name: "Create account instead" }).click();
+  const email = `ui-${randomUUID()}@example.test`;
   await page
     .locator(".account-panel")
     .getByLabel("Email", { exact: true })
-    .fill(`ui-${randomUUID()}@example.test`);
+    .fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page
     .getByRole("button", { name: "Create account", exact: true })
@@ -285,6 +288,7 @@ test("account UI explicitly copies local resumes and returns to local after dele
   await expect(
     page.getByRole("button", { name: "Open account workspace" }),
   ).toBeVisible();
+  await verifyTestEmail(page.request, email);
   await page.getByRole("button", { name: "Open account workspace" }).click();
   await expect(page.locator("#resume-select")).toHaveCount(0);
   await page
@@ -304,8 +308,9 @@ test("account UI explicitly copies local resumes and returns to local after dele
     fullPage: true,
   });
   await page.getByRole("button", { name: "Close account settings" }).click();
+  await openFirstCv(page);
   await page.getByLabel("Full name", { exact: true }).fill("Account copy");
-  await expect(page.getByRole("status")).toHaveText("Saved to your account");
+  await expect(page.locator(".save-status")).toHaveText("Saved to your account");
   await page.route("**/api/resumes", (route) => route.abort());
   await page
     .getByLabel("Full name", { exact: true })
@@ -314,6 +319,7 @@ test("account UI explicitly copies local resumes and returns to local after dele
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Unsaved account draft",
   );
+  page.on("dialog", dialog => dialog.accept());
   const recovery = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download recovery backup" }).click();
   await recovery;
@@ -327,13 +333,8 @@ test("account UI explicitly copies local resumes and returns to local after dele
     "Saved to your account",
   );
   await page.reload();
-  // Browser data remains the default workspace on every fresh load.
-  await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
-    "Alex Morgan",
-  );
-  await page.getByRole("button", { name: "Account", exact: true }).click();
-  await page.getByRole("button", { name: "Open account workspace" }).click();
-  await page.getByRole("button", { name: "Close account settings" }).click();
+  await expect(page.getByRole("heading", { name: "My CVs", exact: true })).toBeVisible();
+  await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Account copy",
   );
@@ -348,6 +349,7 @@ test("account UI explicitly copies local resumes and returns to local after dele
     .click();
   await expect(page.locator(".account-message")).toContainText("deleted");
   await page.getByRole("button", { name: "Close account settings" }).click();
+  await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Alex Morgan",
   );

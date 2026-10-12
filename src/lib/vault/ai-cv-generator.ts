@@ -47,6 +47,7 @@ export function generateAiResume(params: AiCvGenerationParams): ResumeDocument {
 
   // Create base document
   const doc = createDocument(false);
+  doc.provenance = { purpose: "practice", origin: "example" };
   doc.name = `${name} - ${targetTitle}`;
   doc.contact = {
     name,

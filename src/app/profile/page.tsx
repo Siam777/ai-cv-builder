@@ -58,18 +58,18 @@ export default function ProfilePage() {
           </span>
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
-          <Link href="/" className="header-nav-link">
+          <Link href="/builder" className="header-nav-link">
             Resume Studio
           </Link>
           <Link href="/upgrade" className="header-nav-link">
             Pricing
           </Link>
           <Link href="/grader" className="header-nav-link">
-            ATS Grader
+            Resume review
           </Link>
         </nav>
         <div className="header-right">
-          <Link href="/" className="back-to-studio-btn">
+          <Link href="/builder" className="back-to-studio-btn">
             ← Back to Resume Studio
           </Link>
         </div>
@@ -80,8 +80,9 @@ export default function ProfilePage() {
           <span className="profile-badge">STORAGE & ACCOUNT WORKSPACE</span>
           <h1>Your Profile & Account Settings</h1>
           <p className="hero-lead">
-            Manage your account credentials, cloud synchronization, and local storage workspace.
-            Switch seamlessly between private browser-only storage and secure SQLite cloud sync.
+            Manage your account credentials, cloud synchronization, and local
+            storage workspace. Choose device storage or account storage. Signing
+            in does not upload device drafts automatically.
           </p>
         </div>
 
@@ -100,7 +101,7 @@ export default function ProfilePage() {
                 setCloudUser(null);
               }}
               onClose={() => {
-                window.location.href = "/";
+                window.location.href = "/builder";
               }}
               loadLocal={async () => {
                 return createRepository().list();
@@ -110,7 +111,11 @@ export default function ProfilePage() {
                 return `${result.filter((r) => r.status === "imported").length} resumes copied to account. Local originals were kept.`;
               }}
               onExport={async (owner) => {
-                const data = await accountRequest("/api/account/export", {}, owner);
+                const data = await accountRequest(
+                  "/api/account/export",
+                  {},
+                  owner,
+                );
                 const blob = new Blob([JSON.stringify(data, null, 2)], {
                   type: "application/json",
                 });
@@ -141,23 +146,27 @@ export default function ProfilePage() {
               <div className="workspace-stat-row">
                 <span className="stat-label">Active Storage:</span>
                 <span className="stat-value">
-                  {cloudUser ? "Cloud Account (SQLite)" : "Device Local (Browser)"}
+                  {cloudUser ? "Account storage" : "Device Local (Browser)"}
                 </span>
               </div>
               <div className="workspace-stat-row">
                 <span className="stat-label">Local Resumes:</span>
                 <span className="stat-value">
-                  {loading ? "Checking…" : `${localDocs.length} saved on device`}
+                  {loading
+                    ? "Checking…"
+                    : `${localDocs.length} saved on device`}
                 </span>
               </div>
               {cloudUser && (
                 <div className="workspace-stat-row">
                   <span className="stat-label">Cloud User:</span>
-                  <span className="stat-value user-email-val">{cloudUser.email}</span>
+                  <span className="stat-value user-email-val">
+                    {cloudUser.email}
+                  </span>
                 </div>
               )}
               <div className="card-action-row">
-                <Link href="/" className="studio-cta-btn">
+                <Link href="/builder" className="studio-cta-btn">
                   Open Resume Studio →
                 </Link>
               </div>
@@ -170,10 +179,13 @@ export default function ProfilePage() {
                 <h3>Subscription & Plans</h3>
               </div>
               <p>
-                Unlock unlimited 1-Click Job Tailoring, watermark-free PDF/DOCX exports, and all 8 designer templates.
+                Review proposed paid plans and configured limits. Payment and
+                subscription services still require live validation.
               </p>
               <div className="plan-badge-row">
-                <span className="current-plan-tag">Current: Free / Local</span>
+                <span className="current-plan-tag">
+                  Plan status: check billing settings
+                </span>
               </div>
               <Link href="/upgrade" className="upgrade-cta-btn">
                 View Upgrade Options ↗
@@ -187,12 +199,14 @@ export default function ProfilePage() {
                 <h3>Privacy & Data Control</h3>
               </div>
               <p>
-                We believe in zero-surveillance design. Local resumes never leave your browser without explicit cloud sync.
+                Device drafts stay in this browser until you choose an account
+                import or consent to server processing for an export. File
+                uploads are processed on the application server.
               </p>
               <ul className="privacy-feature-list">
-                <li>✓ Full JSON export backup anytime</li>
-                <li>✓ 1-Click permanent account deletion</li>
-                <li>✓ No third-party data tracking</li>
+                <li>✓ JSON backups require sign-in and verified email</li>
+                <li>✓ Account deletion requires explicit confirmation</li>
+                <li>✓ AI provider requests require explicit consent</li>
               </ul>
             </div>
           </aside>
@@ -200,7 +214,10 @@ export default function ProfilePage() {
       </main>
 
       <footer className="profile-footer no-print">
-        <p>AI CV Builder · Privacy-First Career Tooling · Deterministic Resume Architecture</p>
+        <p>
+          AI CV Builder · Privacy-First Career Tooling · Deterministic Resume
+          Architecture
+        </p>
       </footer>
     </div>
   );

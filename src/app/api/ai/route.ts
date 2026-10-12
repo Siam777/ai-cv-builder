@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const session = await auth().api.getSession({ headers: request.headers });
     return json({
       configured: openAIConfigured(),
+      jobCoaching: openAIConfigured(),
       signedIn: Boolean(session),
       provider: "OpenAI",
     });
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   return handle(async () => {
     requireSameOrigin(request, origin());
     const { user } = await authorized(request);
-    const input = generateSchema.parse(await readJson(request, 8192));
+    const input = generateSchema.parse(await readJson(request, 131072));
     return json(await requestRewrite(user.id, input));
   });
 }

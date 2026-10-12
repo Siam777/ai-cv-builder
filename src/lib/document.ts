@@ -39,6 +39,11 @@ const entrySchema = z.strictObject({
   description: text,
   bullets: z.array(z.strictObject({ id, text })).max(100),
 });
+export const provenanceSchema = z.strictObject({
+  purpose: z.enum(["personal", "practice", "unclassified"]),
+  origin: z.enum(["blank", "import", "example", "legacy"]),
+  exampleId: z.string().min(1).max(100).optional(),
+});
 export const documentSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
@@ -46,6 +51,8 @@ export const documentSchema = z
     name: z.string().min(1).max(200),
     revision: z.number().int().nonnegative(),
     updatedAt: z.string().datetime(),
+    // Older backups and stored records are preserved for explicit review.
+    provenance: provenanceSchema.default({ purpose: "unclassified", origin: "legacy" }),
     contact: z.strictObject({
       name: text,
       headline: text,
@@ -115,6 +122,7 @@ export function createCustomSection(
 export function createDocument(sample = false): ResumeDocument {
   const doc: ResumeDocument = {
     schemaVersion: 1,
+    provenance: { purpose: sample ? "practice" : "personal", origin: sample ? "example" : "blank" },
     id: uid(),
     name: sample ? "Alex Morgan · Product designer" : "Untitled resume",
     revision: 0,
@@ -137,6 +145,8 @@ export function createDocument(sample = false): ResumeDocument {
     presentation: presentationSchema.parse({
       template: "classic",
       pageSize: "A4",
+      fontSize: 11,
+      showPhoto: false,
     }),
   };
   if (sample) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { ROLE_BENCHMARKS } from "@/lib/linter/role-analyzer";
@@ -20,7 +21,8 @@ export function AiCvGeneratorModal({
   onClose,
 }: AiCvGeneratorModalProps) {
   useBodyScrollLock(true);
-  const [name, setName] = useState(currentDoc?.contact.name || "Alex Mercer");
+  const dialogRef = useModalFocus(onClose);
+  const [name, setName] = useState("Alex Mercer");
   const [roleId, setRoleId] = useState("software-engineer");
   const [seniority, setSeniority] = useState<"junior" | "mid" | "senior" | "lead">("senior");
   const [industry, setIndustry] = useState("High-Growth SaaS & Distributed Systems");
@@ -62,14 +64,7 @@ export function AiCvGeneratorModal({
 
   async function handleGenerate() {
     setIsGenerating(true);
-    setGenStep("Analyzing role competency benchmarks…");
-    await new Promise((r) => setTimeout(r, 350));
-
-    setGenStep("Drafting Google XYZ accomplishment bullets with quantified metrics…");
-    await new Promise((r) => setTimeout(r, 450));
-
-    setGenStep("Structuring ATS-optimized linear hierarchy…");
-    await new Promise((r) => setTimeout(r, 300));
+    setGenStep("Preparing fictional practice content…");
 
     const generated = generateAiResume({
       name,
@@ -77,10 +72,9 @@ export function AiCvGeneratorModal({
       seniority,
       keySkills: selectedSkills,
       industry,
-      location: currentDoc?.contact.location || "San Francisco, CA",
-      email: currentDoc?.contact.email || `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
-      phone: currentDoc?.contact.phone || "+1 (555) 382-9104",
-      website: currentDoc?.contact.website,
+      location: "San Francisco, CA",
+      email: "alex.mercer@example.com",
+      phone: "+1 (555) 382-9104",
     });
 
     setIsGenerating(false);
@@ -90,14 +84,17 @@ export function AiCvGeneratorModal({
   return (
     <div
       className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
-      aria-label="Generate CV with AI"
+      aria-modal="true"
+      aria-label="Create fictional practice CV"
     >
       <div className="modal-card tailor-modal" style={{ maxWidth: "800px" }}>
         <header className="modal-header">
           <div>
-            <p className="eyebrow">AI RESUME STUDIO · 1-CLICK GENERATOR</p>
-            <h2>Generate a Grounded, High-Impact CV with AI</h2>
+            <p className="library-kind">Fictional practice content</p>
+            <h2>Create a practice CV</h2>
           </div>
           <button
             type="button"
@@ -124,9 +121,9 @@ export function AiCvGeneratorModal({
           ) : (
             <div className="ai-gen-input-stage">
               <p className="helper-text" style={{ marginBottom: "18px" }}>
-                Select your target market role and seniority. Our AI engine generates a complete,
-                professional draft featuring strong active verbs, verified Google XYZ accomplishment
-                formulas, and clean ATS formatting.
+                This example generator uses fictional employers, dates, education, and achievements.
+                It saves to Practice copies, separate from your personal CVs. Replace and review
+                every sample fact before marking a copy as your own.
               </p>
 
               <div className="field-grid" style={{ marginBottom: "14px" }}>
@@ -275,7 +272,7 @@ export function AiCvGeneratorModal({
               onClick={handleGenerate}
               style={{ background: "#059669", borderColor: "#059669" }}
             >
-              ⚡ Generate Full AI Resume Draft
+              Create fictional practice CV
             </button>
             <button type="button" onClick={onClose} disabled={isGenerating}>
               Cancel

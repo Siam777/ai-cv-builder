@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createDocument } from "../src/lib/document";
 import { rewriteContext } from "../src/lib/ai-contract";
 
@@ -52,6 +52,25 @@ test("AI persistence enforces ownership, retry receipts, revision checks, quotas
     await assert.rejects(requestRewrite("bob", input, generator));
     assert.equal(calls, 0);
     const proposal = await requestRewrite("alice", input, generator);
+    const legacyHash = createHash("sha256")
+      .update(
+        JSON.stringify([
+          input.documentId,
+          input.revision,
+          input.bulletId,
+          input.instruction,
+        ]),
+      )
+      .digest("hex");
+    assert.equal(
+      (
+        await client.execute({
+          sql: "SELECT request_hash FROM ai_requests WHERE id=?",
+          args: [input.requestId],
+        })
+      ).rows[0].request_hash,
+      legacyHash,
+    );
     assert.deepEqual(await requestRewrite("alice", input, generator), proposal);
     assert.equal(calls, 1);
     await assert.rejects(

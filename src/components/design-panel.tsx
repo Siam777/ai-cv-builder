@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { layoutBlocks, type LayoutBlock } from "@/lib/layout";
@@ -36,11 +37,11 @@ const ACCENT_PALETTE: { id: Presentation["accent"]; name: string; hex: string }[
   { id: "slate", name: "Slate", hex: "#334155" },
 ];
 
-const FONT_OPTIONS: { id: Presentation["font"]; name: string; label: string; family: string }[] = [
-  { id: "sans", name: "Arial", label: "Clean Sans-Serif", family: "Arial, 'Segoe UI', sans-serif" },
-  { id: "serif", name: "Georgia", label: "Classic Serif", family: "Georgia, 'Times New Roman', serif" },
-  { id: "humanist", name: "Verdana", label: "Humanist Sans", family: "Verdana, Geneva, sans-serif" },
-];
+const FONT_OPTIONS = ([
+  ["sans", "Clean Sans-Serif"],
+  ["serif", "Classic Serif"],
+  ["humanist", "Humanist Sans"],
+] as const).map(([id, label]) => ({ id, label, ...fonts[id] }));
 
 const FONT_SIZES: { value: Presentation["fontSize"]; label: string; desc: string }[] = [
   { value: 10, label: "10 pt", desc: "Compact · Fits more" },
@@ -79,7 +80,7 @@ function TemplateThumbnail({
   }, [width]);
 
   return (
-    <div ref={container} className="template-thumbnail" aria-hidden="true">
+    <div ref={container} className="template-thumbnail" aria-hidden="true" inert>
       <div
         className={`template-miniature ${presentationClass(settings)}`}
         style={{
@@ -108,20 +109,8 @@ export function DesignPanel({
   useBodyScrollLock(true);
   const thumbnailBlocks = useMemo(() => layoutBlocks(doc).slice(0, 18), [doc]);
   const p = doc.presentation;
-  const modalCardRef = useRef<HTMLDivElement>(null);
+  const modalCardRef = useModalFocus(() => onClose?.());
   const [categoryFilter, setCategoryFilter] = useState<"all" | "ats" | "modern" | "executive" | "creative">("all");
-
-  // Keyboard navigation & ESC handler
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose?.();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   const activeTemplateObj = templates.find((t) => t.id === p.template) || templates[0];
 
@@ -141,6 +130,7 @@ export function DesignPanel({
       <div
         id="design-panel"
         ref={modalCardRef}
+        tabIndex={-1}
         className="modal-card design-modal design-modal-spacious"
         role="dialog"
         aria-modal="true"
@@ -156,7 +146,6 @@ export function DesignPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    onClose?.();
                     onOpenDemoGallery();
                   }}
                   style={{
@@ -176,7 +165,7 @@ export function DesignPanel({
               )}
             </div>
             <p style={{ marginTop: "4px" }}>
-              Choose from 8 professionally crafted, ATS-tested templates inspired by Canva, Resume.io, and Novoresume.
+              Choose from twelve layouts, then adjust the typography and spacing for your experience.
             </p>
           </div>
           <button
@@ -202,7 +191,7 @@ export function DesignPanel({
                   <div>
                     <h3>Choose Template Family</h3>
                     <p className="design-section-sub">
-                      All templates preserve 100% of your career data, accomplishments, and ATS readability.
+                      Changing the design preserves your career details. Review the exported file for reading order and layout.
                     </p>
                   </div>
                   <div className="template-category-tabs" role="tablist" aria-label="Template categories">
@@ -272,7 +261,7 @@ export function DesignPanel({
                           {isSelected ? (
                             <span className="template-active-badge">✓ Active</span>
                           ) : (
-                            <span className="template-ats-badge">{template.atsRating} ATS Safe</span>
+                            <span className="template-ats-badge">{template.badge}</span>
                           )}
                         </div>
                         <div className="template-caption">
@@ -519,7 +508,7 @@ export function DesignPanel({
                         onClick={() => onChange({ direction: "rtl" })}
                       >
                         <strong>⬅ RTL</strong>
-                        <small>العربية / עברית</small>
+                        <small>Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© / ×¢×‘×¨×™×ª</small>
                       </button>
                     </div>
                     <select

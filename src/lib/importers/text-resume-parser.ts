@@ -25,6 +25,7 @@ export function parseTextToResume(
     .filter((l) => l.length > 0);
 
   const doc = createDocument(false);
+  doc.provenance = { purpose: "personal", origin: "import" };
   doc.name = fileName.replace(/\.[^/.]+$/, "").slice(0, 100) || "Imported Resume";
 
   if (lines.length === 0) {

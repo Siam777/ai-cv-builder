@@ -103,6 +103,7 @@ export function parseLinkedInArchive(
   candidateName = "Candidate",
 ): ParsedLinkedInResult {
   const doc = createDocument(false);
+  doc.provenance = { purpose: "personal", origin: "import" };
   const warnings: string[] = [];
   const recordsCount = {
     positions: 0,

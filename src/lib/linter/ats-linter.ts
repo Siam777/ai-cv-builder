@@ -1,8 +1,14 @@
-import type { ResumeDocument, Entry, Bullet } from "../document";
+import type { ResumeDocument } from "../document";
 
 export interface AtsLintIssue {
   id: string;
-  ruleId: "weak_verb" | "missing_metric" | "bullet_length" | "contact_missing" | "date_format" | "empty_section";
+  ruleId:
+    | "weak_verb"
+    | "missing_metric"
+    | "bullet_length"
+    | "contact_missing"
+    | "date_format"
+    | "empty_section";
   severity: "critical" | "warning" | "suggestion";
   message: string;
   sectionId?: string;
@@ -12,14 +18,13 @@ export interface AtsLintIssue {
 }
 
 export interface AtsReadinessReport {
-  score: number; // 0 to 100
-  verbsScore: number; // 0 to 100
-  metricsScore: number; // 0 to 100
-  hygieneScore: number; // 0 to 100
-  extractionScore: number; // 0 to 100
+  extractionStatus: "not_checked";
   totalBulletsCount: number;
-  strongVerbsCount: number;
+  weakOpeningCount: number;
   metricsCount: number;
+  contactFieldsPresent: number;
+  validDateCount: number;
+  totalDateCount: number;
   issues: AtsLintIssue[];
 }
 
@@ -56,7 +61,9 @@ export function hasQuantifiableMetric(bulletText: string): boolean {
 }
 
 export function isWeakOpening(bulletText: string): boolean {
-  return WEAK_OPENING_PATTERNS.some((pattern) => pattern.test(bulletText.trim()));
+  return WEAK_OPENING_PATTERNS.some((pattern) =>
+    pattern.test(bulletText.trim()),
+  );
 }
 
 export function wordCount(text: string): number {
@@ -70,7 +77,7 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
   const issues: AtsLintIssue[] = [];
 
   let totalBullets = 0;
-  let strongVerbsCount = 0;
+  let weakOpeningCount = 0;
   let metricsCount = 0;
 
   // 1. Contact Info Completeness
@@ -92,7 +99,7 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
       id: "contact-email",
       ruleId: "contact_missing",
       severity: "critical",
-      message: "Email address is missing. ATS requires direct candidate contact.",
+      message: "Email address is missing from the header.",
       sectionId: "contact",
     });
   } else {
@@ -104,7 +111,8 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
       id: "contact-location",
       ruleId: "contact_missing",
       severity: "warning",
-      message: "Location (City, Country) is missing. Location filters are common in ATS screening.",
+      message:
+        "Location is missing. Consider including it if relevant to your application.",
       sectionId: "contact",
     });
   } else {
@@ -172,18 +180,18 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
         // Check weak verb
         const isPassive = isWeakOpening(text);
         if (isPassive) {
+          weakOpeningCount++;
           issues.push({
             id: `weak-verb-${bullet.id}`,
             ruleId: "weak_verb",
             severity: "warning",
-            message: `Bullet starts with passive phrasing: “${text.slice(0, 30)}…”.`,
+            message: `Bullet starts with a vague opening: “${text.slice(0, 30)}…”.`,
             sectionId: section.id,
             entryId: entry.id,
             bulletId: bullet.id,
-            suggestion: "Replace with an active verb (e.g. Engineered, Spearheaded, Optimized).",
+            suggestion:
+              "Replace with an active verb (e.g. Engineered, Spearheaded, Optimized).",
           });
-        } else {
-          strongVerbsCount++;
         }
 
         // Check quantifiable metric
@@ -195,11 +203,12 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
             id: `no-metric-${bullet.id}`,
             ruleId: "missing_metric",
             severity: "suggestion",
-            message: `Missing measurable outcome in: “${text.slice(0, 35)}…”.`,
+            message: `No numeric pattern found in: “${text.slice(0, 35)}…”.`,
             sectionId: section.id,
             entryId: entry.id,
             bulletId: bullet.id,
-            suggestion: "Add a quantitative outcome (e.g., % latency drop, $ saved, or user scale).",
+            suggestion:
+              "Describe a real outcome. Include a number only if you can support it; qualitative outcomes can also be useful.",
           });
         }
 
@@ -213,7 +222,8 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
             sectionId: section.id,
             entryId: entry.id,
             bulletId: bullet.id,
-            suggestion: "Expand accomplishment to detail the task and the outcome.",
+            suggestion:
+              "Expand accomplishment to detail the task and the outcome.",
           });
         } else if (words > 40) {
           issues.push({
@@ -230,35 +240,15 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
     }
   }
 
-  // Calculate scores
-  const verbsScore =
-    totalBullets > 0 ? Math.round((strongVerbsCount / totalBullets) * 100) : 100;
-  const metricsScore =
-    totalBullets > 0 ? Math.round((metricsCount / totalBullets) * 100) : 100;
-  const dateScore =
-    totalDateCount > 0 ? (validDateCount / totalDateCount) * 50 : 50;
-  const contactScore = (contactFieldsPopulated / 3) * 50;
-  const hygieneScore = Math.round(dateScore + contactScore);
-  const extractionScore = 100; // Layout uses valid linear DOM structure
-
-  // Composite Formula:
-  // 0.25 * verbs + 0.30 * metrics + 0.25 * extraction + 0.20 * hygiene
-  const score = Math.round(
-    0.25 * verbsScore +
-      0.30 * metricsScore +
-      0.25 * extractionScore +
-      0.20 * hygieneScore,
-  );
-
+  // Observations about the document model, not an ATS acceptance prediction.
   return {
-    score: Math.max(0, Math.min(100, score)),
-    verbsScore,
-    metricsScore,
-    hygieneScore,
-    extractionScore,
+    extractionStatus: "not_checked",
     totalBulletsCount: totalBullets,
-    strongVerbsCount,
+    weakOpeningCount,
     metricsCount,
+    contactFieldsPresent: contactFieldsPopulated,
+    validDateCount,
+    totalDateCount,
     issues,
   };
 }

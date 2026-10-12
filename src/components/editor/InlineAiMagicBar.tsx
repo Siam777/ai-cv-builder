@@ -6,7 +6,9 @@ import { synthesizeVerifiedXyzBullet } from "@/lib/vault/impact-coach";
 export interface InlineAiMagicBarProps {
   bulletText: string;
   onApplyEdit: (newText: string) => void;
-  onTriggerAction?: (actionType: "improve" | "metric" | "match" | "concise") => void;
+  onTriggerAction?: (
+    actionType: "improve" | "metric" | "match" | "concise",
+  ) => void;
   disabled?: boolean;
 }
 
@@ -33,29 +35,15 @@ export function InlineAiMagicBar({
       return;
     }
 
-    // Client-side heuristics fallback if no AI provider is configured
+    // Standalone local fallback removes filler only; it never strengthens responsibility.
     if (type === "improve") {
-      // Clean leading passive verbs if present
-      let enhanced = bulletText;
-      if (/^responsible for\b/i.test(enhanced)) {
-        enhanced = enhanced.replace(/^responsible for\b/i, "Spearheaded");
-      } else if (/^assisted (with|in)\b/i.test(enhanced)) {
-        enhanced = enhanced.replace(/^assisted (with|in)\b/i, "Collaborated to deliver");
-      } else if (/^helped (with|to)\b/i.test(enhanced)) {
-        enhanced = enhanced.replace(/^helped (with|to)\b/i, "Partnered to implement");
-      } else if (/^worked on\b/i.test(enhanced)) {
-        enhanced = enhanced.replace(/^worked on\b/i, "Engineered and deployed");
-      } else {
-        const cleaned = enhanced
-          .replace(/\b(successfully|effectively|proactively|diligently)\s+/gi, "")
-          .trim();
-        enhanced = cleaned.length > 0 ? cleaned : enhanced;
-      }
+      const enhanced = bulletText
+        .replace(/\b(successfully|effectively|proactively|diligently)\s+/gi, "")
+        .trim();
       setProposedText(enhanced);
     } else if (type === "concise") {
       const trimmed = bulletText
         .replace(/\b(in order to|with the goal of)\b/gi, "to")
-        .replace(/\b(responsible for the development of)\b/gi, "developed")
         .replace(/\s+/g, " ")
         .trim();
       setProposedText(trimmed);
@@ -110,20 +98,25 @@ export function InlineAiMagicBar({
           className="inline-ai-toggle"
           disabled={disabled || !bulletText.trim()}
           onClick={() => setIsOpen((prev) => !prev)}
-          title="AI Assistant options for this bullet"
+          title="Improve this bullet or add a result you can support"
+          aria-expanded={isOpen}
         >
-          ✨ AI Actions
+          Improve this bullet
         </button>
 
         {isOpen && (
-          <div className="inline-ai-chips" role="toolbar" aria-label="AI bullet actions">
+          <div
+            className="inline-ai-chips"
+            role="toolbar"
+            aria-label="AI bullet actions"
+          >
             <button
               type="button"
               className="ai-chip"
               disabled={disabled}
               onClick={() => handleAction("improve")}
             >
-              ✨ Improve phrasing
+              Rewrite with AI
             </button>
             <button
               type="button"
@@ -131,7 +124,7 @@ export function InlineAiMagicBar({
               disabled={disabled}
               onClick={() => handleAction("metric")}
             >
-              📊 Add metric (XYZ)
+              Add a real result
             </button>
             <button
               type="button"
@@ -139,7 +132,7 @@ export function InlineAiMagicBar({
               disabled={disabled}
               onClick={() => handleAction("concise")}
             >
-              📏 Make concise
+              Shorten with AI
             </button>
           </div>
         )}
@@ -148,7 +141,10 @@ export function InlineAiMagicBar({
       {promptingMetric && (
         <div className="inline-metric-prompt">
           <label>
-            <span>What was the measurable outcome? (e.g. 35% latency drop, $15k saved)</span>
+            <span>
+              What was the measurable outcome? (e.g. 35% latency drop, $15k
+              saved)
+            </span>
             <input
               type="text"
               value={metricInput}
@@ -166,7 +162,11 @@ export function InlineAiMagicBar({
             />
           </label>
           <div className="inline-metric-buttons">
-            <button type="button" className="primary" onClick={handleMetricSubmit}>
+            <button
+              type="button"
+              className="primary"
+              onClick={handleMetricSubmit}
+            >
               Apply metric
             </button>
             <button type="button" onClick={() => setPromptingMetric(false)}>
@@ -177,19 +177,33 @@ export function InlineAiMagicBar({
       )}
 
       {proposedText !== null && (
-        <div className="inline-diff-card" role="region" aria-label="Proposed bullet rewrite">
+        <div
+          className="inline-diff-card"
+          role="region"
+          aria-label="Proposed bullet rewrite"
+        >
           <div className="inline-diff-content">
-            <p className="diff-label">PROPOSED REWRITE (Press Tab to Accept, Esc to Dismiss):</p>
+            <p className="diff-label">
+              PROPOSED REWRITE (Press Tab to Accept, Esc to Dismiss):
+            </p>
             <p className="diff-text">
               <del className="diff-del">{bulletText}</del>{" "}
               <ins className="diff-ins">{proposedText}</ins>
             </p>
           </div>
           <div className="inline-diff-actions">
-            <button type="button" className="primary diff-accept" onClick={acceptProposal}>
+            <button
+              type="button"
+              className="primary diff-accept"
+              onClick={acceptProposal}
+            >
               Accept (Tab)
             </button>
-            <button type="button" className="diff-dismiss" onClick={dismissProposal}>
+            <button
+              type="button"
+              className="diff-dismiss"
+              onClick={dismissProposal}
+            >
               Dismiss (Esc)
             </button>
           </div>

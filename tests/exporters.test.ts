@@ -22,9 +22,9 @@ test("Standalone HTML exporter inlines styles, escapes XSS, and outputs clean HT
   const html = exportToStandaloneHtml(doc, { showWatermark: true });
 
   assert.ok(html.startsWith("<!DOCTYPE html>"));
-  assert.ok(html.includes(`<h1 class="name">${doc.contact.name}</h1>`));
+  assert.ok(html.includes(`<span data-block-text dir="auto">${doc.contact.name}</span>`));
   assert.ok(html.includes("class=\"page-sheet\""));
-  assert.ok(html.includes("class=\"watermark-footer\""));
+  assert.ok(html.includes("class=\"page-watermark\""));
   assert.ok(html.includes("Created with AI CV Builder"));
   assert.ok(html.includes("mailto:"));
 
@@ -83,11 +83,35 @@ test("HTML and DOCX exporters respect RTL reading direction", () => {
 
   const html = exportToStandaloneHtml(doc);
   assert.ok(html.includes('dir="rtl"'));
-  assert.ok(html.includes('lang="ar"'));
-  assert.ok(html.includes("direction: rtl"));
+  assert.ok(html.includes('lang="en"'));
+  assert.ok(html.includes("direction:rtl"));
 
   const docxBytes = exportToDocx(doc);
   const asString = new TextDecoder("latin1").decode(docxBytes);
   assert.ok(asString.includes("<w:bidi/>"));
   assert.ok(asString.includes('<w:jc w:val="right"/>'));
+});
+
+
+test("exports preserve canonical visible text and reject unsafe website/photo resources", () => {
+  const doc = createDocument(true);
+  doc.contact.website = "javascript:alert(1)";
+  doc.contact.photoUrl = "https://private.example.test/photo";
+  doc.presentation.template = "modern";
+  doc.sections.reverse();
+  doc.sections[0].visible = false;
+  const original = structuredClone(doc);
+  const html = exportToStandaloneHtml(doc);
+  assert.ok(!html.includes('href="javascript:'));
+  assert.ok(!html.includes('<img'));
+  assert.ok(html.includes("data:font/woff2;base64,"));
+  assert.ok(html.includes("template-modern"));
+  assert.deepEqual(doc, original);
+  const docx = new TextDecoder().decode(exportToDocx(doc, { showWatermark: true }));
+  assert.ok(!docx.includes('Target="javascript:'));
+  assert.ok(docx.includes('w:styleId="Heading1"'));
+  assert.ok(docx.includes('<w:numPr>'));
+  assert.ok(docx.includes('word/footer1.xml'));
+  assert.ok(docx.includes('w:footerReference'));
+  assert.ok(!docx.includes('<w:t xml:space="preserve">• '));
 });

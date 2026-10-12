@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { documentSchema, type ResumeDocument } from "./document";
+import { coachingRecordSchema } from "./job-coach-contract";
 
 const id = z.string().min(1).max(100);
 export const proposalSchema = z.strictObject({
@@ -9,6 +10,7 @@ export const proposalSchema = z.strictObject({
   baseRevision: z.number().int().nonnegative(),
   message: z.string().max(2000),
   questions: z.array(z.string().min(1).max(500)).max(5),
+  coaching: coachingRecordSchema.optional(),
   operations: z
     .array(
       z.strictObject({
@@ -55,6 +57,52 @@ export function reviewProposal(doc: ResumeDocument, input: unknown) {
   if (proposal.baseRevision !== doc.revision)
     throw new Error("The resume changed. Generate a new proposal.");
   const evidence = new Map(bulletEvidence(doc).map((fact) => [fact.id, fact]));
+  if (proposal.coaching) {
+    const coaching = proposal.coaching;
+    const selected = evidence.get(coaching.selectedBulletId);
+    if (
+      !selected ||
+      !doc.sections.find((section) => section.id === selected.sectionId)
+        ?.visible
+    )
+      throw new Error("Choose a visible bullet for job coaching.");
+    const sourceIds = new Set<string>();
+    for (const source of coaching.sources) {
+      const original = evidence.get(source.id);
+      if (
+        sourceIds.has(source.id) ||
+        !original ||
+        original.text !== source.text ||
+        original.sectionId !== source.sectionId ||
+        original.entryId !== source.entryId ||
+        original.sectionId !== selected.sectionId ||
+        original.entryId !== selected.entryId
+      )
+        throw new Error(
+          "Job coaching evidence changed or belongs to another entry.",
+        );
+      sourceIds.add(source.id);
+    }
+    if (
+      new Set(coaching.assessment.evidenceIds).size !==
+        coaching.assessment.evidenceIds.length ||
+      coaching.assessment.evidenceIds.some((id) => !sourceIds.has(id)) ||
+      (coaching.assessment.status === "relevant" &&
+        !coaching.assessment.evidenceIds.length)
+    )
+      throw new Error("Job coaching citations could not be resolved.");
+    if (
+      proposal.operations.some(
+        (operation) =>
+          operation.bulletId !== selected.id ||
+          operation.evidenceIds.some((id) => !sourceIds.has(id)),
+      ) ||
+      (coaching.assessment.status !== "relevant" && proposal.operations.length)
+    )
+      throw new Error(
+        "Only a supported selected bullet may be proposed for job coaching.",
+      );
+  }
   const targets = new Set<string>();
   const changes = proposal.operations.map((operation) => {
     if (targets.has(operation.bulletId))

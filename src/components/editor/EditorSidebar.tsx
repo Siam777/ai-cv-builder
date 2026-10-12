@@ -19,10 +19,11 @@ export function EditorSidebar({
   onAddSection,
 }: EditorSidebarProps) {
   return (
-    <aside className="section-nav no-print">
+    <aside className="section-nav no-print" aria-label="Resume sections">
       <p className="eyebrow">BUILD YOUR RESUME</p>
       <button
         className={sectionId === "contact" ? "selected" : ""}
+        aria-current={sectionId === "contact" ? "true" : undefined}
         onClick={() => onSelectSection("contact")}
       >
         <span>01</span> Personal details <span>↗</span>
@@ -31,6 +32,7 @@ export function EditorSidebar({
         <button
           key={s.id}
           className={sectionId === s.id ? "selected" : ""}
+          aria-current={sectionId === s.id ? "true" : undefined}
           onClick={() => onSelectSection(s.id)}
         >
           <span>{String(i + 2).padStart(2, "0")}</span>

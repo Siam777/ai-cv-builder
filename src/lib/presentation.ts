@@ -4,82 +4,122 @@ export const templates = [
   {
     id: "classic",
     name: "Classic",
-    description: "Traditional typography with clean linear reading order for maximum parsing reliability.",
-    tagline: "ATS-Safe & Timeless",
+    description:
+      "Traditional typography with a conventional single-column layout.",
+    tagline: "Simple & Timeless",
     badge: "Traditional · 1 Column",
     category: "ats",
-    atsRating: "100%",
     photoSupported: false,
   },
   {
     id: "modern",
     name: "Modern",
-    description: "Clean sans-serif structure, subtle accent header bars, and refined section borders.",
+    description:
+      "Clean sans-serif structure, subtle accent header bars, and refined section borders.",
     tagline: "Polished Tech & Corporate",
     badge: "Contemporary · Clean Header",
     category: "modern",
-    atsRating: "98%",
     photoSupported: true,
   },
   {
     id: "compact",
     name: "Compact",
-    description: "Condensed spacing with bounded line heights, built to fit dense career achievements on fewer pages.",
+    description:
+      "Condensed spacing with bounded line heights, built to fit dense career achievements on fewer pages.",
     tagline: "Maximum Content per Page",
     badge: "High Density · Space Saver",
     category: "ats",
-    atsRating: "99%",
     photoSupported: false,
   },
   {
     id: "creative",
     name: "Creative",
-    description: "Two-column editorial hierarchy with an optional colored side rail for skills and credentials.",
-    tagline: "Distinguished Sidebar Layout",
-    badge: "Editorial · Two-Column",
+    description:
+      "An optional contact sidebar beside a clear, sequential career column.",
+    tagline: "Editorial Contact Sidebar",
+    badge: "Editorial · Contact Sidebar",
     category: "creative",
-    atsRating: "96%",
     photoSupported: true,
   },
   {
     id: "tech",
     name: "Tech Startup",
-    description: "Developer-centric layout with dark tech skill pills, GitHub/portfolio links, and clean project blocks.",
+    description:
+      "Technical typography with clear project blocks and clickable portfolio contact links.",
     tagline: "Developer & Startup Ready",
     badge: "Clean · Tech Stack Focus",
     category: "modern",
-    atsRating: "98%",
     photoSupported: false,
   },
   {
     id: "executive",
     name: "Executive Luxury",
-    description: "Prestigious serif typography with subtle gold/slate/burgundy accents for senior leadership roles.",
+    description:
+      "Serif typography and restrained accent rules for senior leadership roles.",
     tagline: "Leadership & Senior Roles",
     badge: "Prestigious · Executive",
     category: "executive",
-    atsRating: "99%",
     photoSupported: false,
   },
   {
     id: "timeline",
     name: "Timeline Modern",
-    description: "Visual career milestone connectors with dates, circular nodes, and modern pill badges.",
+    description:
+      "A career connector with aligned date cells beside each role’s organization details.",
     tagline: "Career Progression Visualized",
     badge: "Milestones · Timeline Rail",
     category: "modern",
-    atsRating: "97%",
     photoSupported: true,
   },
   {
     id: "minimalist",
     name: "Minimalist Simple",
-    description: "Canva Simple-inspired Swiss design with generous white space and understated typography.",
+    description:
+      "Original minimalist design with generous white space and understated typography.",
     tagline: "Ultra-Clean & Elegant",
-    badge: "Canva Style · Minimalist",
+    badge: "Quiet · Minimalist",
     category: "creative",
-    atsRating: "99%",
     photoSupported: true,
+  },
+  {
+    id: "elegant",
+    name: "Consulting",
+    description:
+      "A centered serif nameplate, restrained rules and clear achievement headings.",
+    tagline: "Finance & Consulting",
+    badge: "Refined · Single Column",
+    category: "executive",
+    photoSupported: false,
+  },
+  {
+    id: "portfolio",
+    name: "Portfolio",
+    description:
+      "Light section panels and a distinct selected-work hierarchy, with your section order preserved.",
+    tagline: "Selected Work & Case Studies",
+    badge: "Creative · Section Panels",
+    category: "creative",
+    photoSupported: true,
+  },
+  {
+    id: "bold",
+    name: "Brand",
+    description:
+      "An expressive accent nameplate balanced by a disciplined single-column body.",
+    tagline: "Sales & Marketing",
+    badge: "Expressive · Clear Structure",
+    category: "modern",
+    photoSupported: false,
+  },
+  {
+    id: "academic",
+    name: "Research",
+    description:
+      "Serif headings and restrained spacing for education, publications and longer research CVs.",
+    tagline: "Research & Education",
+    badge: "Scholarly · Long CV",
+    category: "ats",
+    photoSupported: false,
   },
 ] as const;
 export const accents = {
@@ -92,9 +132,9 @@ export const accents = {
   slate: "#334155",
 };
 export const fonts = {
-  sans: { name: "Arial", family: "Arial, 'Segoe UI', Tahoma, Helvetica, sans-serif" },
-  serif: { name: "Georgia", family: "Georgia, 'Times New Roman', 'Traditional Arabic', serif" },
-  humanist: { name: "Verdana", family: "Verdana, Geneva, Tahoma, sans-serif" },
+  sans: { name: "Source Sans 3", family: "'Source Sans 3', sans-serif" },
+  serif: { name: "Source Serif 4", family: "'Source Serif 4', serif" },
+  humanist: { name: "Lato", family: "Lato, sans-serif" },
 };
 export const densities = {
   airy: { name: "Airy", lineHeight: 1.6, gap: 13, margin: 19 },
@@ -113,6 +153,10 @@ export const presentationSchema = z.strictObject({
     "executive",
     "timeline",
     "minimalist",
+    "elegant",
+    "portfolio",
+    "bold",
+    "academic",
   ]),
   pageSize: z.enum(["A4", "Letter"]),
   accent: z

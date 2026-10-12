@@ -1,5 +1,7 @@
 # Product Review, UX Modernization, and Niche Commercialization Plan
 
+> Historical plan. The [2026-10-10 product quality and launch plan](product-quality-and-launch-plan.md) supersedes conflicting scope, pricing assumptions, and anonymous-export recommendations here. Current release scope is in `../../FEATURE-PLAN.md`; implementation progress is in `../../PLAN.md`.
+
 **Document Path**: `docs/plans/product-review-ux-and-niche-commercialization-plan.md`  
 **Date**: October 2026  
 **Status**: Strategic Proposal & Roadmap  

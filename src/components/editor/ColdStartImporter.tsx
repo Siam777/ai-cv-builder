@@ -11,7 +11,11 @@ import {
 
 export interface ColdStartImporterProps {
   disabled?: boolean;
-  onStaged: (staged: { document: ResumeDocument; warnings: string[]; sourceFile: string }) => void;
+  onStaged: (staged: {
+    document: ResumeDocument;
+    warnings: string[];
+    sourceFile: string;
+  }) => void;
   onError: (error: string) => void;
   onOpenAiGenerator?: () => void;
   onOpenDemoGallery?: () => void;
@@ -53,8 +57,8 @@ export function ColdStartImporter({
         return;
       }
 
-      // If PDF file, use server-side route
-      if (fileName.endsWith(".pdf")) {
+      // PDF and DOCX parsing runs on the application server.
+      if (fileName.endsWith(".pdf") || fileName.endsWith(".docx")) {
         const formData = new FormData();
         formData.append("file", file);
 
@@ -65,7 +69,7 @@ export function ColdStartImporter({
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          throw new Error(data.error || "Failed to parse PDF resume.");
+          throw new Error(data.error || "Failed to parse resume file.");
         }
 
         onStaged({
@@ -127,7 +131,7 @@ export function ColdStartImporter({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.txt,.md,.json,.csv,application/pdf,text/plain,application/json,text/csv"
+        accept=".pdf,.docx,.txt,.md,.json,.csv,application/pdf,text/plain,application/json,text/csv"
         hidden
         aria-label="Upload existing resume"
         disabled={disabled || isProcessing}
@@ -142,11 +146,30 @@ export function ColdStartImporter({
         </span>
         <div className="dropzone-text">
           <strong>
-            {isProcessing ? "Analyzing and extracting resume…" : "Drop your existing resume here"}
+            {isProcessing
+              ? "Analyzing and extracting resume…"
+              : "Drop your existing resume here"}
           </strong>
-          <p>Supports PDF, plain text, Markdown, or JSON backup (up to 5 MB)</p>
+          <p>
+            Supports PDF, DOCX, plain text, Markdown, or JSON backup (up to 5
+            MB)
+          </p>
+          <p>
+            PDF and DOCX files are sent to this app’s server for extraction.
+            Review the parsed fields before saving; scanned PDFs require
+            selectable text.
+          </p>
         </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            marginTop: "12px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
           <button
             type="button"
             className="dropzone-browse-button"
@@ -159,7 +182,11 @@ export function ColdStartImporter({
             <button
               type="button"
               className="dropzone-browse-button"
-              style={{ background: "#eff6ff", color: "#1e3a8a", borderColor: "#bfdbfe" }}
+              style={{
+                background: "#eff6ff",
+                color: "#1e3a8a",
+                borderColor: "#bfdbfe",
+              }}
               disabled={disabled || isProcessing}
               onClick={onOpenDemoGallery}
             >
@@ -170,11 +197,15 @@ export function ColdStartImporter({
             <button
               type="button"
               className="dropzone-browse-button"
-              style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0" }}
+              style={{
+                background: "#ecfdf5",
+                color: "#065f46",
+                borderColor: "#a7f3d0",
+              }}
               disabled={disabled || isProcessing}
               onClick={onOpenAiGenerator}
             >
-              ✨ Generate with AI
+              Create practice example
             </button>
           )}
         </div>

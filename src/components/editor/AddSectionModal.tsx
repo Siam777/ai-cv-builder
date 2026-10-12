@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   CUSTOM_SECTION_PRESETS,
@@ -35,6 +36,7 @@ export function AddSectionModal({
   allDocuments = [],
 }: AddSectionModalProps) {
   useBodyScrollLock(isOpen);
+  const dialogRef = useModalFocus(onClose, isOpen);
   const [activeTab, setActiveTab] = useState<"presets" | "library" | "custom">("presets");
   const [includeStarterExample, setIncludeStarterExample] = useState(true);
   const [customName, setCustomName] = useState("");
@@ -50,16 +52,6 @@ export function AddSectionModal({
       setCustomName("");
     }
   }, [isOpen, allDocuments]);
-
-  // Handle ESC key
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -114,6 +106,8 @@ export function AddSectionModal({
   return (
     <div
       className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-section-title"

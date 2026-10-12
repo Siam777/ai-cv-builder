@@ -14,7 +14,7 @@ def normalize(value):
     return re.sub(r"\s+", "", unicodedata.normalize("NFC", value)).casefold()
 
 
-manifests = [path for path in Path("test-results").glob("*.json") if path.stem.startswith(("classic-", "modern-", "compact-", "creative-"))]
+manifests = [path for path in Path("test-results").glob("*.json") if path.stem.removeprefix("server-").startswith(("classic-", "modern-", "compact-", "creative-", "tech-", "executive-", "timeline-", "minimalist-", "elegant-", "portfolio-", "bold-", "academic-", "starter-", "letter-", "stress-"))]
 assert manifests, "Run the template browser tests first."
 for manifest in sorted(manifests):
     expected = json.loads(manifest.read_text(encoding="utf-8"))
@@ -23,7 +23,8 @@ for manifest in sorted(manifests):
     assert len(reader.pages) == expected["pageCount"], f"Preview/print page count differs: {path}"
     texts = []
     for page in reader.pages:
-        text = re.sub(r"(?m)^\d+\s*/\s*\d+\s*$", "", page.extract_text())
+        # Remove only known page furniture; a continued source block may span pages.
+        text = re.sub(r"(?m)^(?:Created with AI CV Builder\s*)?\d+\s*/\s*\d+\s*$", "", page.extract_text())
         assert text.strip(), f"Blank page: {path}"
         texts.append(text)
     body = normalize("\n".join(texts))

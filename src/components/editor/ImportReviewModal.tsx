@@ -2,6 +2,7 @@
 
 import type { ResumeDocument } from "@/lib/document";
 import { labels } from "@/lib/document";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export interface StagedImportData {
@@ -28,6 +29,7 @@ export function ImportReviewModal({
   onCancel,
 }: ImportReviewModalProps) {
   useBodyScrollLock(true);
+  const dialogRef = useModalFocus<HTMLElement>(() => { if (!busy) onCancel(); });
   const doc = staged.document;
   const totalEntries = doc.sections.reduce((n, s) => n + s.entries.length, 0);
   const populatedSections = doc.sections.filter((s) => s.entries.length > 0);
@@ -43,6 +45,8 @@ export function ImportReviewModal({
       <section
         className="import-review modal-card import-review-card no-print"
         aria-label="Review imported resume"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
       >

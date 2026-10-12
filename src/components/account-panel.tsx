@@ -5,16 +5,23 @@ import { z } from "zod";
 import { accountRequest, importReceipts } from "@/lib/cloud-repository";
 import { userSchema, type AccountUser } from "@/lib/cloud-contract";
 import type { ResumeDocument } from "@/lib/document";
+import { notifySessionChange, watchSessionChanges } from "@/lib/session-events";
+import { GoogleSignIn } from "./GoogleSignIn";
 
 const sessionSchema = z.object({
   configured: z.boolean(),
   user: userSchema.nullable(),
   canDeleteAccount: z.boolean(),
+  emailDelivery: z.enum(["file", "resend", "unconfigured"]).default("unconfigured"),
+  googleConfigured: z.boolean().default(false),
+  googleLinked: z.boolean().default(false),
+  hasPassword: z.boolean().default(true),
 });
 type Session = z.infer<typeof sessionSchema>;
 export function AccountPanel({
   cloudOwner,
   beforeChange,
+  beforeNavigate = beforeChange,
   onLocal,
   onCloud,
   onSignedOut,
@@ -22,16 +29,21 @@ export function AccountPanel({
   onTransfer,
   onExport,
   onClose,
+  onAuthenticated,
+  pendingAction,
 }: {
   cloudOwner: string | null;
   beforeChange: () => Promise<void>;
+  beforeNavigate?: () => Promise<void>;
   onLocal: () => Promise<void>;
   onCloud: (user: AccountUser) => Promise<void>;
-  onSignedOut: () => Promise<void>;
+  onSignedOut: (deleted?: boolean) => Promise<void>;
   loadLocal: () => Promise<ResumeDocument[]>;
   onTransfer: (owner: string, documents: ResumeDocument[]) => Promise<string>;
   onExport: (owner: string) => Promise<void>;
   onClose: () => void;
+  onAuthenticated?: (user: AccountUser) => Promise<void>;
+  pendingAction?: string;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState("");
@@ -74,6 +86,22 @@ export function AccountPanel({
       active = false;
     };
   }, []);
+  useEffect(() => {
+    let active = true;
+    const stop = watchSessionChanges(() => {
+      void accountRequest("/api/account").then(value => {
+        if (!active) return;
+        const next = sessionSchema.parse(value);
+        setSession(previous => {
+          if (previous?.user?.id !== next.user?.id) {
+            setLocalDocs(null); setSelected([]); setImported([]); setPassword(""); setCurrentPassword(""); setDeleteOpen(false); setPasswordOpen(false);
+          }
+          return next;
+        });
+      }).catch(() => {});
+    });
+    return () => { active = false; stop(); };
+  }, []);
   async function run(work: () => Promise<void>) {
     setWorking(true);
     setError("");
@@ -99,21 +127,6 @@ export function AccountPanel({
           <p>Choose where your resumes are saved.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {typeof window !== "undefined" && window.location.pathname !== "/profile" && (
-            <a
-              href="/profile"
-              style={{
-                fontSize: "11px",
-                color: "var(--green)",
-                fontWeight: 600,
-                textDecoration: "underline",
-                padding: "4px 8px",
-              }}
-              title="Open dedicated profile page"
-            >
-              Full Profile Page ↗
-            </a>
-          )}
           <button
             onClick={onClose}
             disabled={working}
@@ -123,6 +136,14 @@ export function AccountPanel({
           </button>
         </div>
       </div>
+      <nav className="account-navigation" aria-label="Account navigation">
+        {[["/profile", "Profile"], ["/pricing", "Plans"], ["/help", "Help"], ["/privacy", "Data & privacy"]].map(([href, label]) =>
+          <a key={href} href={href} onClick={(event) => {
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+            event.preventDefault();
+            void run(async () => { await beforeNavigate(); window.location.assign(href); });
+          }}>{label}</a>)}
+      </nav>
       {error && (
         <p className="account-error" role="alert">
           {error}
@@ -171,11 +192,12 @@ export function AccountPanel({
               <p>
                 {session.configured
                   ? "Save resumes in your account. Signing in never uploads your local resumes automatically."
-                  : "Account storage is not configured on this installation. Your local editor and exports are available."}
+                  : "Account storage is not configured on this installation. Local editing is available; exporting requires sign-in."}
               </p>
               {user && (
                 <>
                   <span className="account-email">{user.email}</span>
+                  {pendingAction && onAuthenticated && <button className="primary" disabled={working || !user.emailVerified} onClick={() => void run(() => onAuthenticated(user))}>{pendingAction}</button>}
                   <button
                     disabled={working || cloudOwner === user.id}
                     onClick={() => void run(() => onCloud(user))}
@@ -188,6 +210,15 @@ export function AccountPanel({
               )}
             </div>
           </div>
+          {session.configured && !user && <div className="account-signin-options">
+            {session.googleConfigured ? <GoogleSignIn disabled={working} onWaitingChange={setWorking} beforeChange={beforeChange} onComplete={async () => {
+              const next = await refresh();
+              notifySessionChange();
+              if (!next.user || !next.googleLinked) throw new Error("Google sign-in did not establish a session. Your draft is kept.");
+              if (onAuthenticated) await onAuthenticated(next.user);
+              setMessage("Signed in with Google. Choose your workspace; device drafts were kept.");
+            }} /> : <p>Google sign-in is not configured on this installation. Use email and password below.</p>}
+          </div>}
           {session.configured && !user && (
             <form
               className="account-form"
@@ -204,8 +235,10 @@ export function AccountPanel({
                     }),
                   })) as { message?: string };
                   setPassword("");
-                  await refresh();
-                  setMessage(result.message || "Request completed.");
+                  const signedIn = await refresh();
+                  notifySessionChange();
+                  if (signedIn.user && onAuthenticated) await onAuthenticated(signedIn.user);
+                  setMessage(result.message || (signedIn.user?.emailVerified === false ? "Signed in. Verify your email before exporting; your draft is kept." : "Request completed."));
                 });
               }}
             >
@@ -245,8 +278,7 @@ export function AccountPanel({
               )}
               {action === "signup" && (
                 <p>
-                  Use at least 12 characters. Email verification and recovery
-                  are not configured yet.
+                  Use at least 12 characters. Verify your email before exporting.
                 </p>
               )}
               <div className="button-row">
@@ -271,11 +303,40 @@ export function AccountPanel({
                     ? "Already have an account?"
                     : "Create account instead"}
                 </button>
+                <button type="button" disabled={working} onClick={() => { setAction("reset"); setPassword(""); }}>Forgot password?</button>
               </div>
             </form>
           )}
           {user && (
             <>
+              <div className="account-signin-options">
+                <h3>Sign-in methods</h3>
+                <p>{session.hasPassword ? "Email and password" : "Google sign-in · no password set"}{session.googleLinked && session.hasPassword ? " · Google linked" : ""}</p>
+                {session.googleConfigured && <GoogleSignIn
+                  mode={session.googleLinked ? "signin" : "link"} owner={user.id} onWaitingChange={setWorking}
+                  disabled={working || (!session.googleLinked && !user.emailVerified)} beforeChange={beforeChange}
+                  onComplete={async () => {
+                    const next = await refresh(); notifySessionChange();
+                    if (!next.user || next.user.id !== user.id || !next.googleLinked)
+                      throw new Error("The signed-in account changed. Your original workspace draft is kept; restore its session or save a device copy before switching.");
+                    if (onAuthenticated) await onAuthenticated(next.user);
+                    setMessage(session.googleLinked ? "Google session refreshed. Your workspace was kept." : "Google linked to this account. Your CVs and email were kept.");
+                  }} />}
+                {!session.googleLinked && <p>Verify your email and sign in recently, then link the Google account with the same email. Accounts are not merged automatically.</p>}
+              </div>
+              <div className="account-verification">
+                <p>{user.emailVerified ? "Email verified." : "Verify your email to download CVs and cover letters. You can keep editing and download your stored account data."}</p>
+                {session.emailDelivery === "unconfigured" && <p>Email delivery is not configured on this installation.</p>}
+                {session.emailDelivery === "file" && <p>Local development uses a private email test outbox. No email is delivered.</p>}
+                {!user.emailVerified && <button disabled={working || session.emailDelivery === "unconfigured"} onClick={() => void run(async () => {
+                  await accountRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "verify" }) }, user.id);
+                  setMessage("Verification email requested. Open its link, then refresh verification status here.");
+                })}>Send verification email</button>}
+                <button disabled={working} onClick={() => void run(async () => {
+                  const next = await refresh(); notifySessionChange();
+                  setMessage(next.user?.emailVerified ? "Email verified. Continue your export when ready." : "Email is not verified yet. Open the link in your email.");
+                })}>Refresh verification status</button>
+              </div>
               <div className="account-actions">
                 <button
                   disabled={working}
@@ -297,7 +358,7 @@ export function AccountPanel({
                 >
                   Download account data
                 </button>
-                <button
+                {session.hasPassword ? <button
                   disabled={working}
                   onClick={() => {
                     setPasswordOpen((value) => !value);
@@ -305,7 +366,10 @@ export function AccountPanel({
                   }}
                 >
                   Change password
-                </button>
+                </button> : <button disabled={working || session.emailDelivery === "unconfigured"} onClick={() => void run(async () => {
+                  await accountRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "reset", email: user.email }) });
+                  setMessage("Password setup email requested. Use its recovery link to set a password; Google stays linked.");
+                })}>Set a password by email</button>}
                 <button
                   disabled={working}
                   onClick={() =>
@@ -315,6 +379,7 @@ export function AccountPanel({
                         method: "POST",
                         body: JSON.stringify({ action: "signout" }),
                       });
+                      notifySessionChange();
                       setSession({ ...session, user: null });
                       setLocalDocs(null);
                       setPassword("");
@@ -425,6 +490,7 @@ export function AccountPanel({
                       setPasswordOpen(false);
                       setCurrentPassword("");
                       setMessage("Password updated.");
+                      notifySessionChange();
                     });
                   }}
                 >
@@ -484,15 +550,16 @@ export function AccountPanel({
                           "/api/account",
                           {
                             method: "DELETE",
-                            body: JSON.stringify({ password, confirmation }),
+                            body: JSON.stringify({ ...(session.hasPassword ? { password } : {}), confirmation }),
                           },
                           user.id,
                         );
                         setSession({ ...session, user: null });
+                        notifySessionChange();
                         setDeleteOpen(false);
                         setLocalDocs(null);
                         setPassword("");
-                        await onSignedOut();
+                        await onSignedOut(true);
                         setMessage(
                           "Account and active cloud resumes deleted. Local copies were kept.",
                         );
@@ -507,7 +574,7 @@ export function AccountPanel({
                       Provider backups expire according to your deployment’s
                       retention policy.
                     </p>
-                    <label>
+                    {session.hasPassword ? <label>
                       Current password
                       <input
                         type="password"
@@ -517,7 +584,7 @@ export function AccountPanel({
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                       />
-                    </label>
+                    </label> : <p>Sign in again with Google, then confirm deletion within ten minutes. No password is required for a Google-only account.</p>}
                     <label>
                       Type DELETE MY ACCOUNT
                       <input

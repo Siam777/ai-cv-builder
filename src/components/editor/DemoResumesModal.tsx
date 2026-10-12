@@ -1,23 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { DEMO_PROFILES, type DemoResumeMeta } from "@/lib/demo-resumes";
 import type { ResumeDocument } from "@/lib/document";
+import { ResumePreview } from "../resume-preview";
 
 interface DemoResumesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectDemo: (doc: ResumeDocument) => void;
+  onUseDesign: (doc: ResumeDocument, exampleId: string) => void;
 }
 
 export function DemoResumesModal({
   isOpen,
   onClose,
-  onSelectDemo,
+  onUseDesign,
 }: DemoResumesModalProps) {
   useBodyScrollLock(isOpen);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selected, setSelected] = useState<{ meta: DemoResumeMeta; doc: ResumeDocument } | null>(null);
+  const dialog = useModalFocus(onClose, isOpen);
 
   if (!isOpen) return null;
 
@@ -27,9 +31,7 @@ export function DemoResumesModal({
       : DEMO_PROFILES.filter((p) => p.category === selectedCategory);
 
   function handlePick(demo: DemoResumeMeta) {
-    const doc = demo.create();
-    onSelectDemo(doc);
-    onClose();
+    setSelected({ meta: demo, doc: demo.create() });
   }
 
   return (
@@ -39,6 +41,9 @@ export function DemoResumesModal({
       aria-modal="true"
       aria-label="Demo Resume Gallery"
       onClick={onClose}
+      ref={dialog}
+      tabIndex={-1}
+
     >
       <div
         className="modal-card demo-gallery-modal"
@@ -47,12 +52,12 @@ export function DemoResumesModal({
       >
         <div className="modal-header">
           <div>
-            <span className="modal-kicker">REAL-WORLD DEMO PROFILES</span>
+            <span className="library-kind">Demo · fictional content</span>
             <h2 className="modal-title" style={{ margin: "4px 0" }}>
-              Explore Templates with Realistic Demo Resumes
+              Demo examples
             </h2>
             <p className="modal-subtitle" style={{ margin: 0, color: "#64748b" }}>
-              Select an industry profile to test typography, photo rendering, and ATS metrics across all 8 template families.
+              Preview a fictional CV, then use its design with your own details. Browsing adds nothing to My CVs.
             </p>
           </div>
           <button
@@ -66,6 +71,16 @@ export function DemoResumesModal({
         </div>
 
         {/* Filter categories */}
+        {selected ? (
+          <div className="example-preview">
+            <div className="button-row">
+              <button onClick={() => setSelected(null)}>Back to examples</button>
+              <button className="primary" onClick={() => onUseDesign(selected.doc, selected.meta.id)}>Use this design</button>
+            </div>
+            <p>Read-only example. Names, employers, and achievements will not be copied to your CV.</p>
+            <div className="paper-stage"><ResumePreview doc={selected.doc} /></div>
+          </div>
+        ) : <>
         <div className="demo-category-tabs">
           {[
             { id: "all", label: "All Profiles (5)" },
@@ -92,7 +107,6 @@ export function DemoResumesModal({
             <div
               key={profile.id}
               className="demo-profile-card"
-              onClick={() => handlePick(profile)}
             >
               <div className="demo-card-top">
                 <div className="demo-avatar-badge">
@@ -136,12 +150,13 @@ export function DemoResumesModal({
                     handlePick(profile);
                   }}
                 >
-                  Load Resume <span>→</span>
+                  Preview example
                 </button>
               </div>
             </div>
           ))}
         </div>
+        </>}
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose}>

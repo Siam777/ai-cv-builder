@@ -1,232 +1,139 @@
-import {
-  type ResumeDocument,
-  type Entry,
-  dateRange,
-} from "../document";
+import type { ResumeDocument } from "../document";
+import { layoutBlocks } from "../layout";
+import { accents, densities, fonts, pageMetrics } from "../presentation";
 import { SimpleZip } from "./zip-writer";
 
 function escapeXml(text: string): string {
   return text
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
+const declaration = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+const wns =
+  'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+const rns =
+  'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+const relationshipType =
+  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 
-function xmlTextRun(text: string, options?: { bold?: boolean; italic?: boolean; sizePt?: number; colorHex?: string }): string {
-  const rPrParts: string[] = [];
-  if (options?.bold) rPrParts.push("<w:b/>");
-  if (options?.italic) rPrParts.push("<w:i/>");
-  if (options?.sizePt) rPrParts.push(`<w:sz w:val="${Math.round(options.sizePt * 2)}"/>`);
-  if (options?.colorHex) rPrParts.push(`<w:color w:val="${options.colorHex.replace("#", "")}"/>`);
-
-  const rPr = rPrParts.length > 0 ? `<w:rPr>${rPrParts.join("")}</w:rPr>` : "";
-  return `<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
-}
-
+/** Editable, sequential Word layout. Decorative PDF rails/panels and photos
+ * intentionally stay out of DOCX; content and presentation tokens are shared. */
 export function exportToDocx(
   doc: ResumeDocument,
   options?: { showWatermark?: boolean },
 ): Uint8Array {
   const zip = new SimpleZip();
-
-  // 1. [Content_Types].xml
+  const p = doc.presentation;
+  const metrics = pageMetrics(p);
+  const density = densities[p.density];
+  const accent = accents[p.accent].slice(1);
+  const font = fonts[p.font].name;
+  const rtl = p.direction === "rtl";
+  const bidi = rtl ? '<w:bidi/><w:jc w:val="right"/>' : "";
+  const centered = ["classic", "executive", "elegant"].includes(p.template);
+  const serif = ["classic", "executive", "elegant", "academic"].includes(
+    p.template,
+  );
+  const nameSize =
+    p.template === "compact" ? 22 : p.template === "minimalist" ? 25 : 27;
+  const twips = (mm: number) => Math.round((mm * 1440) / 25.4);
+  const run = (text: string, properties = "") =>
+    `<w:r>${properties || rtl ? `<w:rPr>${properties}${rtl ? "<w:rtl/>" : ""}</w:rPr>` : ""}${text
+      .split(/\r?\n/)
+      .map(
+        (line, i) =>
+          `${i ? "<w:br/>" : ""}<w:t xml:space="preserve">${escapeXml(line)}</w:t>`,
+      )
+      .join("")}</w:r>`;
+  const relationships = [
+    `<Relationship Id="styles" Type="${relationshipType}styles" Target="styles.xml"/>`,
+    `<Relationship Id="numbering" Type="${relationshipType}numbering" Target="numbering.xml"/>`,
+  ];
+  const paragraphs = layoutBlocks(doc)
+    .filter((block) => block.kind !== "photo")
+    .map((block, index) => {
+      const style =
+        block.kind === "name"
+          ? "Title"
+          : block.kind === "section"
+            ? "Heading1"
+            : block.kind === "title"
+              ? "Heading2"
+              : block.kind === "headline"
+                ? "Subtitle"
+                : block.kind === "meta" || block.kind === "contact"
+                  ? "Metadata"
+                  : "Normal";
+      let properties = `<w:pStyle w:val="${style}"/>${bidi}${block.keepNext ? "<w:keepNext/>" : ""}<w:widowControl/>`;
+      if (centered && ["name", "headline", "contact"].includes(block.kind))
+        properties += '<w:jc w:val="center"/>';
+      if (block.kind === "bullet")
+        properties +=
+          '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+      let content = run(block.text);
+      if (block.href) {
+        const id = `link${index}`;
+        relationships.push(
+          `<Relationship Id="${id}" Type="${relationshipType}hyperlink" Target="${escapeXml(block.href)}" TargetMode="External"/>`,
+        );
+        content = `<w:hyperlink r:id="${id}">${run(block.text, `<w:color w:val="${accent}"/><w:u w:val="single"/>`)}</w:hyperlink>`;
+      }
+      return `<w:p><w:pPr>${properties}</w:pPr>${content}</w:p>`;
+    });
+  const watermark = !!options?.showWatermark;
+  if (watermark) {
+    relationships.push(
+      `<Relationship Id="footer" Type="${relationshipType}footer" Target="footer1.xml"/>`,
+    );
+    zip.addFile(
+      "word/footer1.xml",
+      `${declaration}<w:ftr ${wns}><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${run("Created with AI CV Builder", '<w:sz w:val="15"/><w:color w:val="677468"/>')}</w:p></w:ftr>`,
+    );
+  }
   zip.addFile(
     "[Content_Types].xml",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-</Types>`,
+    `${declaration}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${["document", "styles", "numbering"].map((part) => `<Override PartName="/word/${part}.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.${part === "document" ? "document.main" : part}+xml"/>`).join("")}${watermark ? '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : ""}</Types>`,
   );
-
-  // 2. _rels/.rels
   zip.addFile(
     "_rels/.rels",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`,
+    `${declaration}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="document" Type="${relationshipType}officeDocument" Target="word/document.xml"/></Relationships>`,
   );
-
-  // 3. word/_rels/document.xml.rels
   zip.addFile(
     "word/_rels/document.xml.rels",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`,
+    `${declaration}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships.join("")}</Relationships>`,
   );
-
-  // 4. word/styles.xml
+  const style = (
+    id: string,
+    name: string,
+    paragraph: string,
+    properties: string,
+  ) =>
+    `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr>${paragraph}</w:pPr><w:rPr>${properties}</w:rPr></w:style>`;
+  const headingFont = serif
+    ? '<w:rFonts w:ascii="Source Serif 4" w:hAnsi="Source Serif 4"/>'
+    : "";
   zip.addFile(
     "word/styles.xml",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:docDefaults>
-    <w:rPrDefault>
-      <w:rPr>
-        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>
-        <w:sz w:val="20"/>
-        <w:color w:val="26322C"/>
-      </w:rPr>
-    </w:rPrDefault>
-  </w:docDefaults>
-</w:styles>`,
+    `${declaration}<w:styles ${wns}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="${font}"/><w:sz w:val="${p.fontSize * 2}"/><w:szCs w:val="${p.fontSize * 2}"/><w:color w:val="26322C"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="${p.density === "tight" ? 40 : 80}" w:line="${Math.round(density.lineHeight * 240)}" w:lineRule="auto"/><w:widowControl/>${bidi}</w:pPr></w:pPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+  ${style("Title", "Title", '<w:keepNext/><w:spacing w:after="140"/>', `${headingFont}<w:b/><w:sz w:val="${nameSize * 2}"/><w:color w:val="${accent}"/>`)}
+  ${style("Subtitle", "Subtitle", '<w:keepNext/><w:spacing w:after="140"/>', `<w:sz w:val="22"/><w:color w:val="${accent}"/>`)}
+  ${style("Heading1", "heading 1", `<w:keepNext/><w:keepLines/><w:outlineLvl w:val="0"/><w:spacing w:before="${density.gap * 20}" w:after="100"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="3" w:color="${accent}"/></w:pBdr>`, `${headingFont}<w:b/><w:sz w:val="22"/><w:color w:val="${accent}"/>`)}
+  ${style("Heading2", "heading 2", '<w:keepNext/><w:keepLines/><w:outlineLvl w:val="1"/><w:spacing w:before="100" w:after="40"/>', "<w:b/>")}
+  ${style("Metadata", "Metadata", '<w:spacing w:after="60"/>', '<w:sz w:val="18"/><w:color w:val="4F5F52"/>')}
+  </w:styles>`,
   );
-
-  // 5. word/document.xml
-  const isLetter = doc.presentation.pageSize === "Letter";
-  const pgW = isLetter ? 12240 : 11906; // twips
-  const pgH = isLetter ? 15840 : 16838;
-  const marginTwips = 850; // ~15mm
-
-  const isRtl = doc.presentation.direction === "rtl";
-  const bidiPr = isRtl ? '<w:bidi/><w:jc w:val="right"/>' : "";
-  const bidiBulletPr = isRtl
-    ? '<w:bidi/><w:jc w:val="right"/><w:ind w:right="360" w:hanging="180"/>'
-    : '<w:ind w:left="360" w:hanging="180"/>';
-
-  const paragraphs: string[] = [];
-
-  // Contact Name
-  paragraphs.push(`
-    <w:p>
-      <w:pPr>
-        ${bidiPr}
-        <w:spacing w:after="80"/>
-      </w:pPr>
-      ${xmlTextRun(doc.contact.name || "Resume", { bold: true, sizePt: 22, colorHex: "1A221D" })}
-    </w:p>`);
-
-  // Headline
-  if (doc.contact.headline) {
-    paragraphs.push(`
-      <w:p>
-        <w:pPr>
-          ${bidiPr}
-          <w:spacing w:after="100"/>
-        </w:pPr>
-        ${xmlTextRun(doc.contact.headline, { bold: true, sizePt: 11, colorHex: "285641" })}
-      </w:p>`);
-  }
-
-  // Contact Info Row
-  const contactParts = [
-    doc.contact.email,
-    doc.contact.phone,
-    doc.contact.location,
-    doc.contact.website,
-  ].filter(Boolean);
-
-  if (contactParts.length > 0) {
-    paragraphs.push(`
-      <w:p>
-        <w:pPr>
-          ${bidiPr}
-          <w:spacing w:after="240"/>
-        </w:pPr>
-        ${xmlTextRun(contactParts.join(" | "), { sizePt: 9, colorHex: "556358" })}
-      </w:p>`);
-  }
-
-  // Sections
-  for (const section of doc.sections) {
-    if (!section.visible || section.entries.length === 0) continue;
-
-    // Section Heading
-    paragraphs.push(`
-      <w:p>
-        <w:pPr>
-          ${bidiPr}
-          <w:spacing w:before="260" w:after="100"/>
-          <w:pBdr>
-            <w:bottom w:val="single" w:sz="6" w:space="3" w:color="285641"/>
-          </w:pBdr>
-        </w:pPr>
-        ${xmlTextRun(section.label.toUpperCase(), { bold: true, sizePt: 11, colorHex: "285641" })}
-      </w:p>`);
-
-    // Entries
-    for (const entry of section.entries) {
-      const headingParts = [entry.title, entry.organization].filter(Boolean);
-      const metaParts = [entry.location, dateRange(entry)].filter(Boolean);
-
-      if (headingParts.length > 0) {
-        paragraphs.push(`
-          <w:p>
-            <w:pPr>
-              ${bidiPr}
-              <w:spacing w:before="120" w:after="40"/>
-            </w:pPr>
-            ${xmlTextRun(headingParts.join(" · "), { bold: true, sizePt: 10.5 })}
-          </w:p>`);
-      }
-
-      if (metaParts.length > 0) {
-        paragraphs.push(`
-          <w:p>
-            <w:pPr>
-              ${bidiPr}
-              <w:spacing w:after="80"/>
-            </w:pPr>
-            ${xmlTextRun(metaParts.join(" | "), { italic: true, sizePt: 9, colorHex: "5B695E" })}
-          </w:p>`);
-      }
-
-      if (entry.description) {
-        paragraphs.push(`
-          <w:p>
-            <w:pPr>
-              ${bidiPr}
-              <w:spacing w:after="80"/>
-            </w:pPr>
-            ${xmlTextRun(entry.description, { sizePt: 10 })}
-          </w:p>`);
-      }
-
-      for (const bullet of entry.bullets) {
-        if (!bullet.text.trim()) continue;
-        paragraphs.push(`
-          <w:p>
-            <w:pPr>
-              ${bidiBulletPr}
-              <w:spacing w:after="40"/>
-            </w:pPr>
-            ${xmlTextRun("• ", { sizePt: 10, colorHex: "285641" })}
-            ${xmlTextRun(bullet.text.trim(), { sizePt: 10 })}
-          </w:p>`);
-      }
-    }
-  }
-
-  // Watermark if requested
-  if (options?.showWatermark) {
-    paragraphs.push(`
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-          <w:spacing w:before="400" w:after="100"/>
-        </w:pPr>
-        ${xmlTextRun("Created with AI CV Builder", { italic: true, sizePt: 8, colorHex: "888888" })}
-      </w:p>`);
-  }
-
-  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    ${paragraphs.join("\n")}
-    <w:sectPr>
-      <w:pgSz w:w="${pgW}" w:h="${pgH}"/>
-      <w:pgMar w:top="${marginTwips}" w:right="${marginTwips}" w:bottom="${marginTwips}" w:left="${marginTwips}"/>
-    </w:sectPr>
-  </w:body>
-</w:document>`;
-
-  zip.addFile("word/document.xml", documentXml);
-
+  zip.addFile(
+    "word/numbering.xml",
+    `${declaration}<w:numbering ${wns}><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="${rtl ? "right" : "left"}"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="240"/></w:tabs><w:ind w:${rtl ? "right" : "left"}="240" w:hanging="240"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>`,
+  );
+  zip.addFile(
+    "word/document.xml",
+    `${declaration}<w:document ${wns} ${rns}><w:body>${paragraphs.join("")}<w:sectPr>${watermark ? '<w:footerReference w:type="default" r:id="footer"/>' : ""}<w:pgSz w:w="${twips(metrics.width)}" w:h="${twips(metrics.height)}"/><w:pgMar w:top="${twips(metrics.margin)}" w:right="${twips(metrics.margin)}" w:bottom="${twips(metrics.margin)}" w:left="${twips(metrics.margin)}" w:footer="397"/>${rtl ? "<w:bidi/>" : ""}</w:sectPr></w:body></w:document>`,
+  );
   return zip.generate();
 }

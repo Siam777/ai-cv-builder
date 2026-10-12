@@ -1,35 +1,39 @@
 # AI CV/resume builder: feature plan
 
-This document defines the release scope for AI CV Builder. PLAN.md owns implementation phases and verified progress. The repository includes the local editor, Phase 2 templates, and a working SQLite account foundation. Turso deployment is configured but not live-verified. The OpenAI bullet assistant is implemented and awaits live API verification; broader AI features remain planned.
+Updated: 2026-10-10. This document owns release scope; PLAN.md owns implementation progress and acceptance evidence. The current improvement specification is `docs/plans/product-quality-and-launch-plan.md` in the application repository. All new requirements below are planned, not claims of implemented behavior.
 
-## First release
+The initial source audit confirmed an existing editor, eight registered template styles, five demo profiles, Better Auth account infrastructure, six resume export formats, and analyzer/AI flows, and identified anonymous exports, fixed ATS percentages, and fictional generation requiring correction. Current implementation and validation are recorded in PLAN.md; historical audit findings are not a statement of current behavior or a production certification.
+
+## Polished launch scope
 
 | Area | Features | Done when |
 | --- | --- | --- |
-| Editor | Contact details; summary, experience, education, skills, projects, certifications, languages; reorder/rename/hide sections | Edits persist and template switching loses no data |
-| Resume management | Named variants, autosave states, undo, JSON backup/restore | Variants remain independent and restore preserves content |
-| Templates | Classic, Modern, Compact, Creative; accents, density, A4/Letter | All four render short and long resumes without clipped content |
-| Chatbot | Guided fact collection, summary drafts, bullet rewrites, evidence-based skill suggestions | Proposed changes are reviewable, reversible, and contain no unsupported factual additions in evaluation fixtures |
-| Imports | Paste text; staged LinkedIn CSV/ZIP; JSON restore; merge/replace preview | Partial and malformed input cannot silently overwrite a resume |
-| Tailoring | Pasted job description, evidence-based requirement coverage, targeted rewrites | Missing skills stay gaps and every reported match has supporting evidence |
-| Export | Selectable PDF, plain text, JSON | Exported content preserves facts and expected reading order |
-| Writing audit and skills | Explained local writing findings and a basic searchable skill library | Findings are contextual and missing requirements never become claimed skills |
-| Access and privacy | Choose local-only or account storage explicitly; server-side AI credentials; document ownership for hosted mode | No cross-user access and no resume text in routine logs |
+| Landing and navigation | Public landing page, template/example galleries and detail pages, resume review entry point, pricing, help, and privacy information | Coherent mobile/desktop UI; working CTAs; authentic product demonstrations and claims |
+| Editor | Existing content types and custom sections; focused editing, preview navigation, keyboard bullets, accessible mobile modes | Edits persist, template switching loses no facts, and core journeys pass accessibility checks |
+| Resume management | Distinct My CVs, On this device, and Demo examples views; explicit purpose/provenance; safe legacy-draft review; named variants, autosave, undo, history, authenticated backup | User can recognize personal CVs; viewing demos creates no personal record; no deleted legacy edits, silent overwrite, cross-account mixing, or lost draft during sign-in |
+| Templates | Refine Classic, Modern, Compact, Creative, Tech, Executive, Timeline, Minimalist; add Elegant, Portfolio, Bold, Academic for 12 total; bounded fonts, accents, density, A4/Letter | 72 short/long PDF cases across 12 templates and two sizes, plus stress and DOCX checks; no fixed ATS percentages |
+| Demo starters | Separate read-only library with 12 fictional profiles; persistent Demo badge; preview, design-only personal start, and optional clearly separated practice copies | Examples never populate My CVs, personal recents or counts; personal documents start without inherited fictional history |
+| Authentication | Better Auth email/password, verification, recovery, Google sign-in, session controls, safe account deletion | Live flows verified; session expiry preserves drafts; server ownership checks cover private resources |
+| Mandatory export access | Authenticate every app-provided download/export, including free users, backups, cover letters, reports, sample files, account data, and app print/copy actions | Direct requests and all UI paths reject anonymous/expired/wrong-owner access; no print fallback bypass |
+| Export formats | PDF, DOCX, HTML, Markdown, TXT, JSON; matching cover-letter outputs integrated with the same policy | Actual files preserve content and order; editable DOCX verified; unsupported format/layout differences disclosed |
+| Analyzer | Actual PDF/DOCX readability, deterministic writing findings, explicit target role, evidence-based job coverage, semantic AI coaching | Explained methods and uncertainty, no perfect default extraction score, versioned held-out evaluations meet launch gates |
+| AI assistance | Guided fact collection, summary/bullet proposals, supported skill suggestions, job tailoring | Candidate facts only; before/after review, evidence, accept/reject/undo, revision checks, and spending limits |
+| Imports | Text, text-based PDF, staged LinkedIn CSV/ZIP, JSON restore; review omissions before merge/replace | Validated input and explicit review; scanned PDFs and unsupported formats receive honest feedback |
+| Privacy and operations | Explicit local/cloud storage choice, authenticated transient processing for local exports, metadata-only logs, retention/deletion, monitoring and restore runbook | Production provider behavior verified; no silent cloud import; ownership and backup-restoration tests pass |
 
-## First usable milestone
+## Authentication policy and first improvement milestone
 
-Manual editing, local IndexedDB persistence, independent named variants, undo, a Classic preview, A4/Letter browser print, plain-text export, and validated version 1 JSON backup/restore. Phase 2 adds all four template families, bounded design controls, and a measured paginated preview shared with browser print. Phase 3 adds Better Auth accounts on SQLite, a Turso/libSQL deployment adapter, ownership/revision checks, account export/deletion, and explicit local-to-account copying. Live hosting and Turso verification remain outstanding. The first Phase 4 flow adds an account-only OpenAI bullet assistant with transmission consent, evidence checks, before/after review, atomic acceptance, rejection, and undo; live API verification is pending. Contextual chat, summaries, skill suggestions, LinkedIn/pasted-text imports, tailoring, writing audit, and basic skills search remain planned. Browser, font, and printer differences remain; deterministic hosted PDF rendering is not claimed.
+Guests can browse, edit a device-local draft, preview templates, and view basic review findings. Every app-provided download/export requires a valid server-verified account session, independently of payment. CVs, cover letters, recovery backups and app print/copy additionally require verified email; account-data export remains available to authenticated owners before verification and is never paywalled. Sign-in and verification return to the pending document and format. Recovery backups have no anonymous exemption. An expired or changed cloud session pauses the workspace without discarding its in-tab draft; restore the original session or explicitly keep a device copy before switching. Browser/OS printing or manual copying of visible content cannot be technically prohibited and is not a DRM promise.
 
-## Next release
+After establishing the baseline, start with the My CVs versus Demo examples separation: personal/account documents, device-local drafts, and read-only examples have distinct views and reliable metadata. Preserve older documents with unknown provenance for explicit review; never infer ownership from names or silently delete them. Finish production authentication and close every anonymous export path within this first Q1 slice. Then deliver the public landing and product shell, polish the existing eight templates, expand to the 12-design/12-demo launch collection, validate the analyzer, and complete live release checks. Existing editor functionality must survive route and account changes.
 
-- Decomposed modular editor (`EditorSidebar`, `SectionEditor`, `BulletList`, `EditorHeader`) with continuous scroll, bidirectional preview sync, and inline contextual AI magic bar (see `resume-builder-editor-ux`).
-- Existing PDF/DOCX resume cold-start onboarding with text extraction and staged preview review.
-- Master Career Vault architecture separating immutable candidate records from targeted resume variants (see `resume-builder-career-vault`).
-- 1-Click Job Tailoring engine with heuristic requirement extraction, transparent coverage scoring, gap analysis, and Google XYZ Impact Coach.
-- Deterministic ATS writing linter (active verbs, metrics, length), ATS plain-text diagnostic tab with reading-order checks, and public ATS grader lead magnet (see `resume-builder-ats-linter`).
-- Commercial monetization with Stripe Checkout, subscription lifecycle webhooks, Job Hunter Pass, Lifetime Pass, and watermark export controls (see `resume-builder-monetization`).
-- DOCX, standalone HTML, Markdown, cover letters, version history, and reusable custom sections.
-- Localization and tested RTL templates. Keyboard operation, screen-reader semantics, and Unicode content are first-release requirements.
+## Follow-on scope
+
+- Expanded, persistently stored Master Career Vault and application workflows after validating the existing separation of facts and variants.
+- DOCX import and OCR, each with a dedicated extraction/review acceptance gate.
+- More occupation-specific rubrics, language-specific analysis, and RTL template families after their own evaluations. Unicode preservation remains a launch requirement; it is not a claim of validated analysis in every language.
+- MFA/passkeys, collaboration, and public sharing only after defining their access policies. Public sharing cannot create anonymous file-download access.
+- Commercial pricing/tier refinement after usability and cost testing. Existing billing code needs live verification before paid release; lifetime/unlimited AI offers are not committed. No exact price is established by this plan.
 
 ## Enterprise, when required
 
@@ -37,9 +41,9 @@ Organization roles, tenant isolation, shared brand templates, approval workflows
 
 ## Suggested architecture
 
-This project uses Next.js/TypeScript, browser IndexedDB, SQLite for local accounts, and Turso/libSQL for the deployed database, with Drizzle and Better Auth. Turso is the database provider; an application host remains to be selected. Keep a versioned resume document and one rendering contract shared by preview/export. Add object storage for real asset needs and a worker queue for server PDF workloads. Choose authentication, ORM, queue, AI provider, and deployment based on project constraints; they are not skill prerequisites. A local prototype can begin without enterprise infrastructure.
+Retain Next.js/TypeScript, IndexedDB, SQLite/Turso, Drizzle, and Better Auth. Keep a versioned canonical document and a shared preview/export contract. Add a central authenticated export service and client coordinator, versioned analysis results and evidence, and a public marketing/workspace route split. Use private temporary artifacts and a queue only when required by measured workloads. The application host, email service, and production AI configuration require current documentation and staging validation.
 
-Implement in this order: canonical document and editor; local persistence and variants; templates and exports; hosted foundation; AI proposals; imports, tailoring, and local audit; release readiness; optional enterprise features. Each phase should leave a usable vertical slice.
+Implementation order: Q0 baseline and factual integrity; Q1 My CVs/demo separation plus authentication/export policy; Q2 landing/product shell; Q3 templates/demos; Q4 analyzer/evidence workflow; Q5 production validation. Detailed acceptance gates and progress live in PLAN.md. Preserve existing code and candidate data while implementing reviewable slices.
 
 ## R&D assumptions to verify during implementation
 
@@ -77,7 +81,7 @@ Use $resume-builder-ai to add an evidence-grounded chatbot and server AI proposa
 ```
 
 ```text
-Use $resume-builder-templates to add Classic, Modern, Compact, and Creative templates with live preview, ATS diagnostic checks, and verified exports.
+Use $resume-builder-templates to refine the existing eight designs and add the planned launch collection with live preview, actual-file diagnostics, and authenticated, verified exports.
 ```
 
 These skills guide Codex while developing the application. The application's chatbot still needs its own runtime prompts, validation, model connection, and tests.

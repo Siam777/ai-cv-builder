@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import {
@@ -29,6 +30,7 @@ export function VersionHistoryModal({
   onClose,
 }: VersionHistoryModalProps) {
   useBodyScrollLock(true);
+  const dialogRef = useModalFocus(onClose);
   const [snapshots, setSnapshots] = useState<ResumeSnapshot[]>([]);
   const [newSnapshotLabel, setNewSnapshotLabel] = useState("");
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
@@ -70,7 +72,10 @@ export function VersionHistoryModal({
   return (
     <div
       className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
+      aria-modal="true"
       aria-label="Resume Version History"
     >
       <div className="modal-card tailor-modal" style={{ maxWidth: "780px" }}>

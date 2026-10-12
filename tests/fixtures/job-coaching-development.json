@@ -1,0 +1,126 @@
+{
+  "version": "job-coaching-development-v1",
+  "purpose": "Controlled reply regression cases, not held-out model-quality evaluation",
+  "cases": [
+    {
+      "name": "concrete-user-research",
+      "source": "Ran customer interviews to understand onboarding friction.",
+      "criterion": "Required: user research",
+      "text": "Conducted customer interviews about onboarding friction.",
+      "status": "relevant",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": true
+    },
+    {
+      "name": "related-cloud-is-not-evidence",
+      "source": "Built Docker containers for a support tool.",
+      "criterion": "Required: Kubernetes",
+      "text": "Owned production Kubernetes operations.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "assistance-is-not-leadership",
+      "source": "Assisted the team lead during migration planning.",
+      "criterion": "Required: leadership",
+      "text": "Led the migration team.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "learning-is-not-applied-work",
+      "source": "Learning Python through tutorials.",
+      "criterion": "Required: Python",
+      "text": "Developed Python services.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "negation-preserved",
+      "source": "Did not manage AWS infrastructure.",
+      "criterion": "Required: AWS",
+      "text": "Managed AWS infrastructure.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "compound-missing-part",
+      "source": "Built Python tools for the support team.",
+      "criterion": "Required: Python and Kubernetes",
+      "text": "Built Python and Kubernetes tools.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "duration-always-manual",
+      "source": "Maintained Python tools.",
+      "criterion": "Required: 5 years of Python",
+      "text": "Maintained Python tools for 5 years.",
+      "status": "relevant",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": false
+    },
+    {
+      "name": "invented-impact-blocked",
+      "source": "Designed a Figma prototype for onboarding.",
+      "criterion": "Required: Figma",
+      "text": "Designed a Figma prototype that improved conversion by 97%.",
+      "status": "relevant",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": false
+    },
+    {
+      "name": "credential-in-progress",
+      "source": "Preparing for the AWS certification exam.",
+      "criterion": "Required: AWS certified",
+      "text": "Earned AWS certification.",
+      "status": "relevant",
+      "assessmentSupport": false,
+      "rewriteSupport": false,
+      "expectedEdit": false
+    },
+    {
+      "name": "uncertainty-does-not-edit",
+      "source": "Maintained an internal support tool.",
+      "criterion": "Required: leadership",
+      "text": "Led support operations.",
+      "status": "uncertain",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": false
+    },
+    {
+      "name": "no-support-is-entry-specific",
+      "source": "Created support documentation.",
+      "criterion": "Required: AWS",
+      "text": "Managed AWS systems.",
+      "status": "not_demonstrated",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": false
+    },
+    {
+      "name": "supported-outcome-preserved",
+      "source": "Reduced support response time by 20% using Python automation.",
+      "criterion": "Required: Python",
+      "text": "Used Python automation to reduce support response time by 20%.",
+      "status": "relevant",
+      "assessmentSupport": true,
+      "rewriteSupport": true,
+      "expectedEdit": true
+    }
+  ]
+}

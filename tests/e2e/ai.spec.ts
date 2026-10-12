@@ -1,3 +1,5 @@
+import { openEditorTools } from "./helpers";
+import { startSampleResume, openFirstCv, authenticateForExport } from "./helpers";
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
@@ -6,8 +8,9 @@ import { bulletEvidence } from "../../src/lib/ai-proposals";
 test("AI controls keep local data private and require account storage", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Explore an example" }).click();
+  await page.goto("/builder");
+  await startSampleResume(page);
+  await openEditorTools(page);
   await page
     .getByRole("button", { name: "AI bullet assistant", exact: true })
     .click();
@@ -26,7 +29,7 @@ test("AI controls keep local data private and require account storage", async ({
 test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves are real", async ({
   page,
 }) => {
-  const origin = "http://localhost:3000";
+  const origin = (process.env.E2E_ORIGIN || "http://localhost:3100");
   const password = "Synthetic-AI-password-42";
   const signup = await page.request.post("/api/auth", {
     headers: {
@@ -132,10 +135,9 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
         })
       ).status(),
     ).toBe(403);
-    await page.goto("/");
-    await page.getByRole("button", { name: "Account", exact: true }).click();
-    await page.getByRole("button", { name: "Open account workspace" }).click();
-    await page.getByRole("button", { name: "Close account settings" }).click();
+    await page.goto("/builder");
+    await openFirstCv(page, "Practice copies");
+    await openEditorTools(page);
     await page
       .getByRole("button", { name: "AI bullet assistant", exact: true })
       .click();

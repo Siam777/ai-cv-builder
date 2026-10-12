@@ -1,8 +1,13 @@
 "use client";
 
+import type { FileDiagnosticReport } from "@/lib/file-diagnostics";
+import { FileDiagnosticResults } from "@/components/editor/FileDiagnostics";
 import { useState } from "react";
 import Link from "next/link";
-import { lintResumeDocument, type AtsLintIssue } from "@/lib/linter/ats-linter";
+import {
+  lintResumeDocument,
+  type AtsReadinessReport,
+} from "@/lib/linter/ats-linter";
 import { extractAtsPlainText } from "@/lib/linter/ats-plain-text";
 import { parseTextToResume } from "@/lib/importers/text-resume-parser";
 import {
@@ -57,18 +62,19 @@ export default function GraderPage() {
   const [resumeText, setResumeText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isPractice, setIsPractice] = useState(false);
   const [error, setError] = useState("");
 
   const [report, setReport] = useState<{
     doc: ResumeDocument;
-    atsScore: number;
-    verbsScore: number;
-    metricsScore: number;
-    issues: AtsLintIssue[];
+    findings: AtsReadinessReport;
+    warnings: string[];
     plainText: string;
+    fileDiagnostics?: FileDiagnosticReport;
     jobAnalysis?: {
       targetTitle: string;
-      coverageScore: number;
+      matchedCount: number;
+      totalCount: number;
       matchedRequirements: MatchedEvidence[];
       skillGaps: SkillGap[];
     };
@@ -76,6 +82,7 @@ export default function GraderPage() {
 
   function loadSampleData() {
     setTab("paste");
+    setIsPractice(true);
     setResumeText(SAMPLE_RESUME_TEXT);
     setJobDescription(SAMPLE_JOB_DESCRIPTION);
     setError("");
@@ -87,10 +94,14 @@ export default function GraderPage() {
 
     try {
       let parsedDoc: ResumeDocument | null = null;
+      let warnings: string[] = [];
+      let fileDiagnostics: FileDiagnosticReport | undefined;
 
       if (tab === "upload") {
         if (!file) {
-          throw new Error("Please select a resume file (.pdf, .txt, or .json) to audit.");
+          throw new Error(
+            "Please select a resume file (.pdf, .docx or .txt) to audit.",
+          );
         }
         const formData = new FormData();
         formData.append("file", file);
@@ -105,12 +116,18 @@ export default function GraderPage() {
           throw new Error(data.error || "Failed to process resume file.");
         }
         parsedDoc = data.document;
+        warnings = Array.isArray(data.warnings) ? data.warnings : [];
+        fileDiagnostics = data.diagnostics;
       } else {
         if (!resumeText.trim()) {
           throw new Error("Please paste your resume text to audit.");
         }
-        const { document } = parseTextToResume(resumeText, "Pasted Resume");
+        const { document, warnings: parseWarnings } = parseTextToResume(
+          resumeText,
+          "Pasted Resume",
+        );
         parsedDoc = document;
+        warnings = parseWarnings;
       }
 
       if (!parsedDoc) {
@@ -121,6 +138,9 @@ export default function GraderPage() {
         parsedDoc.name = `${parsedDoc.contact.name} · Resume`;
       }
 
+      if (tab === "paste" && isPractice)
+        parsedDoc.provenance = { purpose: "practice", origin: "example" };
+
       // Run ATS Heuristic Audit
       const linterResult = lintResumeDocument(parsedDoc);
       const plainText = extractAtsPlainText(parsedDoc);
@@ -128,12 +148,14 @@ export default function GraderPage() {
       // Optional Job Description Matching
       let jobAnalysis = undefined;
       if (jobDescription.trim().length > 30) {
-        const reqs: ExtractedJobRequirements = parseJobDescriptionHeuristics(jobDescription);
+        const reqs: ExtractedJobRequirements =
+          parseJobDescriptionHeuristics(jobDescription);
         const matchResult = matchEvidenceAndCalculateCoverage(reqs, parsedDoc);
 
         jobAnalysis = {
           targetTitle: matchResult.jobTitle || reqs.jobTitle,
-          coverageScore: matchResult.coverageScore,
+          matchedCount: matchResult.matchedCount,
+          totalCount: matchResult.totalRequirementsCount,
           matchedRequirements: matchResult.matchedEvidence,
           skillGaps: matchResult.skillGaps,
         };
@@ -141,10 +163,9 @@ export default function GraderPage() {
 
       setReport({
         doc: parsedDoc,
-        atsScore: linterResult.score,
-        verbsScore: linterResult.verbsScore,
-        metricsScore: linterResult.metricsScore,
-        issues: linterResult.issues,
+        findings: linterResult,
+        fileDiagnostics,
+        warnings,
         plainText,
         jobAnalysis,
       });
@@ -160,9 +181,10 @@ export default function GraderPage() {
     try {
       const repo = createRepository();
       await repo.save(report.doc, null);
-      window.location.href = "/";
+      sessionStorage.setItem("cv-workspace", "device");
+      window.location.href = "/builder";
     } catch (e) {
-      setError("Unable to transfer to studio. You can copy the plain text below.");
+      setError("Unable to transfer to the editor. Please try again.");
     }
   }
 
@@ -174,11 +196,11 @@ export default function GraderPage() {
             cv<span>·</span>
           </span>
           <span>
-            ATS Grader<small>AI CV BUILDER</small>
+            Resume Reviewer<small>AI CV BUILDER</small>
           </span>
         </Link>
         <div className="grader-header-actions">
-          <Link href="/" className="nav-link">
+          <Link href="/builder" className="nav-link">
             Open Resume Studio →
           </Link>
         </div>
@@ -186,12 +208,19 @@ export default function GraderPage() {
 
       <main className="grader-main">
         <section className="grader-hero">
-          <span className="grader-badge">100% PRIVATE · CLIENT-SIDE HEURISTIC AUDIT</span>
-          <h1>Free ATS Resume Grader & Match Inspector</h1>
+          <span className="grader-badge">
+            VISIBLE CONTENT · DETERMINISTIC CHECKS
+          </span>
+          <h1>Free Resume Content Review</h1>
+          <p>
+            Upload your CV or paste its text, then choose Review resume content.
+            Read the findings, check any import notes, and open the editor to
+            make changes. A job description is optional.
+          </p>
           <p className="hero-lead">
-            Audit your resume against enterprise applicant tracking system (ATS) parser rules,
-            action verb strength, and quantifiable outcome density. Paste a job description to
-            check keyword match coverage in seconds.
+            Review contact details, vague bullet openings, dates, and numeric
+            patterns. Add a job description to see keyword and token overlaps.
+            These checks do not predict ATS acceptance or hiring outcomes.
           </p>
         </section>
 
@@ -210,7 +239,7 @@ export default function GraderPage() {
                     className={`tab-pill ${tab === "upload" ? "active" : ""}`}
                     onClick={() => setTab("upload")}
                   >
-                    Upload File (.pdf, .txt)
+                    Upload File (.pdf, .docx, .txt)
                   </button>
                   <button
                     type="button"
@@ -233,21 +262,26 @@ export default function GraderPage() {
                     <input
                       type="file"
                       id="resume-file"
-                      accept=".pdf,.txt,.json"
+                      accept=".pdf,.docx,.txt"
                       onChange={(e) => {
                         if (e.target.files?.[0]) setFile(e.target.files[0]);
                       }}
                     />
                     <label htmlFor="resume-file" className="dropzone-label">
                       <span className="upload-icon">📄</span>
-                      <strong>{file ? file.name : "Choose a PDF, TXT, or JSON resume"}</strong>
-                      <span className="file-hint">Drag and drop or browse from your device</span>
+                      <strong>
+                        {file ? file.name : "Choose a PDF, DOCX or TXT resume"}
+                      </strong>
+                      <span className="file-hint">
+                        Up to 5 MB · Files are sent to this application server
+                      </span>
                     </label>
                   </div>
                 ) : (
                   <textarea
                     className="resume-textarea"
                     rows={12}
+                    aria-label="Resume text"
                     placeholder="Paste the full text of your resume here..."
                     value={resumeText}
                     onChange={(e) => setResumeText(e.target.value)}
@@ -261,11 +295,13 @@ export default function GraderPage() {
                   <h3>Target Job Description (Optional)</h3>
                 </div>
                 <p className="box-hint">
-                  Paste the requirements section of a role you want to apply for to compute keyword match score.
+                  Paste actual requirements to compare skill aliases and token
+                  fragments. Text overlap does not verify qualifications.
                 </p>
                 <textarea
                   className="job-textarea"
                   rows={12}
+                  aria-label="Job description"
                   placeholder="Paste job description requirements and qualifications here..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
@@ -273,7 +309,11 @@ export default function GraderPage() {
               </div>
             </div>
 
-            {error && <div className="alert" role="alert">{error}</div>}
+            {error && (
+              <div className="alert" role="alert">
+                {error}
+              </div>
+            )}
 
             <div className="audit-action-bar">
               <button
@@ -282,7 +322,9 @@ export default function GraderPage() {
                 disabled={loading}
                 onClick={handleAudit}
               >
-                {loading ? "Analyzing resume against ATS heuristics…" : "⚡ Run Free ATS & Match Audit"}
+                {loading
+                  ? "Reviewing resume content…"
+                  : "Review resume content"}
               </button>
             </div>
           </section>
@@ -302,42 +344,72 @@ export default function GraderPage() {
               </button>
             </div>
 
-            {/* Scoreboard */}
+            <p className="box-hint">
+              The report checks the parsed document model. Exported-file layout
+              and reading order have not been checked. Numeric patterns do not
+              verify achievements.
+            </p>
+            {report.warnings.length > 0 && (
+              <div className="import-warnings">
+                <h3>Import notes</h3>
+                <ul>
+                  {report.warnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {report.fileDiagnostics && (
+              <FileDiagnosticResults report={report.fileDiagnostics} />
+            )}
+            {/* Observed counts */}
             <div className="scoreboard-grid">
               <div className="score-card primary-score">
-                <span className="score-label">ATS READINESS SCORE</span>
-                <div className="score-number">{report.atsScore}%</div>
+                <span className="score-label">WRITING FINDINGS</span>
+                <div className="score-number">
+                  {report.findings.issues.length}
+                </div>
                 <p className="score-sub">
-                  {report.atsScore >= 80
-                    ? "Strong ATS foundation. Minor tweaks recommended."
-                    : report.atsScore >= 60
-                    ? "Moderate readiness. Missing key quantifiable metrics or active verbs."
-                    : "Needs revision to pass automated parser screening."}
+                  Review these rule matches in context. This is a findings
+                  count, not an ATS score.
                 </p>
               </div>
 
               {report.jobAnalysis && (
                 <div className="score-card role-match-score">
-                  <span className="score-label">JOB MATCH COVERAGE</span>
-                  <div className="score-number">{report.jobAnalysis.coverageScore}%</div>
+                  <span className="score-label">JOB REQUIREMENT OVERLAP</span>
+                  <div className="score-number">
+                    {report.jobAnalysis.totalCount > 0
+                      ? `${report.jobAnalysis.matchedCount}/${report.jobAnalysis.totalCount}`
+                      : "Not assessed"}
+                  </div>
                   <p className="score-sub">
-                    Match against <strong>{report.jobAnalysis.targetTitle}</strong>
+                    Parsed requirement lines in{" "}
+                    <strong>{report.jobAnalysis.targetTitle}</strong>
                   </p>
                 </div>
               )}
 
               <div className="metric-mini-cards">
                 <div className="mini-card">
-                  <span className="mini-label">Action Verbs</span>
-                  <span className="mini-val">{report.verbsScore}%</span>
+                  <span className="mini-label">Vague openings</span>
+                  <span className="mini-val">
+                    {report.findings.weakOpeningCount}/
+                    {report.findings.totalBulletsCount}
+                  </span>
                 </div>
                 <div className="mini-card">
-                  <span className="mini-label">Quantified Impact</span>
-                  <span className="mini-val">{report.metricsScore}%</span>
+                  <span className="mini-label">Numeric patterns</span>
+                  <span className="mini-val">
+                    {report.findings.metricsCount}/
+                    {report.findings.totalBulletsCount}
+                  </span>
                 </div>
                 <div className="mini-card">
-                  <span className="mini-label">Reading Order</span>
-                  <span className="mini-val clean">100% Clean</span>
+                  <span className="mini-label">
+                    Exported-file reading order
+                  </span>
+                  <span className="mini-val clean">Not checked</span>
                 </div>
               </div>
             </div>
@@ -345,9 +417,10 @@ export default function GraderPage() {
             {/* High-Converting CTA Banner */}
             <div className="report-cta-box">
               <div className="cta-text">
-                <h3>Take this resume directly into the AI Studio</h3>
+                <h3>Review and edit your imported content</h3>
                 <p>
-                  Fix weak verbs with Google XYZ impact formulas and tailor this resume for your target role in 1 click.
+                  Save a copy on this device and check the imported content
+                  before making changes.
                 </p>
               </div>
               <button
@@ -355,27 +428,40 @@ export default function GraderPage() {
                 className="cta-button"
                 onClick={handleOpenInStudio}
               >
-                Open in AI Studio to Fix & Tailor ↗
+                Open in Resume Studio ↗
               </button>
             </div>
 
             {/* Detailed Findings & Gaps */}
+            <p className="review-start-note">
+              Start with Writing findings below. They describe possible fixes,
+              not a hiring score. Review the imported text before trusting a
+              finding; the original file may contain details the import missed.
+            </p>
             <div className="findings-section">
               <div className="findings-col">
-                <h3>🔍 Heuristic Findings ({report.issues.length})</h3>
-                {report.issues.length === 0 ? (
-                  <div className="empty-findings">✓ No critical ATS issues detected!</div>
+                <h3>🔍 Writing findings ({report.findings.issues.length})</h3>
+                {report.findings.issues.length === 0 ? (
+                  <div className="empty-findings">
+                    No findings from the current rules. File compatibility
+                    remains unchecked.
+                  </div>
                 ) : (
                   <ul className="issue-list">
-                    {report.issues.map((issue) => (
-                      <li key={issue.id} className={`issue-item ${issue.severity}`}>
+                    {report.findings.issues.map((issue) => (
+                      <li
+                        key={issue.id}
+                        className={`issue-item ${issue.severity}`}
+                      >
                         <span className="issue-icon">
                           {issue.severity === "critical" ? "❌" : "⚠️"}
                         </span>
                         <div>
                           <strong>{issue.message}</strong>
                           {issue.suggestion && (
-                            <p className="issue-fix">💡 Suggestion: {issue.suggestion}</p>
+                            <p className="issue-fix">
+                              💡 Suggestion: {issue.suggestion}
+                            </p>
                           )}
                         </div>
                       </li>
@@ -388,11 +474,31 @@ export default function GraderPage() {
                 <div className="findings-col">
                   <h3>🎯 Keyword & Requirements Breakdown</h3>
                   <div className="keyword-section">
-                    <h4>Matched Evidence ({report.jobAnalysis.matchedRequirements.length})</h4>
+                    <p className="box-hint">
+                      Rules detect requirement lines and compare skill aliases
+                      and token fragments. A partial match may leave other parts
+                      of a requirement unmet. Review the candidate text for each
+                      match; no qualifications have been verified.
+                    </p>
+                    <h4>
+                      Candidate text overlaps (
+                      {report.jobAnalysis.matchedRequirements.length})
+                    </h4>
                     <ul className="match-pill-list">
                       {report.jobAnalysis.matchedRequirements.map((item) => (
                         <li key={item.requirementId} className="matched-pill">
-                          ✓ {item.description}
+                          {item.description}
+                          {item.matchedBullets.map((bullet) => (
+                            <p key={bullet.bulletId}>
+                              {bullet.entryTitle}: “{bullet.text}”
+                            </p>
+                          ))}
+                          {item.matchedSkills.length > 0 && (
+                            <p>
+                              Listed skill terms:{" "}
+                              {item.matchedSkills.join(", ")}
+                            </p>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -400,7 +506,8 @@ export default function GraderPage() {
                     {report.jobAnalysis.skillGaps.length > 0 && (
                       <>
                         <h4 className="gap-heading">
-                          Missing Keywords & Gaps ({report.jobAnalysis.skillGaps.length})
+                          No text overlap found (
+                          {report.jobAnalysis.skillGaps.length})
                         </h4>
                         <ul className="gap-pill-list">
                           {report.jobAnalysis.skillGaps.map((gap) => (
@@ -419,18 +526,19 @@ export default function GraderPage() {
             {/* ATS Plain Text Stream Preview */}
             <div className="plain-text-preview-box">
               <div className="box-header">
-                <h3>Extracted ATS Plain-Text Stream (What Applicant Tracking Robots Read)</h3>
+                <h3>Document model text</h3>
                 <button
                   type="button"
                   className="copy-btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText(report.plainText);
-                    alert("ATS plain-text stream copied to clipboard!");
-                  }}
+                  onClick={handleOpenInStudio}
                 >
-                  📋 Copy Clean Text
+                  Open in editor to export
                 </button>
               </div>
+              <p className="box-hint">
+                Assembled from parsed fields in section order. This does not
+                reproduce an ATS parser or validate the original file.
+              </p>
               <pre className="plain-text-terminal">{report.plainText}</pre>
             </div>
           </section>
@@ -439,7 +547,9 @@ export default function GraderPage() {
 
       <footer className="grader-footer">
         <p>
-          AI CV Builder · Deterministic ATS Audit Engine · No data is sold or sent to third parties.
+          AI CV Builder · Deterministic content checks · Pasted text is analyzed
+          in your browser. File uploads are processed by this application
+          server.
         </p>
       </footer>
     </div>

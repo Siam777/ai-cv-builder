@@ -20,10 +20,12 @@ export interface DemoResumeMeta {
   create: () => ResumeDocument;
 }
 
+import { additionalDemoProfiles } from "./additional-demo-resumes";
+
 export const DEMO_PROFILES: DemoResumeMeta[] = [
   {
     id: "siam-riaz",
-    name: "Siam Riaz",
+    name: "Alex Rowan",
     role: "Senior Full Stack Engineer",
     category: "tech",
     headline: "Senior Full Stack Engineer & Cloud Architect",
@@ -36,7 +38,7 @@ export const DEMO_PROFILES: DemoResumeMeta[] = [
   },
   {
     id: "lorna-alvarado",
-    name: "Lorna Alvarado",
+    name: "Tessa Vale",
     role: "Lead Product & UX Designer",
     category: "design",
     headline: "Lead Product & Interaction Designer",
@@ -49,7 +51,7 @@ export const DEMO_PROFILES: DemoResumeMeta[] = [
   },
   {
     id: "richard-sanchez",
-    name: "Richard Sanchez",
+    name: "Owen Carter",
     role: "Principal Solutions Architect",
     category: "executive",
     headline: "Principal Cloud Solutions Architect & VP Engineering",
@@ -62,7 +64,7 @@ export const DEMO_PROFILES: DemoResumeMeta[] = [
   },
   {
     id: "sarah-jenkins",
-    name: "Sarah Jenkins",
+    name: "Priya Ellis",
     role: "Senior Business Analyst",
     category: "business",
     headline: "Senior Business Analyst & Operations Lead",
@@ -75,7 +77,7 @@ export const DEMO_PROFILES: DemoResumeMeta[] = [
   },
   {
     id: "sharya-singh",
-    name: "Sharya Singh",
+    name: "Kai Bennett",
     role: "Digital Growth & Web Lead",
     category: "marketing",
     headline: "Digital Growth & Web Marketing Lead",
@@ -86,6 +88,7 @@ export const DEMO_PROFILES: DemoResumeMeta[] = [
     hasPhoto: true,
     create: createSharyaSinghResume,
   },
+  ...additionalDemoProfiles,
 ];
 
 // Reusable SVG Avatar Portraits
@@ -101,7 +104,11 @@ const ARCHITECT_AVATAR_SVG =
 const MARKETING_AVATAR_SVG =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23334155'/><circle cx='50' cy='36' r='20' fill='%23fde047'/><path d='M22,86 C22,66 36,60 50,60 C64,60 78,66 78,86 Z' fill='%23f1f5f9'/><circle cx='50' cy='36' r='14' fill='%23fcd34d'/></svg>";
 
-function helperAdd(doc: ResumeDocument, type: SectionType, fields: Partial<Entry>) {
+function helperAdd(
+  doc: ResumeDocument,
+  type: SectionType,
+  fields: Partial<Entry>,
+) {
   const section = doc.sections.find((s) => s.type === type);
   if (section) {
     section.entries.push({
@@ -121,14 +128,15 @@ function helperAdd(doc: ResumeDocument, type: SectionType, fields: Partial<Entry
 
 export function createSiamRiazResume(): ResumeDocument {
   const doc = createDocument(false);
-  doc.name = "Siam Riaz — Senior Full Stack Engineer";
+  doc.provenance = { purpose: "practice", origin: "example" };
+  doc.name = "Alex Rowan — Senior Full Stack Engineer";
   doc.contact = {
-    name: "Siam Riaz",
+    name: "Alex Rowan",
     headline: "Senior Full Stack Engineer & Cloud Architect",
-    email: "siamriazcr777@gmail.com",
-    phone: "+880 1774-356269",
+    email: "alex.rowan@example.com",
+    phone: "+1 (202) 555-0142",
     location: "Dhaka, Bangladesh",
-    website: "elfasyssolution.com",
+    website: "example.com/alex-rowan",
     photoUrl: TECH_AVATAR_SVG,
   };
   doc.presentation = {
@@ -148,7 +156,7 @@ export function createSiamRiazResume(): ResumeDocument {
 
   helperAdd(doc, "experience", {
     title: "Lead Full Stack Engineer",
-    organization: "Synesis IT Ltd",
+    organization: "Northstar Systems (fictional)",
     location: "Karwan Bazar, Dhaka",
     start: "2021-02",
     current: true,
@@ -174,7 +182,7 @@ export function createSiamRiazResume(): ResumeDocument {
 
   helperAdd(doc, "experience", {
     title: "Senior Software Engineer",
-    organization: "Elfasys Solutions",
+    organization: "Example Systems",
     location: "Dhaka, Bangladesh",
     start: "2018-06",
     end: "2021-01",
@@ -196,7 +204,7 @@ export function createSiamRiazResume(): ResumeDocument {
 
   helperAdd(doc, "education", {
     title: "B.Sc. in Computer Science & Engineering",
-    organization: "CUET (Chittagong University of Engineering & Technology)",
+    organization: "Harbor Institute of Engineering (fictional)",
     location: "Chittagong, Bangladesh",
     start: "2014",
     end: "2018",
@@ -241,14 +249,15 @@ export function createSiamRiazResume(): ResumeDocument {
 
 export function createLornaAlvaradoResume(): ResumeDocument {
   const doc = createDocument(false);
-  doc.name = "Lorna Alvarado — Lead Product Designer";
+  doc.provenance = { purpose: "practice", origin: "example" };
+  doc.name = "Tessa Vale — Lead Product Designer";
   doc.contact = {
-    name: "Lorna Alvarado",
+    name: "Tessa Vale",
     headline: "Lead Product & Interaction Designer",
-    email: "lorna.alvarado@example.com",
-    phone: "+1 (555) 456-7890",
+    email: "tessa.vale@example.com",
+    phone: "+1 (202) 555-0143",
     location: "San Francisco, CA",
-    website: "lorna-design.io",
+    website: "example.com/tessa",
     photoUrl: DESIGN_AVATAR_SVG,
   };
   doc.presentation = {
@@ -308,14 +317,14 @@ export function createLornaAlvaradoResume(): ResumeDocument {
 
   helperAdd(doc, "education", {
     title: "Master of Human-Computer Interaction",
-    organization: "Stanford University",
+    organization: "Redwood Graduate Institute (fictional)",
     location: "Stanford, CA",
     start: "2016",
     end: "2018",
   });
   helperAdd(doc, "education", {
     title: "B.F.A. in Communication Design",
-    organization: "Rhode Island School of Design (RISD)",
+    organization: "Seabrook School of Design (fictional)",
     location: "Providence, RI",
     start: "2012",
     end: "2016",
@@ -354,14 +363,15 @@ export function createLornaAlvaradoResume(): ResumeDocument {
 
 export function createRichardSanchezResume(): ResumeDocument {
   const doc = createDocument(false);
-  doc.name = "Richard Sanchez — Solutions Architect";
+  doc.provenance = { purpose: "practice", origin: "example" };
+  doc.name = "Owen Carter — Solutions Architect";
   doc.contact = {
-    name: "Richard Sanchez",
+    name: "Owen Carter",
     headline: "Principal Cloud Solutions Architect & Engineering Leader",
-    email: "richard.sanchez@example.com",
-    phone: "+1 (555) 345-6789",
+    email: "owen.carter@example.com",
+    phone: "+1 (202) 555-0144",
     location: "Seattle, WA",
-    website: "richardsanchez.cloud",
+    website: "example.com/owen",
     photoUrl: ARCHITECT_AVATAR_SVG,
   };
   doc.presentation = {
@@ -425,14 +435,14 @@ export function createRichardSanchezResume(): ResumeDocument {
 
   helperAdd(doc, "education", {
     title: "M.S. in Computer Science (Distributed Systems)",
-    organization: "University of Washington",
+    organization: "Rainier Technical University (fictional)",
     location: "Seattle, WA",
     start: "2014",
     end: "2016",
   });
   helperAdd(doc, "education", {
     title: "B.S. in Computer Engineering",
-    organization: "University of California, Berkeley",
+    organization: "Bayview Research University (fictional)",
     location: "Berkeley, CA",
     start: "2010",
     end: "2014",
@@ -454,14 +464,15 @@ export function createRichardSanchezResume(): ResumeDocument {
 
 export function createSarahJenkinsResume(): ResumeDocument {
   const doc = createDocument(false);
-  doc.name = "Sarah Jenkins — Senior Business Analyst";
+  doc.provenance = { purpose: "practice", origin: "example" };
+  doc.name = "Priya Ellis — Senior Business Analyst";
   doc.contact = {
-    name: "Sarah Jenkins",
+    name: "Priya Ellis",
     headline: "Senior Business Analyst & Operations Lead",
-    email: "sarah.jenkins@example.com",
-    phone: "+1 (555) 789-0123",
+    email: "priya.ellis@example.com",
+    phone: "+1 (202) 555-0145",
     location: "Chicago, IL",
-    website: "linkedin.com/in/sarah-jenkins-ba",
+    website: "example.com/priya",
   };
   doc.presentation = {
     ...doc.presentation,
@@ -502,7 +513,7 @@ export function createSarahJenkinsResume(): ResumeDocument {
 
   helperAdd(doc, "experience", {
     title: "Business Systems Analyst",
-    organization: "Deloitte Consulting",
+    organization: "Cedarbridge Consulting (fictional)",
     location: "Chicago, IL",
     start: "2018-08",
     end: "2021-05",
@@ -520,7 +531,7 @@ export function createSarahJenkinsResume(): ResumeDocument {
 
   helperAdd(doc, "education", {
     title: "B.S. in Information Systems & Finance",
-    organization: "University of Illinois Urbana-Champaign",
+    organization: "Prairie State College (fictional)",
     location: "Champaign, IL",
     start: "2014",
     end: "2018",
@@ -542,14 +553,15 @@ export function createSarahJenkinsResume(): ResumeDocument {
 
 export function createSharyaSinghResume(): ResumeDocument {
   const doc = createDocument(false);
-  doc.name = "Sharya Singh — Digital Growth Lead";
+  doc.provenance = { purpose: "practice", origin: "example" };
+  doc.name = "Kai Bennett — Digital Growth Lead";
   doc.contact = {
-    name: "Sharya Singh",
+    name: "Kai Bennett",
     headline: "Digital Growth & Web Marketing Lead",
-    email: "sharya.singh@example.com",
-    phone: "+1 (555) 234-5678",
+    email: "kai.bennett@example.com",
+    phone: "+1 (202) 555-0146",
     location: "Austin, TX",
-    website: "sharyasingh.com",
+    website: "example.com/kai",
     photoUrl: MARKETING_AVATAR_SVG,
   };
   doc.presentation = {
@@ -609,7 +621,7 @@ export function createSharyaSinghResume(): ResumeDocument {
 
   helperAdd(doc, "education", {
     title: "B.A. in Marketing & Digital Communication",
-    organization: "University of Texas at Austin",
+    organization: "Lakeside Business College (fictional)",
     location: "Austin, TX",
     start: "2015",
     end: "2019",
@@ -632,4 +644,24 @@ export function createSharyaSinghResume(): ResumeDocument {
 export function getDemoResume(id: string): ResumeDocument | undefined {
   const profile = DEMO_PROFILES.find((p) => p.id === id);
   return profile ? profile.create() : undefined;
+}
+
+/** A synthetic teaching example, not a job recommendation or AI evaluation. */
+export function demoLearningExample(profile: DemoResumeMeta) {
+  const document = profile.create();
+  const entry = document.sections
+    .flatMap((section) => section.entries)
+    .find((item) => item.bullets.some((bullet) => bullet.text.trim()));
+  const bullet = entry?.bullets.find((item) => item.text.trim());
+  return {
+    job: `Fictional opening: ${profile.role}. Describe your contribution, explain how you worked with colleagues, and provide evidence for claimed outcomes.`,
+    before: "Worked on projects and helped the team.",
+    after:
+      bullet?.text ??
+      document.sections
+        .flatMap((section) => section.entries)
+        .find((item) => item.description)?.description ??
+      "",
+    evidence: [entry?.title, entry?.organization].filter(Boolean).join(" · "),
+  };
 }

@@ -33,8 +33,13 @@ test("detectAppliedRoleFromDocument accurately detects role across all 5 demo re
   assert.equal(detectAppliedRoleFromDocument(lorna).roleId, "product-designer");
   assert.equal(detectAppliedRoleFromDocument(lorna).source, "headline");
 
-  const richard = DEMO_PROFILES.find((p) => p.id === "richard-sanchez")!.create();
-  assert.equal(detectAppliedRoleFromDocument(richard).roleId, "software-architect");
+  const richard = DEMO_PROFILES.find(
+    (p) => p.id === "richard-sanchez",
+  )!.create();
+  assert.equal(
+    detectAppliedRoleFromDocument(richard).roleId,
+    "software-architect",
+  );
   assert.equal(detectAppliedRoleFromDocument(richard).source, "headline");
 
   const sarah = DEMO_PROFILES.find((p) => p.id === "sarah-jenkins")!.create();
@@ -46,22 +51,26 @@ test("detectAppliedRoleFromDocument accurately detects role across all 5 demo re
   assert.equal(detectAppliedRoleFromDocument(sharya).source, "headline");
 });
 
-test("analyzeResumeForRole calibrates to applied role (Sharya Singh = Marketing, Lorna = Designer)", async () => {
+test("Role checklists report observed terms for marketing and design samples", async () => {
   const { DEMO_PROFILES } = await import("../src/lib/demo-resumes");
 
   const sharya = DEMO_PROFILES.find((p) => p.id === "sharya-singh")!.create();
   // Auto-detects applied role (marketing-lead) rather than falling back to software-engineer
   const sharyaAnalysis = analyzeResumeForRole(sharya);
   assert.equal(sharyaAnalysis.roleId, "marketing-lead");
-  assert.ok(sharyaAnalysis.overallScore >= 80, `Expected score >= 80, got ${sharyaAnalysis.overallScore}`);
+  assert.equal(sharyaAnalysis.status, "supported");
   assert.ok(sharyaAnalysis.matchedCompetencies.includes("Technical SEO"));
-  assert.ok(sharyaAnalysis.matchedCompetencies.includes("Conversion Rate Optimization (CRO)"));
+  assert.ok(
+    sharyaAnalysis.matchedCompetencies.includes(
+      "Conversion Rate Optimization (CRO)",
+    ),
+  );
   assert.ok(sharyaAnalysis.matchedMetricTypes.length >= 2);
 
   const lorna = DEMO_PROFILES.find((p) => p.id === "lorna-alvarado")!.create();
   const lornaAnalysis = analyzeResumeForRole(lorna);
   assert.equal(lornaAnalysis.roleId, "product-designer");
-  assert.ok(lornaAnalysis.overallScore >= 80, `Expected score >= 80, got ${lornaAnalysis.overallScore}`);
+  assert.equal(lornaAnalysis.status, "supported");
   assert.ok(lornaAnalysis.matchedCompetencies.includes("Design Systems"));
   assert.ok(lornaAnalysis.matchedCompetencies.includes("Figma"));
 });
@@ -71,23 +80,42 @@ test("generateAiResume generates valid ResumeDocument for product-designer and m
     name: "Clara Oswald",
     roleId: "product-designer",
     seniority: "senior",
-    keySkills: ["Design Systems", "Figma", "User Research", "WCAG 2.1 Accessibility"],
+    keySkills: [
+      "Design Systems",
+      "Figma",
+      "User Research",
+      "WCAG 2.1 Accessibility",
+    ],
   });
   const parsedDesigner = documentSchema.parse(designerDoc);
   assert.ok(parsedDesigner.contact.headline.includes("Designer"));
-  const designerAnalysis = analyzeResumeForRole(parsedDesigner, "product-designer");
-  assert.ok(designerAnalysis.overallScore >= 70);
+  const designerAnalysis = analyzeResumeForRole(
+    parsedDesigner,
+    "product-designer",
+  );
+  assert.ok(designerAnalysis.matchedCompetencies.includes("Figma"));
 
   const marketingDoc = generateAiResume({
     name: "Julian Vance",
     roleId: "marketing-lead",
     seniority: "lead",
-    keySkills: ["Technical SEO", "Conversion Rate Optimization (CRO)", "Google Analytics 4", "HubSpot"],
+    keySkills: [
+      "Technical SEO",
+      "Conversion Rate Optimization (CRO)",
+      "Google Analytics 4",
+      "HubSpot",
+    ],
   });
   const parsedMarketing = documentSchema.parse(marketingDoc);
-  assert.ok(parsedMarketing.contact.headline.includes("Marketing") || parsedMarketing.contact.headline.includes("Growth"));
-  const marketingAnalysis = analyzeResumeForRole(parsedMarketing, "marketing-lead");
-  assert.ok(marketingAnalysis.overallScore >= 70);
+  assert.ok(
+    parsedMarketing.contact.headline.includes("Marketing") ||
+      parsedMarketing.contact.headline.includes("Growth"),
+  );
+  const marketingAnalysis = analyzeResumeForRole(
+    parsedMarketing,
+    "marketing-lead",
+  );
+  assert.ok(marketingAnalysis.matchedCompetencies.includes("Technical SEO"));
 });
 
 test("analyzeResumeForRole evaluates SWE skills and detects missing competencies", () => {
@@ -95,11 +123,11 @@ test("analyzeResumeForRole evaluates SWE skills and detects missing competencies
   const result = analyzeResumeForRole(doc, "software-engineer");
 
   assert.equal(result.roleId, "software-engineer");
-  assert.ok(typeof result.overallScore === "number");
-  assert.ok(result.overallScore >= 0 && result.overallScore <= 100);
+  assert.equal(result.status, "supported");
+  assert.equal("overallScore" in result, false);
   assert.ok(result.missingCompetencies.length > 0);
   assert.ok(result.missingMetricTypes.length > 0);
-  assert.ok(result.actionableInsights.length > 0);
+  assert.deepEqual(result.actionableInsights, []);
 });
 
 test("generateAiResume generates valid ResumeDocument for software-engineer", () => {
@@ -107,7 +135,14 @@ test("generateAiResume generates valid ResumeDocument for software-engineer", ()
     name: "Devon Vance",
     roleId: "software-engineer",
     seniority: "senior",
-    keySkills: ["TypeScript", "React", "Node.js", "PostgreSQL", "Docker", "AWS"],
+    keySkills: [
+      "TypeScript",
+      "React",
+      "Node.js",
+      "PostgreSQL",
+      "Docker",
+      "AWS",
+    ],
     industry: "High-Growth SaaS",
   });
 
@@ -115,14 +150,22 @@ test("generateAiResume generates valid ResumeDocument for software-engineer", ()
   const parsed = documentSchema.parse(doc);
   assert.equal(parsed.contact.name, "Devon Vance");
   assert.ok(parsed.contact.headline.includes("Software Engineer"));
-  assert.ok(parsed.sections.some((s) => s.type === "experience" && s.entries.length >= 2));
-  assert.ok(parsed.sections.some((s) => s.type === "skills" && s.entries.length >= 1));
-  assert.ok(parsed.sections.some((s) => s.type === "summary" && s.entries.length >= 1));
+  assert.ok(
+    parsed.sections.some(
+      (s) => s.type === "experience" && s.entries.length >= 2,
+    ),
+  );
+  assert.ok(
+    parsed.sections.some((s) => s.type === "skills" && s.entries.length >= 1),
+  );
+  assert.ok(
+    parsed.sections.some((s) => s.type === "summary" && s.entries.length >= 1),
+  );
 
-  // Role analysis on generated resume should yield strong score
+  // Fictional practice terms can match a checklist without assessing ability
   const analysis = analyzeResumeForRole(parsed, "software-engineer");
-  assert.ok(analysis.overallScore >= 70);
-  assert.equal(analysis.detectedSeniority, "Senior");
+  assert.ok(analysis.matchedCompetencies.length > 0);
+  assert.equal("detectedSeniority" in analysis, false);
 });
 
 test("generateAiResume generates valid ResumeDocument for software-architect", () => {
@@ -130,7 +173,13 @@ test("generateAiResume generates valid ResumeDocument for software-architect", (
     name: "Elena Rostova",
     roleId: "software-architect",
     seniority: "lead",
-    keySkills: ["System Design", "Microservices Architecture", "AWS", "Kafka", "Kubernetes"],
+    keySkills: [
+      "System Design",
+      "Microservices Architecture",
+      "AWS",
+      "Kafka",
+      "Kubernetes",
+    ],
   });
 
   const parsed = documentSchema.parse(doc);
@@ -139,12 +188,18 @@ test("generateAiResume generates valid ResumeDocument for software-architect", (
 
   const expSec = parsed.sections.find((s) => s.type === "experience");
   assert.ok(expSec);
-  const allBullets = expSec.entries.flatMap((e) => e.bullets.map((b) => b.text));
+  const allBullets = expSec.entries.flatMap((e) =>
+    e.bullets.map((b) => b.text),
+  );
   // Should have architectural and cloud metrics
-  assert.ok(allBullets.some((b) => b.includes("uptime SLA") || b.includes("microservices")));
+  assert.ok(
+    allBullets.some(
+      (b) => b.includes("uptime SLA") || b.includes("microservices"),
+    ),
+  );
 
   const analysis = analyzeResumeForRole(parsed, "software-architect");
-  assert.ok(analysis.overallScore >= 70);
+  assert.ok(analysis.matchedCompetencies.length > 0);
 });
 
 test("generateAiResume generates valid ResumeDocument for business-analyst", () => {
@@ -152,7 +207,12 @@ test("generateAiResume generates valid ResumeDocument for business-analyst", () 
     name: "Marcus Sterling",
     roleId: "business-analyst",
     seniority: "mid",
-    keySkills: ["Requirements Gathering", "BRD / FRD Documentation", "User Stories", "Stakeholder Management"],
+    keySkills: [
+      "Requirements Gathering",
+      "BRD / FRD Documentation",
+      "User Stories",
+      "Stakeholder Management",
+    ],
   });
 
   const parsed = documentSchema.parse(doc);
@@ -161,18 +221,24 @@ test("generateAiResume generates valid ResumeDocument for business-analyst", () 
 
   const expSec = parsed.sections.find((s) => s.type === "experience");
   assert.ok(expSec);
-  const allBullets = expSec.entries.flatMap((e) => e.bullets.map((b) => b.text));
-  assert.ok(allBullets.some((b) => b.includes("BRD") || b.includes("UAT") || b.includes("cycle time")));
+  const allBullets = expSec.entries.flatMap((e) =>
+    e.bullets.map((b) => b.text),
+  );
+  assert.ok(
+    allBullets.some(
+      (b) => b.includes("BRD") || b.includes("UAT") || b.includes("cycle time"),
+    ),
+  );
 
   const analysis = analyzeResumeForRole(parsed, "business-analyst");
-  assert.ok(analysis.overallScore >= 70);
+  assert.ok(analysis.matchedCompetencies.length > 0);
 });
 
-test("DEMO_PROFILES contains 5 complete realistic profiles that strictly validate", async () => {
+test("DEMO_PROFILES contains 12 complete fictional profiles that strictly validate", async () => {
   const { DEMO_PROFILES } = await import("../src/lib/demo-resumes");
   const { layoutBlocks } = await import("../src/lib/layout");
 
-  assert.equal(DEMO_PROFILES.length, 5);
+  assert.equal(DEMO_PROFILES.length, 12);
 
   for (const profile of DEMO_PROFILES) {
     const doc = profile.create();
@@ -188,9 +254,48 @@ test("DEMO_PROFILES contains 5 complete realistic profiles that strictly validat
     assert.ok(blocks.some((b) => b.kind === "section"));
     assert.ok(blocks.some((b) => b.kind === "bullet"));
 
-    if (profile.hasPhoto) {
+    if (profile.hasPhoto && (await import("../src/lib/presentation")).templates.find(t => t.id === parsed.presentation.template)?.photoSupported) {
       assert.ok(blocks.some((b) => b.kind === "photo"));
     }
   }
 });
 
+test("Unsupported explicit roles and unknown checklist IDs receive general content review", () => {
+  for (const headline of [
+    "Civil Engineer",
+    "Landscape Architect",
+    "Nurse",
+    "Interior Designer",
+  ]) {
+    const doc = createDocument(true);
+    doc.contact.headline = headline;
+    const role = detectAppliedRoleFromDocument(doc);
+    assert.equal(role.roleId, "general", headline);
+    const analysis = analyzeResumeForRole(doc);
+    assert.equal(analysis.status, "general");
+    assert.deepEqual(analysis.matchedCompetencies, []);
+    assert.equal("overallScore" in analysis, false);
+  }
+  assert.equal(
+    analyzeResumeForRole(createDocument(true), "unknown-role").status,
+    "general",
+  );
+});
+
+test("Hidden experience cannot supply a suggested checklist", () => {
+  const doc = createDocument(true);
+  doc.contact.headline = "";
+  doc.name = "Untitled";
+  for (const section of doc.sections) section.visible = false;
+  assert.equal(detectAppliedRoleFromDocument(doc).roleId, "general");
+});
+
+test("Role numeric patterns only inspect visible experience and projects", () => {
+  const doc = createDocument(true);
+  for (const section of doc.sections)
+    section.visible = section.type === "skills";
+  const skills = doc.sections.find((section) => section.type === "skills")!;
+  skills.entries[0].description = "Improved latency by 30 milliseconds";
+  const analysis = analyzeResumeForRole(doc, "software-engineer");
+  assert.deepEqual(analysis.matchedMetricTypes, []);
+});

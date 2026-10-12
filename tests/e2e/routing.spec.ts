@@ -1,3 +1,4 @@
+import { startSampleResume, openFirstCv, authenticateForExport } from "./helpers";
 import { test, expect } from "@playwright/test";
 
 test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
@@ -25,7 +26,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     const backBtn = page.getByRole("link", { name: "← Back to Resume Studio" });
     await expect(backBtn).toBeVisible();
     await backBtn.click();
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL("/builder");
   });
 
   test("account URL redirects directly to /profile", async ({ page }) => {
@@ -66,7 +67,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     const backBtn = page.getByRole("link", { name: "← Back to Resume Studio" });
     await expect(backBtn).toBeVisible();
     await backBtn.click();
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL("/builder");
   });
 
   test("pricing URL redirects directly to /upgrade", async ({ page }) => {
@@ -80,9 +81,9 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
   test("in-studio account toggle completely hides CV editor while open and restores it when closed", async ({
     page,
   }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Explore an example" }).click();
-    await expect(page.getByRole("status")).toHaveText("Saved on this device");
+    await page.goto("/builder");
+    await startSampleResume(page);
+    await expect(page.locator(".save-status")).toHaveText("Saved on this device");
 
     // Before opening account, editor layout and toolbar are visible
     await expect(page.locator(".workspace-body")).toBeVisible();
@@ -106,9 +107,9 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
   test("modal open mode locks outside body scroll and enables full internal scroll to see entire modal content", async ({
     page,
   }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Explore an example" }).click();
-    await expect(page.getByRole("status")).toHaveText("Saved on this device");
+    await page.goto("/builder");
+    await startSampleResume(page);
+    await expect(page.locator(".save-status")).toHaveText("Saved on this device");
 
     // Body should not have modal-open initially
     const initialOverflow = await page.evaluate(() => document.body.style.overflow);
@@ -116,7 +117,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // Open CV Analyzer & Role Gap Inspector (AtsReadinessPanel)
     await page.locator(".ats-score-pill").click();
-    const dialog = page.getByRole("dialog", { name: "ATS Readiness Audit" });
+    const dialog = page.getByRole("dialog", { name: "Resume content review" });
     await expect(dialog).toBeVisible();
 
     // 1. Verify outside body is not scrollable (body scroll locked)
@@ -126,12 +127,13 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // 2. Verify modal content is internally scrollable
     const atsContent = page.locator(".ats-content");
+    await dialog.getByRole("button", { name: "Review selected checklist" }).click();
     await expect(atsContent).toBeVisible();
     const isScrollable = await atsContent.evaluate((el) => el.scrollHeight > el.clientHeight);
     expect(isScrollable).toBe(true);
 
     // 3. Verify the bottom content and templates are fully reachable
-    await expect(page.getByText("Role Metric Benchmarks & Google XYZ Templates")).toBeVisible();
+    await expect(page.getByText("Role numeric patterns", { exact: true })).toBeVisible();
 
     // 4. Verify the modal footer 'Done' button is visible and pinned
     const doneBtn = page.getByRole("button", { name: "Done" });

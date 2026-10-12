@@ -101,8 +101,8 @@ test("all exporters cleanly format and output custom sections", () => {
 
   // 3. Standalone HTML export
   const html = exportToStandaloneHtml(doc);
-  assert.ok(html.includes("Volunteer Experience</h2>"));
-  assert.ok(html.includes("Patents &amp; Inventions</h2>"));
+  assert.ok(html.includes("Volunteer Experience</span></h2>"));
+  assert.ok(html.includes("Patents &amp; Inventions</span></h2>"));
   assert.ok(html.includes(volunteerSec.entries[0].title));
 
   // 4. DOCX export

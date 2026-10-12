@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseTextToResume } from "../src/lib/importers/text-resume-parser";
-import { extractTextFromPdf } from "../src/lib/importers/pdf-text-extractor";
+import { analyzeFile } from "../src/lib/server/file-extraction";
+import { renderResumePdf } from "../src/lib/server/pdf-generator";
+import { createDocument } from "../src/lib/document";
 import { documentSchema } from "../src/lib/document";
 
 test("text-resume-parser extracts contact info, sections, dates, and bullets from plain text", () => {
@@ -36,11 +38,17 @@ Cloud & Infra: AWS, Kubernetes, Docker, Terraform, CI/CD
 Databases: PostgreSQL, Redis
 `;
 
-  const { document, warnings } = parseTextToResume(sampleResumeText, "Sarah_Connor_Resume.txt");
+  const { document, warnings } = parseTextToResume(
+    sampleResumeText,
+    "Sarah_Connor_Resume.txt",
+  );
 
   assert.equal(document.name, "Sarah_Connor_Resume");
   assert.equal(document.contact.name, "Sarah Connor");
-  assert.equal(document.contact.headline, "Senior DevOps & Infrastructure Engineer");
+  assert.equal(
+    document.contact.headline,
+    "Senior DevOps & Infrastructure Engineer",
+  );
   assert.equal(document.contact.email, "sarah.connor@example.com");
   assert.equal(document.contact.phone, "+1 (555) 234-5678");
   assert.ok(document.contact.website.includes("linkedin.com/in/sarahconnor"));
@@ -51,10 +59,16 @@ Databases: PostgreSQL, Redis
   assert.ok(expSection.entries.length >= 2, "Should have 2 experience entries");
 
   const firstRole = expSection.entries[0];
-  assert.ok(firstRole.title.includes("Principal Cloud Engineer") || firstRole.title.includes("Cyberdyne"));
+  assert.ok(
+    firstRole.title.includes("Principal Cloud Engineer") ||
+      firstRole.title.includes("Cyberdyne"),
+  );
   assert.equal(firstRole.current, true);
   assert.equal(firstRole.start, "2022-01");
-  assert.ok(firstRole.bullets.length >= 3, "First role should have at least 3 bullets");
+  assert.ok(
+    firstRole.bullets.length >= 3,
+    "First role should have at least 3 bullets",
+  );
 
   // Check skills section
   const skillsSection = document.sections.find((s) => s.type === "skills");
@@ -66,23 +80,14 @@ Databases: PostgreSQL, Redis
   assert.equal(validated.contact.name, "Sarah Connor");
 });
 
-test("pdf-text-extractor extracts text strings from uncompressed and stream blocks", () => {
-  // Construct a minimal valid PDF stream buffer with BT ... (Hello World) Tj ... ET
-  const pdfSource = `%PDF-1.4
-1 0 obj
-<< /Length 44 >>
-stream
-BT
-/F1 12 Tf
-(Antigravity CV Resume Test) Tj
-ET
-endstream
-endobj
-%%EOF`;
-
-  const extracted = extractTextFromPdf(Buffer.from(pdfSource, "utf-8"));
-  assert.ok(
-    extracted.includes("Antigravity CV Resume Test"),
-    "Extractor must locate and extract text in stream BT...ET blocks",
+test("real PDF import preserves contact email and source text before section mapping", async () => {
+  const doc = createDocument(true);
+  const bytes = await renderResumePdf(doc);
+  const report = await analyzeFile(
+    new File([Buffer.from(bytes)], "resume.pdf"),
+    doc,
   );
+  assert.equal(report.comparison?.missingCount, 0);
+  const imported = parseTextToResume(report.text, "resume.pdf");
+  assert.equal(imported.document.contact.email, doc.contact.email);
 });
