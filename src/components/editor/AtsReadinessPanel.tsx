@@ -20,6 +20,8 @@ export interface AtsReadinessPanelProps {
   onNavigateToIssue?: (issue: AtsLintIssue) => void;
   /** Jump to the editor section with this id ("contact" for personal details). */
   onNavigateToSection?: (sectionId: string) => void;
+  /** Tab to open on; the role benchmark entry point opens the checklist. */
+  initialTab?: "score" | "role" | "issues";
   onClose: () => void;
 }
 
@@ -27,6 +29,7 @@ export function AtsReadinessPanel({
   doc,
   onNavigateToIssue,
   onNavigateToSection,
+  initialTab = "score",
   onClose,
 }: AtsReadinessPanelProps) {
   useBodyScrollLock(true);
@@ -39,7 +42,7 @@ export function AtsReadinessPanel({
   const [roleConfirmed, setRoleConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "score" | "role" | "issues" | "plaintext" | "file"
-  >("score");
+  >(initialTab);
   const score = useMemo(() => scoreResume(doc), [doc]);
   useEffect(() => {
     setSelectedRoleId(suggestedRole.roleId);

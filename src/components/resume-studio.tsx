@@ -153,6 +153,11 @@ export function ResumeStudio({
     sourceId: string;
   } | null>(null);
   const [showAts, setShowAts] = useState(false);
+  const [atsTab, setAtsTab] = useState<"score" | "role">("score");
+  function openReview(tab: "score" | "role" = "score") {
+    setAtsTab(tab);
+    setShowAts(true);
+  }
   const [showPricing, setShowPricing] = useState(false);
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -1032,7 +1037,7 @@ export function ResumeStudio({
             setShowLibrary(true);
           });
         }}
-        onOpenAts={() => setShowAts(true)}
+        onOpenAts={() => openReview()}
         onOpenPricing={() => setShowPricing(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
         isSubscriber={isSubscriber}
@@ -1298,6 +1303,7 @@ export function ResumeStudio({
             }
             setShowAts(false);
           }}
+          initialTab={atsTab}
           onNavigateToSection={(id) => {
             setMobileTab("editor");
             setSectionId(id);
@@ -1670,7 +1676,7 @@ export function ResumeStudio({
               onOpenAI={() => openWriting()}
               onOpenAiGenerator={() => setShowAiGen(true)}
               onOpenDemoGallery={() => setShowDemoGallery(true)}
-              onOpenAts={() => setShowAts(true)}
+              onOpenAts={() => openReview("role")}
               onOpenTailor={() => setShowTailor(true)}
               onOpenCoverLetter={() => setShowCoverLetter(true)}
               onOpenHistory={() => setShowHistory(true)}
@@ -1686,7 +1692,7 @@ export function ResumeStudio({
                 <button
                   className={`taskbar-score tone-${liveScore.total >= 90 ? "excellent" : liveScore.total >= 75 ? "strong" : liveScore.total >= 55 ? "fair" : "low"}`}
                   disabled={busy}
-                  onClick={() => setShowAts(true)}
+                  onClick={() => openReview()}
                   aria-label={`Resume score ${liveScore.total} out of 100, ${liveScore.grade}. Check my CV`}
                 >
                   <span className="taskbar-score-value">{liveScore.total}</span>
@@ -1733,7 +1739,7 @@ export function ResumeStudio({
                   field: id === "contact" ? "name" : undefined,
                 });
               }}
-              onReview={() => setShowAts(true)}
+              onReview={() => openReview()}
             />
 
             <div className="mobile-tabs no-print">
@@ -1751,7 +1757,7 @@ export function ResumeStudio({
               >
                 Preview resume
               </button>
-              <button disabled={busy} onClick={() => setShowAts(true)}>
+              <button disabled={busy} onClick={() => openReview()}>
                 Review resume
               </button>
               <span className="mobile-save-feedback">
