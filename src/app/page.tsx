@@ -20,8 +20,9 @@ export default function Home() {
         <div className={styles.heroCopy}>
           <h1>Your experience. Clearly presented.</h1>
           <p>
-            Give your career a thoughtful introduction. Choose a design, add
-            your real experience, and make every word count.
+            Build your CV in three steps: add your experience, check your
+            score, and fix what matters. Every point is explained, and a job
+            posting shows exactly what is missing.
           </p>
           <div className={styles.actions}>
             <Link href="/builder" className={styles.button}>
@@ -31,7 +32,7 @@ export default function Home() {
               href="/grader"
               className={`${styles.button} ${styles.secondary}`}
             >
-              Review my resume
+              Score my resume free
             </Link>
           </div>
           <p className={styles.accessNote}>
@@ -48,7 +49,7 @@ export default function Home() {
         <div className={styles.sectionHead}>
           <div>
             <h2 id="designs-heading">A design that lets your work speak.</h2>
-            <p>Eight current styles. The same details, presented your way.</p>
+            <p>Twelve designs. The same details, presented your way.</p>
           </div>
           <Link href="/templates">Browse all designs</Link>
         </div>
@@ -98,17 +99,18 @@ export default function Home() {
         </div>
         <ol className={styles.steps}>
           <li>
-            <h3>Start with your experience</h3>
+            <h3>Add your experience</h3>
             <p>
-              Create a blank CV or review an import. Examples give you a design
-              to borrow, while the career details are your own.
+              Start blank, import an existing CV, or follow the guided start.
+              Pick any design; switching later keeps every detail.
             </p>
           </li>
           <li>
-            <h3>Review and refine</h3>
+            <h3>Score and improve</h3>
             <p>
-              Read writing findings, compare job terms and tailor an independent
-              version. Review suggestions against what you actually did.
+              Get a 0–100 score with benchmarks and your top three fixes. Paste
+              a job posting to see missing skills, then use writing help to
+              strengthen bullets with facts you supply.
             </p>
           </li>
           <li>

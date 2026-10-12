@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createDocument,
   duplicateDocument,
@@ -46,6 +46,7 @@ import { CoverLetterModal } from "./vault/CoverLetterModal";
 import { VersionHistoryModal } from "./editor/VersionHistoryModal";
 import { AddSectionModal } from "./editor/AddSectionModal";
 import { AtsReadinessPanel } from "./editor/AtsReadinessPanel";
+import { scoreResume } from "@/lib/linter/resume-score";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
 import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
@@ -167,6 +168,7 @@ export function ResumeStudio({
   const [mobileTab, setMobileTab] = useState("editor");
   const [staged, setStaged] = useState<StagedImportData | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  const liveScore = useMemo(() => (doc ? scoreResume(doc) : null), [doc]);
 
   const isModalActive = Boolean(
     showDesign ||
@@ -1296,6 +1298,12 @@ export function ResumeStudio({
             }
             setShowAts(false);
           }}
+          onNavigateToSection={(id) => {
+            setMobileTab("editor");
+            setSectionId(id);
+            setFocusTarget({ sectionId: id });
+            setShowAts(false);
+          }}
           onClose={() => setShowAts(false)}
         />
       )}
@@ -1674,6 +1682,33 @@ export function ResumeStudio({
               className="editor-taskbar no-print"
               aria-label="Help with this CV"
             >
+              {liveScore && (
+                <button
+                  className={`taskbar-score tone-${liveScore.total >= 90 ? "excellent" : liveScore.total >= 75 ? "strong" : liveScore.total >= 55 ? "fair" : "low"}`}
+                  disabled={busy}
+                  onClick={() => setShowAts(true)}
+                  aria-label={`Resume score ${liveScore.total} out of 100, ${liveScore.grade}. Check my CV`}
+                >
+                  <span className="taskbar-score-value">{liveScore.total}</span>
+                  <span className="taskbar-score-text">
+                    <strong>Check my CV</strong>
+                    <span>
+                      {liveScore.grade}
+                      {liveScore.topFixes[0]
+                        ? ` · next: ${liveScore.topFixes[0].label.toLowerCase()}`
+                        : ""}
+                    </span>
+                  </span>
+                </button>
+              )}
+              <button disabled={busy} onClick={() => openWriting()}>
+                <span aria-hidden="true">✨</span>
+                <strong>Writing help</strong>
+              </button>
+              <button disabled={busy} onClick={() => setShowTailor(true)}>
+                <span aria-hidden="true">🎯</span>
+                <strong>Compare with a job</strong>
+              </button>
               <button
                 disabled={busy}
                 onClick={() => {
@@ -1682,20 +1717,8 @@ export function ResumeStudio({
                   setFocusTarget({ sectionId: "contact", field: "photo" });
                 }}
               >
+                <span aria-hidden="true">📷</span>
                 <strong>Add or change photo</strong>
-                <span>In Personal details</span>
-              </button>
-              <button disabled={busy} onClick={() => openWriting()}>
-                <strong>Writing help</strong>
-                <span>Bullets, summary, results and skills</span>
-              </button>
-              <button disabled={busy} onClick={() => setShowAts(true)}>
-                <strong>Check my CV</strong>
-                <span>Find issues and jump to a fix</span>
-              </button>
-              <button disabled={busy} onClick={() => setShowTailor(true)}>
-                <strong>Compare with a job</strong>
-                <span>See matches and missing evidence</span>
               </button>
             </nav>
             <EditorStartGuide

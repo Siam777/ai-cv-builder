@@ -207,9 +207,10 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await startSampleResume(page);
   await page.getByRole("button", { name: /Check my CV/ }).click();
   const check = page.getByRole("dialog", { name: "Resume content review" });
-  await expect(
-    check.getByRole("button", { name: /Writing findings/ }),
-  ).toHaveClass(/active/);
+  await expect(check.getByRole("button", { name: /^Score/ })).toHaveClass(
+    /active/,
+  );
+  await expect(check.locator(".score-fixes")).toContainText("Fix these first");
   await check.getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: /Compare with a job/ }).click();
   const dialog = page.getByRole("dialog", { name: "Job Tailoring Engine" });

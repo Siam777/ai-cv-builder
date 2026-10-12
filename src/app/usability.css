@@ -1,24 +1,60 @@
 /* Editor tasks and scrollable dialogs use the same readable control scale. */
+/* One compact assist row aligned with the document toolbar: live score first. */
 .editor-taskbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: stretch;
   gap: 8px;
-  margin: 12px 0 18px;
+  margin: 10px 4% 14px;
 }
-.editor-taskbar button {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.studio .editor-taskbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 14px;
   text-align: left;
-  gap: 2px;
-  flex: 1 1 170px;
-  min-height: 68px;
-  padding: 12px 16px;
 }
-.editor-taskbar button span {
+.editor-taskbar button strong { font-weight: 600; }
+.studio .editor-taskbar .taskbar-score {
+  flex: 1 1 260px;
+  padding: 6px 14px 6px 6px;
+  border-color: #c9d6e2;
+  background: linear-gradient(90deg, #f4f7fa, #fff);
+}
+.taskbar-score-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: white;
+  font-weight: 800;
+  font-size: 15px;
+  flex: none;
+}
+.tone-excellent .taskbar-score-value { background: #12805c; }
+.tone-strong .taskbar-score-value { background: #2254d1; }
+.tone-fair .taskbar-score-value { background: #b7791f; }
+.tone-low .taskbar-score-value { background: #c2410c; }
+.taskbar-score-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.taskbar-score-text > span {
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* While editing, the CV name is a compact label rather than a page headline. */
+.studio .workspace-heading.is-editing { padding-top: 12px; padding-bottom: 10px; align-items: center; }
+.studio .workspace-heading.is-editing h1 { font-size: 22px; }
+.studio .workspace-heading.is-editing p:not(.eyebrow) { display: none; }
+@media (max-width: 720px) {
+  .editor-taskbar { margin: 8px 12px 12px; }
+  .studio .editor-taskbar button:not(.taskbar-score) { flex: 1 1 calc(50% - 8px); }
 }
 .studio .bullet-field {
   align-items: stretch;

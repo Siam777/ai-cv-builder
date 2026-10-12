@@ -159,7 +159,7 @@ export function PricingModal({
                 <li>
                   ✓ <strong>Clean, watermark-free</strong> PDF & DOCX export
                 </li>
-                <li>Eight current editor designs</li>
+                <li>All twelve editor designs</li>
                 <li>✓ Master Career Vault & Google XYZ Impact Coach</li>
                 <li>Cancellation flow requires live validation</li>
               </ul>
@@ -201,7 +201,7 @@ export function PricingModal({
                   <strong>{PLANS.lifetime.maxTailoredPerMonth}</strong>{" "}
                   tailoring uses/month
                 </li>
-                <li>Eight current editor designs</li>
+                <li>All twelve editor designs</li>
                 <li>✓ Watermark-free PDF/DOCX while entitlement is active</li>
                 <li>Provider features await live validation</li>
               </ul>

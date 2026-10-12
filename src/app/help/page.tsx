@@ -37,9 +37,14 @@ export default function Help() {
         </p>
         <h2>Choose the right review</h2>
         <p>
-          <strong>Check my CV</strong> starts with content findings you can
-          click to fix. Role checklist compares your CV with common terms for a
-          role you choose. File diagnostics checks an exported file.{" "}
+          <strong>Check my CV</strong> opens with a 0–100 score that explains
+          every point, compares your CV with common benchmarks, and lists the
+          three fixes worth the most. Fix now jumps to the right section; the
+          score in the toolbar updates as you edit. Writing findings lists
+          each line to improve, Role checklist compares your CV with common
+          terms for a role you choose, and File diagnostics checks an exported
+          file. The score describes written content only; it does not predict
+          ATS acceptance or hiring outcomes.{" "}
           <strong>Compare with a job</strong> uses a pasted posting to show
           matching evidence and gaps; it can create a separate copy with
           reviewed bullet ordering.

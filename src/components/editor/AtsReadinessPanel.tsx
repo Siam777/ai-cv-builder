@@ -12,16 +12,21 @@ import {
   analyzeResumeForRole,
   detectAppliedRoleFromDocument,
 } from "@/lib/linter/role-analyzer";
+import { scoreResume } from "@/lib/linter/resume-score";
+import { ResumeScoreReport } from "../score/ResumeScoreReport";
 
 export interface AtsReadinessPanelProps {
   doc: ResumeDocument;
   onNavigateToIssue?: (issue: AtsLintIssue) => void;
+  /** Jump to the editor section with this id ("contact" for personal details). */
+  onNavigateToSection?: (sectionId: string) => void;
   onClose: () => void;
 }
 
 export function AtsReadinessPanel({
   doc,
   onNavigateToIssue,
+  onNavigateToSection,
   onClose,
 }: AtsReadinessPanelProps) {
   useBodyScrollLock(true);
@@ -33,8 +38,9 @@ export function AtsReadinessPanel({
   const [selectedRoleId, setSelectedRoleId] = useState(suggestedRole.roleId);
   const [roleConfirmed, setRoleConfirmed] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "role" | "issues" | "plaintext" | "file"
-  >("issues");
+    "score" | "role" | "issues" | "plaintext" | "file"
+  >("score");
+  const score = useMemo(() => scoreResume(doc), [doc]);
   useEffect(() => {
     setSelectedRoleId(suggestedRole.roleId);
     setRoleConfirmed(false);
@@ -75,12 +81,12 @@ export function AtsReadinessPanel({
         </header>
         <div className="ats-content">
           <p className="review-start-note">
-            Start with <strong>Writing findings</strong>: choose a finding to
-            edit that part of your CV. Use <strong>Role checklist</strong> to
-            compare with a typical role, or <strong>File diagnostics</strong> to
-            check a PDF or Word file you exported.
+            Start with your <strong>Score</strong>: it explains every point and
+            what to fix first. <strong>Writing findings</strong> lists each line
+            to improve; <strong>File diagnostics</strong> checks a PDF or Word
+            file you exported.
           </p>
-          {activeTab !== "file" && (
+          {activeTab !== "file" && activeTab !== "score" && (
             <div className="ats-score-hero" style={{ marginBottom: "16px" }}>
               <div className="ats-score-circle">
                 <span className="big-score">{report.issues.length}</span>
@@ -134,6 +140,13 @@ export function AtsReadinessPanel({
           <div className="tailor-tabs" style={{ marginBottom: "16px" }}>
             <button
               type="button"
+              className={activeTab === "score" ? "active" : ""}
+              onClick={() => setActiveTab("score")}
+            >
+              Score ({score.total})
+            </button>
+            <button
+              type="button"
               className={activeTab === "role" ? "active" : ""}
               onClick={() => setActiveTab("role")}
             >
@@ -161,6 +174,22 @@ export function AtsReadinessPanel({
               File diagnostics
             </button>
           </div>
+          {activeTab === "score" && (
+            <ResumeScoreReport
+              score={score}
+              onFix={
+                onNavigateToSection
+                  ? (type) => {
+                      const target =
+                        type === "contact"
+                          ? "contact"
+                          : doc.sections.find((s) => s.type === type)?.id;
+                      if (target) onNavigateToSection(target);
+                    }
+                  : undefined
+              }
+            />
+          )}
           {activeTab === "file" && <FileDiagnostics doc={doc} />}
           {activeTab === "role" && (
             <div className="role-analyzer-stage">

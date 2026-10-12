@@ -169,6 +169,10 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
         }
       }
 
+      // Skills and languages store list items as bullets; accomplishment rules
+      // (verbs, numbers, length) do not apply to them.
+      if (section.type === "skills" || section.type === "languages") continue;
+
       // Bullets check
       for (const bullet of entry.bullets) {
         const text = bullet.text.trim();

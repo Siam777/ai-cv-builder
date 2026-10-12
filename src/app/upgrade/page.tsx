@@ -267,7 +267,7 @@ export default function UpgradePage() {
                   <strong>{PLANS.lifetime.maxTailoredPerMonth}</strong>{" "}
                   tailoring uses/month
                 </li>
-                <li>Eight current editor designs</li>
+                <li>All twelve editor designs</li>
                 <li>
                   ✓{" "}
                   <strong>

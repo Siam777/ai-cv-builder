@@ -281,6 +281,9 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
   await expect(
     page.getByRole("dialog", { name: "Resume content review" }),
   ).toBeVisible();
+  // The review opens on the explained score; findings are one tab away.
+  await expect(page.locator(".score-report")).toBeVisible();
+  await page.getByRole("button", { name: /Writing findings/ }).click();
   await expect(page.locator(".big-score")).toBeVisible();
   await expect(page.locator(".ats-metrics-breakdown")).toContainText(
     "Not checked",
@@ -404,34 +407,37 @@ test("Public ATS Grader lead magnet audits resume, displays matches, and transfe
 }) => {
   await page.goto("/grader");
   await expect(
-    page.getByRole("heading", { name: "Free Resume Content Review" }),
+    page.getByRole("heading", { name: "How good is your resume?" }),
   ).toBeVisible();
 
-  // Click Load Sample button
-  await page.getByRole("button", { name: "Load Sample" }).click();
+  await page.getByRole("button", { name: "Try a sample" }).click();
   await expect(page.locator(".resume-textarea")).toContainText("Alex Morgan");
   await expect(page.locator(".job-textarea")).toContainText(
     "Staff Full-Stack Engineer",
   );
 
-  // Run the audit
+  // Run the review
   await page.getByRole("button", { name: /Review resume content/ }).click();
 
-  // Verify diagnostic report
+  // Score, benchmarks and gap analysis lead the report
   await expect(page.locator(".report-top-banner")).toContainText("Alex Morgan");
+  await expect(page.locator(".score-dial").first()).toContainText("/100");
+  await expect(page.locator(".score-fixes")).toContainText("Fix these first");
+  await expect(page.locator(".score-benchmarks")).toContainText(
+    "How you compare",
+  );
+  await expect(page.locator(".gap-report")).toContainText("Gap analysis");
+  await expect(page.locator(".gap-report")).toContainText("What to do next");
+  // Skills are not reported as short accomplishment bullets
+  await expect(page.locator(".issue-list")).not.toContainText(
+    "Bullet is very short (1 words)",
+  );
+
+  // Detailed observations remain available
   await expect(page.locator(".primary-score .score-number")).toHaveText(
     /^[0-9]+$/,
   );
-  await expect(page.locator(".role-match-score .score-number")).toHaveText(
-    /^[0-9]+\/[0-9]+$/,
-  );
   await expect(page.locator(".metric-mini-cards")).toContainText("Not checked");
-  await expect(page.locator(".findings-section")).toContainText(
-    "Writing findings",
-  );
-  await expect(page.locator(".findings-section")).toContainText(
-    "Candidate text overlaps",
-  );
   await expect(page.locator(".plain-text-terminal")).toContainText(
     "ALEX MORGAN",
   );

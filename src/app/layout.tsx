@@ -6,6 +6,7 @@ import "./resume-fonts.css";
 import "./library.css";
 import "./editor-polish.css";
 import "./usability.css";
+import "./score.css";
 
 const interfaceFont = localFont({
   src: "./fonts/SourceSans3-Upright.woff2",
@@ -21,7 +22,7 @@ const displayFont = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI CV Builder Â· Resume studio",
+  title: "AI CV Builder · Resume studio",
   description:
     "Create and organize your personal CVs, explore separate demo examples, and sign in to export.",
 };

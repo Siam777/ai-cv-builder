@@ -1,0 +1,167 @@
+/* Resume score, benchmarks and job gap analysis: shared by the public reviewer
+   and the editor's review panel. */
+.score-report,
+.gap-report {
+  --score-ink: #162737;
+  --score-muted: #526473;
+  --score-line: #d9e2eb;
+  --score-soft: #f4f7fa;
+  --tone-excellent: #12805c;
+  --tone-strong: #2254d1;
+  --tone-fair: #b7791f;
+  --tone-low: #c2410c;
+  color: var(--score-ink);
+  font-family: var(--font-interface), Arial, Helvetica, sans-serif;
+}
+.score-report { display: grid; gap: 22px; }
+.score-report h3,
+.gap-report h3 { margin: 0 0 6px; font-size: 18px; }
+.score-report h4,
+.gap-report h4 { margin: 0 0 8px; font-size: 14px; }
+.score-note { margin: 0; color: var(--score-muted); font-size: 13px; line-height: 1.5; }
+
+.score-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--score-line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, var(--score-soft) 100%);
+}
+.score-dial { position: relative; width: 150px; flex: none; text-align: center; }
+.score-dial svg { width: 150px; height: 150px; display: block; }
+.dial-track { fill: none; stroke: #e5ebf1; stroke-width: 10; }
+.dial-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dasharray 0.6s ease; }
+.tone-excellent .dial-fill { stroke: var(--tone-excellent); }
+.tone-strong .dial-fill { stroke: var(--tone-strong); }
+.tone-fair .dial-fill { stroke: var(--tone-fair); }
+.tone-low .dial-fill { stroke: var(--tone-low); }
+.dial-center {
+  position: absolute; inset: 0 0 auto; height: 150px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.dial-value { font-size: 38px; line-height: 1; font-weight: 800; }
+.dial-value small { font-size: 14px; font-weight: 600; color: var(--score-muted); margin-left: 2px; }
+.dial-label { margin-top: 6px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.tone-excellent .dial-label { color: var(--tone-excellent); }
+.tone-strong .dial-label { color: var(--tone-strong); }
+.tone-fair .dial-label { color: var(--tone-fair); }
+.tone-low .dial-label { color: var(--tone-low); }
+.dial-caption { margin: 6px 0 0; font-size: 12px; color: var(--score-muted); }
+
+.score-categories { flex: 1 1 320px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 20px; }
+.score-category-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; font-size: 14px; }
+.score-category-head strong { font-size: 16px; }
+.score-category-head small { color: var(--score-muted); font-weight: 500; }
+.score-category p { margin: 4px 0 0; font-size: 12px; color: var(--score-muted); }
+.score-bar { height: 8px; border-radius: 99px; background: #e5ebf1; overflow: hidden; margin-top: 6px; }
+.score-bar span { display: block; height: 100%; border-radius: inherit; transition: width 0.6s ease; }
+.score-bar .tone-excellent { background: var(--tone-excellent); }
+.score-bar .tone-strong { background: var(--tone-strong); }
+.score-bar .tone-fair { background: var(--tone-fair); }
+.score-bar .tone-low { background: var(--tone-low); }
+
+.score-fixes ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.score-fixes li {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 16px; border: 1px solid var(--score-line); border-radius: 12px; background: white;
+}
+.score-fixes li p { margin: 3px 0 0; color: var(--score-muted); font-size: 14px; line-height: 1.45; }
+.fix-points {
+  flex: none; min-width: 44px; text-align: center; padding: 4px 8px; border-radius: 8px;
+  background: #e8f5ef; color: var(--tone-excellent); font-weight: 800; font-size: 14px;
+}
+.fix-jump { margin-left: auto; flex: none; font-size: 13px; padding: 7px 12px; border-radius: 8px; }
+
+.score-benchmarks ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.benchmark-row { padding: 14px 16px; border: 1px solid var(--score-line); border-radius: 12px; background: white; }
+.benchmark-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.benchmark-label { font-weight: 600; font-size: 14px; }
+.benchmark-values { text-align: right; font-size: 12px; color: var(--score-muted); }
+.benchmark-values strong { display: block; font-size: 18px; color: var(--score-ink); }
+.benchmark-track { position: relative; height: 8px; margin: 10px 0 8px; border-radius: 99px; background: #eef2f6; }
+.benchmark-band { position: absolute; top: 0; bottom: 0; border-radius: 99px; background: #cfe9de; }
+.benchmark-marker {
+  position: absolute; top: 50%; width: 14px; height: 14px; margin-left: -7px; margin-top: -7px;
+  border-radius: 50%; background: var(--tone-excellent); border: 2px solid white; box-shadow: 0 0 0 1px #9fb3c4;
+}
+.is-below .benchmark-marker, .is-above .benchmark-marker { background: var(--tone-fair); }
+.benchmark-advice { margin: 0; font-size: 13px; line-height: 1.45; color: var(--score-muted); }
+.benchmark-status { font-weight: 700; color: var(--tone-excellent); }
+.is-below .benchmark-status, .is-above .benchmark-status { color: var(--tone-fair); }
+
+.score-breakdown { border: 1px solid var(--score-line); border-radius: 12px; padding: 12px 16px; background: white; }
+.score-breakdown summary { font-weight: 600; }
+.score-breakdown-group { margin-top: 14px; }
+.score-breakdown ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.score-breakdown li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
+.score-breakdown li p { margin: 2px 0 0; color: var(--score-muted); font-size: 13px; }
+.check-points { flex: none; min-width: 54px; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; padding: 2px 6px; border-radius: 6px; text-align: center; }
+.is-pass .check-points { background: #e8f5ef; color: var(--tone-excellent); }
+.is-miss .check-points { background: #fdf3e3; color: #92400e; }
+.score-breakdown > .score-note { margin-top: 14px; }
+
+.gap-report { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--score-line); border-radius: 14px; background: white; }
+.gap-head { display: flex; gap: 18px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.gap-head > div:first-child { flex: 1 1 320px; }
+.gap-summary { text-align: right; }
+.gap-summary strong { display: block; font-size: 34px; line-height: 1; color: var(--tone-strong); }
+.gap-summary span { font-size: 12px; color: var(--score-muted); }
+.gap-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.gap-fact { padding: 10px 14px; border-radius: 10px; background: var(--score-soft); border-left: 4px solid #c3cfda; }
+.gap-fact span { display: block; font-size: 12px; color: var(--score-muted); }
+.gap-fact strong { font-size: 15px; }
+.gap-fact.is-ok { border-left-color: var(--tone-excellent); }
+.gap-fact.is-warn { border-left-color: var(--tone-fair); background: #fffaf0; }
+.gap-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.gap-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.gap-chips li { padding: 4px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; border: 1px solid; }
+.gap-chips small { margin-left: 5px; font-weight: 500; opacity: 0.75; }
+.gap-chips.is-missing li { background: #fff1ec; border-color: #f6c3ad; color: #9a3412; }
+.gap-chips.is-unproven li { background: #fff8e6; border-color: #f2d48f; color: #854d0e; }
+.gap-chips.is-found li { background: #eaf7f1; border-color: #a9dcc6; color: #11603f; }
+.gap-empty { margin: 0; font-size: 13px; color: var(--score-muted); }
+.gap-steps ol { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .score-hero { justify-content: center; padding: 16px; }
+  .score-fixes li { flex-wrap: wrap; }
+  .fix-jump { margin-left: 58px; }
+  .gap-summary { text-align: left; }
+}
+
+/* Public reviewer inside the shared site shell: blue/teal public palette. */
+.grader-main { max-width: 1120px; margin: 0 auto; padding: 24px 40px 64px; }
+.grader-main .grader-hero h1 { font: 400 44px/1.15 var(--font-display), Georgia, serif; letter-spacing: -0.5px; }
+.grader-main .grader-hero p { max-width: 680px; margin: 0 auto; color: #526473; font-size: 17px; }
+.grader-main .grader-input-card,
+.grader-main .grader-report-card { border-color: #d9e2eb; border-radius: 16px; }
+.grader-main .grader-report-card { display: grid; gap: 22px; }
+.grader-main .step-num,
+.grader-main .tab-pill.active,
+.grader-main .audit-submit-btn { background: #2254d1; border-color: #2254d1; }
+.grader-main .tab-pill { font-size: 13px; padding: 7px 14px; }
+.grader-main .box-header h3 small { font-weight: 500; color: #526473; font-size: 13px; margin-left: 4px; }
+.grader-main .audit-action-bar { display: grid; justify-items: center; gap: 10px; }
+.grader-main .audit-action-bar .box-hint { margin: 0; text-align: center; }
+.grader-main .report-top-banner { margin: 0; align-items: center; flex-wrap: wrap; gap: 14px; }
+.grader-main .report-top-banner .eyebrow { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #526473; }
+.grader-main .report-top-banner h2 { margin: 2px 0 0; font: 400 30px/1.2 var(--font-display), Georgia, serif; }
+.report-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.report-actions .cta-button { background: #2254d1; color: white; }
+.grader-main .report-cta-box { margin: 0; background: #162737; }
+.grader-main .report-cta-box .cta-button { color: #162737; }
+.grader-main .import-warnings { border: 1px solid #f2d48f; background: #fffaf0; border-radius: 12px; padding: 12px 16px; color: #854d0e; font-size: 14px; }
+.grader-main .import-warnings summary { font-weight: 600; }
+.report-section { border: 1px solid #d9e2eb; border-radius: 12px; padding: 14px 18px; background: white; }
+.report-section > summary { font-weight: 600; font-size: 15px; }
+.report-section[open] > summary { margin-bottom: 14px; }
+.report-section .scoreboard-grid { margin-bottom: 14px; }
+@media (max-width: 720px) {
+  .grader-main { padding: 12px 16px 40px; }
+  .grader-main .grader-hero h1 { font-size: 32px; }
+  .grader-main .grader-input-card { padding: 18px; }
+}
+.grader-main .plain-text-preview-box { margin: 0; }

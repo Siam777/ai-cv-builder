@@ -215,21 +215,31 @@
 .template-tech .block-contact,
 .template-executive .block-contact,
 .template-timeline .block-contact,
+.template-elegant .block-contact,
+.template-portfolio .block-contact,
+.template-bold .block-contact,
+.template-academic .block-contact,
 .template-minimalist .block-contact {
   display: inline-block;
   margin-right: 14pt;
   font-size: 9pt;
   padding-bottom: 4pt;
 }
-.template-classic .block-contact:not(:last-of-type)::after,
-.template-modern .block-contact:not(:last-of-type)::after,
-.template-compact .block-contact:not(:last-of-type)::after,
-.template-tech .block-contact:not(:last-of-type)::after,
-.template-executive .block-contact:not(:last-of-type)::after,
-.template-timeline .block-contact:not(:last-of-type)::after,
-.template-minimalist .block-contact:not(:last-of-type)::after {
-  content: " • ";
-  margin-left: 14pt;
+/* Separators sit in the gap before each following item, so the last item never
+   gets a dangling dot (other blocks follow contacts, so :last-of-type never matched). */
+.template-classic .block-contact + .block-contact::before,
+.template-modern .block-contact + .block-contact::before,
+.template-compact .block-contact + .block-contact::before,
+.template-tech .block-contact + .block-contact::before,
+.template-executive .block-contact + .block-contact::before,
+.template-timeline .block-contact + .block-contact::before,
+.template-elegant .block-contact + .block-contact::before,
+.template-portfolio .block-contact + .block-contact::before,
+.template-bold .block-contact + .block-contact::before,
+.template-academic .block-contact + .block-contact::before,
+.template-minimalist .block-contact + .block-contact::before {
+  content: "•";
+  margin-right: 14pt;
   color: #94a3b8;
 }
 
@@ -527,6 +537,21 @@
   font-weight: 700;
   color: #0f172a;
 }
+/* Tech: accent square marker and accent dates distinguish it from Compact.
+   Empty generated content keeps PDF text extraction unchanged. */
+.template-tech .block-section::before {
+  content: "";
+  display: inline-block;
+  width: 6pt;
+  height: 6pt;
+  margin-inline-end: 6pt;
+  background: var(--accent);
+  vertical-align: 1pt;
+}
+.template-tech .resume-date {
+  color: var(--accent);
+  font-weight: 600;
+}
 
 /* Executive Luxury Template */
 .template-executive .block-name {
@@ -661,7 +686,9 @@
 .template-elegant .block-section { font-family: "Source Serif 4", serif; font-size: 12pt; text-transform: none; letter-spacing: 0; border-bottom: 0.5pt solid var(--accent); }
 .template-portfolio .block-name { font-family: "Source Sans 3", sans-serif; font-weight: 800; font-size: 28pt; color: var(--accent); }
 .template-portfolio .block-headline { font-size: 12pt; }
-.template-portfolio .block-section { background: color-mix(in srgb, var(--accent) 8%, white); padding: 5pt 7pt; margin-top: 0; border: 0; border-top: var(--section-gap) solid white; border-inline-start: 3pt solid var(--accent); letter-spacing: 0.6pt; }
+/* The accent rail is an inset shadow so it never mitres into the white spacer border. */
+.template-portfolio .block-section { background: color-mix(in srgb, var(--accent) 8%, white); padding: 5pt 7pt 5pt 10pt; margin-top: 0; border: 0; border-top: var(--section-gap) solid white; box-shadow: inset 3pt 0 0 var(--accent); letter-spacing: 0.6pt; }
+.template-portfolio.rtl .block-section { box-shadow: inset -3pt 0 0 var(--accent); padding: 5pt 10pt 5pt 7pt; }
 .template-portfolio .block-title { font-size: 11pt; padding-top: 8pt; }
 .template-bold .block-name { font-family: "Source Sans 3", sans-serif; font-size: 30pt; font-weight: 900; color: white; background: var(--accent); padding: 8pt 10pt; letter-spacing: -0.6pt; }
 .template-bold .block-headline { font-size: 12pt; font-weight: 700; padding-top: 7pt; }
@@ -1453,7 +1480,8 @@
    own direction so Latin links and punctuation remain readable in RTL layouts. */
 .rtl .block-contact { display: block; margin: 0; }
 .rtl .block-contact::after,
-.rtl .block-contact:not(:last-of-type)::after { content: none; }
+.rtl .block-contact:not(:last-of-type)::after,
+.rtl .block-contact + .block-contact::before { content: none; }
 /* Vector dots avoid a bidi bullet character interrupting extracted sentences. */
 .rtl .block-bullet::before {
   content: "";
@@ -1512,7 +1540,8 @@
   align-self: start; color: white; margin: 0; padding: 3pt 0;
 }
 .template-creative.with-sidebar .block-contact::after,
-.template-creative.with-sidebar .block-contact:not(:last-of-type)::after { content: none; }
+.template-creative.with-sidebar .block-contact:not(:last-of-type)::after,
+.template-creative.with-sidebar .block-contact + .block-contact::before { content: none; }
 .template-creative.with-sidebar .block-section { margin: 0; width: auto; }
 .template-creative.with-sidebar.rtl .page-sheet,
 .page-sheet.template-creative.with-sidebar.rtl,
@@ -1523,3 +1552,16 @@
   display: grid; grid-template-columns: minmax(0, 1fr) 34mm; column-gap: 6pt;
 }
 .template-timeline .resume-date { border-inline-start: 0.6pt solid #cbd5e1; padding-inline-start: 6pt; }
+/* The date moves to its own column, so the inline separator would dangle. */
+.template-timeline .resume-meta-sep { display: none; }
+
+/* Centered headers: inline contact items center through their container, while
+   every other block keeps start alignment. */
+.template-classic .page-content,
+.template-executive .page-content { text-align: center; }
+.template-classic .page-content > .resume-block:not(.block-contact),
+.template-executive .page-content > .resume-block:not(.block-contact) { text-align: start; }
+.template-classic .page-content > .block-name,
+.template-classic .page-content > .block-headline,
+.template-executive .page-content > .block-name,
+.template-executive .page-content > .block-headline { text-align: center; }
