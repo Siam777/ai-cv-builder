@@ -295,7 +295,7 @@ for (const width of [360, 768, 1440]) {
     await capture("checkout-unconfigured", true);
     await page.goto("/grader");
     await capture("reviewer-input", true);
-    await page.getByRole("button", { name: "Load Sample" }).click();
+    await page.getByRole("button", { name: "Try a sample" }).click();
     await page.getByRole("button", { name: "Review resume content" }).click();
     await expect(page.locator(".grader-report-card")).toBeVisible();
     await capture("reviewer-report", true);

@@ -98,7 +98,9 @@ export function ResumeBlock({
             <>
               <span>
                 {block.details}
-                {block.details ? " · " : ""}
+                {block.details ? (
+                  <span className="resume-meta-sep"> · </span>
+                ) : null}
               </span>
               <span className="resume-date">{block.date}</span>
             </>

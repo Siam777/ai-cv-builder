@@ -127,6 +127,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // 2. Verify modal content is internally scrollable
     const atsContent = page.locator(".ats-content");
+    await dialog.getByRole("button", { name: "Role checklist", exact: true }).click();
     await dialog.getByRole("button", { name: "Review selected checklist" }).click();
     await expect(atsContent).toBeVisible();
     const isScrollable = await atsContent.evaluate((el) => el.scrollHeight > el.clientHeight);

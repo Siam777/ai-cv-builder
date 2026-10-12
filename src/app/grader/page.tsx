@@ -18,6 +18,17 @@ import {
   type SkillGap,
 } from "@/lib/vault/job-tailoring";
 import { createRepository } from "@/lib/repository";
+import {
+  analyzeJobGap,
+  scoreResume,
+  type JobGapAnalysis,
+  type ResumeScore,
+} from "@/lib/linter/resume-score";
+import {
+  JobGapReport,
+  ResumeScoreReport,
+} from "@/components/score/ResumeScoreReport";
+import { PublicShell } from "@/components/public/PublicShell";
 import type { ResumeDocument } from "@/lib/document";
 
 const SAMPLE_RESUME_TEXT = `Alex Morgan
@@ -70,6 +81,8 @@ export default function GraderPage() {
     findings: AtsReadinessReport;
     warnings: string[];
     plainText: string;
+    score: ResumeScore;
+    gap?: JobGapAnalysis;
     fileDiagnostics?: FileDiagnosticReport;
     jobAnalysis?: {
       targetTitle: string;
@@ -161,8 +174,16 @@ export default function GraderPage() {
         };
       }
 
+      const score = scoreResume(parsedDoc);
+      const gap =
+        jobDescription.trim().length > 30
+          ? analyzeJobGap(parsedDoc, jobDescription)
+          : undefined;
+
       setReport({
         doc: parsedDoc,
+        score,
+        gap,
         findings: linterResult,
         fileDiagnostics,
         warnings,
@@ -189,38 +210,14 @@ export default function GraderPage() {
   }
 
   return (
-    <div className="grader-container">
-      <header className="grader-header">
-        <Link href="/" className="brand" aria-label="AI CV Builder home">
-          <span className="brand-mark">
-            cv<span>·</span>
-          </span>
-          <span>
-            Resume Reviewer<small>AI CV BUILDER</small>
-          </span>
-        </Link>
-        <div className="grader-header-actions">
-          <Link href="/builder" className="nav-link">
-            Open Resume Studio →
-          </Link>
-        </div>
-      </header>
-
-      <main className="grader-main">
+    <PublicShell active="/grader">
+      <div className="grader-main">
         <section className="grader-hero">
-          <span className="grader-badge">
-            VISIBLE CONTENT · DETERMINISTIC CHECKS
-          </span>
-          <h1>Free Resume Content Review</h1>
+          <h1>How good is your resume?</h1>
           <p>
-            Upload your CV or paste its text, then choose Review resume content.
-            Read the findings, check any import notes, and open the editor to
-            make changes. A job description is optional.
-          </p>
-          <p className="hero-lead">
-            Review contact details, vague bullet openings, dates, and numeric
-            patterns. Add a job description to see keyword and token overlaps.
-            These checks do not predict ATS acceptance or hiring outcomes.
+            Get a 0–100 score with the reasons behind every point, see how you
+            compare with common recruiter benchmarks, and add a job posting to
+            find the gaps. Free, no account needed.
           </p>
         </section>
 
@@ -230,30 +227,34 @@ export default function GraderPage() {
               <div className="resume-source-box">
                 <div className="box-header">
                   <span className="step-num">1</span>
-                  <h3>Select or Paste Your Resume</h3>
+                  <h3>Your resume</h3>
                 </div>
 
-                <div className="tab-pill-row">
+                <div className="tab-pill-row" role="tablist">
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={tab === "upload"}
                     className={`tab-pill ${tab === "upload" ? "active" : ""}`}
                     onClick={() => setTab("upload")}
                   >
-                    Upload File (.pdf, .docx, .txt)
+                    Upload file
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={tab === "paste"}
                     className={`tab-pill ${tab === "paste" ? "active" : ""}`}
                     onClick={() => setTab("paste")}
                   >
-                    Paste Text
+                    Paste text
                   </button>
                   <button
                     type="button"
                     className="tab-pill sample-btn"
                     onClick={loadSampleData}
                   >
-                    Load Sample
+                    Try a sample
                   </button>
                 </div>
 
@@ -268,12 +269,15 @@ export default function GraderPage() {
                       }}
                     />
                     <label htmlFor="resume-file" className="dropzone-label">
-                      <span className="upload-icon">📄</span>
+                      <span className="upload-icon" aria-hidden="true">
+                        📄
+                      </span>
                       <strong>
                         {file ? file.name : "Choose a PDF, DOCX or TXT resume"}
                       </strong>
                       <span className="file-hint">
                         Up to 5 MB · Files are sent to this application server
+                        for text extraction and are not saved
                       </span>
                     </label>
                   </div>
@@ -292,17 +296,19 @@ export default function GraderPage() {
               <div className="job-description-box">
                 <div className="box-header">
                   <span className="step-num">2</span>
-                  <h3>Target Job Description (Optional)</h3>
+                  <h3>
+                    Job posting <small>optional</small>
+                  </h3>
                 </div>
                 <p className="box-hint">
-                  Paste actual requirements to compare skill aliases and token
-                  fragments. Text overlap does not verify qualifications.
+                  Paste a job description to get a gap analysis: which skills
+                  and requirements your resume covers, and which are missing.
                 </p>
                 <textarea
                   className="job-textarea"
                   rows={12}
                   aria-label="Job description"
-                  placeholder="Paste job description requirements and qualifications here..."
+                  placeholder="Paste the job description here..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                 />
@@ -322,105 +328,71 @@ export default function GraderPage() {
                 disabled={loading}
                 onClick={handleAudit}
               >
-                {loading
-                  ? "Reviewing resume content…"
-                  : "Review resume content"}
+                {loading ? "Scoring your resume…" : "Review resume content"}
               </button>
+              <p className="box-hint">
+                Pasted text is analyzed in your browser. Scores describe the
+                written content, not ATS acceptance or hiring outcomes.
+              </p>
             </div>
           </section>
         ) : (
           <section className="grader-report-card">
             <div className="report-top-banner">
               <div>
-                <p className="eyebrow">DIAGNOSTIC REPORT FOR</p>
-                <h2>{report.doc.contact.name || "Candidate Resume"}</h2>
+                <p className="eyebrow">Resume report</p>
+                <h2>{report.doc.contact.name || "Your resume"}</h2>
               </div>
-              <button
-                type="button"
-                className="audit-retry-btn"
-                onClick={() => setReport(null)}
-              >
-                ← Audit Another Resume
-              </button>
+              <div className="report-actions">
+                <button
+                  type="button"
+                  className="audit-retry-btn"
+                  onClick={() => setReport(null)}
+                >
+                  ← Review another
+                </button>
+                <button
+                  type="button"
+                  className="cta-button"
+                  onClick={handleOpenInStudio}
+                >
+                  Improve it in the editor
+                </button>
+              </div>
             </div>
 
-            <p className="box-hint">
-              The report checks the parsed document model. Exported-file layout
-              and reading order have not been checked. Numeric patterns do not
-              verify achievements.
-            </p>
             {report.warnings.length > 0 && (
-              <div className="import-warnings">
-                <h3>Import notes</h3>
+              <details className="import-warnings">
+                <summary>
+                  Import notes ({report.warnings.length}): check these if a
+                  score looks wrong
+                </summary>
                 <ul>
                   {report.warnings.map((warning, index) => (
                     <li key={index}>{warning}</li>
                   ))}
                 </ul>
-              </div>
+              </details>
             )}
-            {report.fileDiagnostics && (
-              <FileDiagnosticResults report={report.fileDiagnostics} />
+
+            <ResumeScoreReport
+              score={report.score}
+              jobMatch={report.gap?.matchPercent}
+            />
+
+            {report.gap && (
+              <JobGapReport
+                gap={report.gap}
+                title={report.jobAnalysis?.targetTitle}
+              />
             )}
-            {/* Observed counts */}
-            <div className="scoreboard-grid">
-              <div className="score-card primary-score">
-                <span className="score-label">WRITING FINDINGS</span>
-                <div className="score-number">
-                  {report.findings.issues.length}
-                </div>
-                <p className="score-sub">
-                  Review these rule matches in context. This is a findings
-                  count, not an ATS score.
-                </p>
-              </div>
 
-              {report.jobAnalysis && (
-                <div className="score-card role-match-score">
-                  <span className="score-label">JOB REQUIREMENT OVERLAP</span>
-                  <div className="score-number">
-                    {report.jobAnalysis.totalCount > 0
-                      ? `${report.jobAnalysis.matchedCount}/${report.jobAnalysis.totalCount}`
-                      : "Not assessed"}
-                  </div>
-                  <p className="score-sub">
-                    Parsed requirement lines in{" "}
-                    <strong>{report.jobAnalysis.targetTitle}</strong>
-                  </p>
-                </div>
-              )}
-
-              <div className="metric-mini-cards">
-                <div className="mini-card">
-                  <span className="mini-label">Vague openings</span>
-                  <span className="mini-val">
-                    {report.findings.weakOpeningCount}/
-                    {report.findings.totalBulletsCount}
-                  </span>
-                </div>
-                <div className="mini-card">
-                  <span className="mini-label">Numeric patterns</span>
-                  <span className="mini-val">
-                    {report.findings.metricsCount}/
-                    {report.findings.totalBulletsCount}
-                  </span>
-                </div>
-                <div className="mini-card">
-                  <span className="mini-label">
-                    Exported-file reading order
-                  </span>
-                  <span className="mini-val clean">Not checked</span>
-                </div>
-              </div>
-            </div>
-
-            {/* High-Converting CTA Banner */}
             <div className="report-cta-box">
               <div className="cta-text">
-                <h3>Review and edit your imported content</h3>
+                <h3>Fix it in minutes</h3>
                 <p>
-                  Save a copy on this device and check the imported content
-                  before making changes.
+                  Open this resume in the editor to apply the fixes, pick a
+                  design and watch your score update as you type.
                 </p>
               </div>
               <button
@@ -432,126 +404,126 @@ export default function GraderPage() {
               </button>
             </div>
 
-            {/* Detailed Findings & Gaps */}
-            <p className="review-start-note">
-              Start with Writing findings below. They describe possible fixes,
-              not a hiring score. Review the imported text before trusting a
-              finding; the original file may contain details the import missed.
-            </p>
-            <div className="findings-section">
-              <div className="findings-col">
-                <h3>🔍 Writing findings ({report.findings.issues.length})</h3>
-                {report.findings.issues.length === 0 ? (
-                  <div className="empty-findings">
-                    No findings from the current rules. File compatibility
-                    remains unchecked.
+            <details className="report-section">
+              <summary>
+                Line-by-line writing findings ({report.findings.issues.length})
+              </summary>
+              <div className="scoreboard-grid">
+                <div className="score-card primary-score">
+                  <span className="score-label">Writing findings</span>
+                  <div className="score-number">
+                    {report.findings.issues.length}
                   </div>
-                ) : (
-                  <ul className="issue-list">
-                    {report.findings.issues.map((issue) => (
-                      <li
-                        key={issue.id}
-                        className={`issue-item ${issue.severity}`}
-                      >
-                        <span className="issue-icon">
-                          {issue.severity === "critical" ? "❌" : "⚠️"}
-                        </span>
-                        <div>
-                          <strong>{issue.message}</strong>
-                          {issue.suggestion && (
-                            <p className="issue-fix">
-                              💡 Suggestion: {issue.suggestion}
-                            </p>
-                          )}
-                        </div>
+                </div>
+                <div className="metric-mini-cards">
+                  <div className="mini-card">
+                    <span className="mini-label">Vague openings</span>
+                    <span className="mini-val">
+                      {report.findings.weakOpeningCount}/
+                      {report.findings.totalBulletsCount}
+                    </span>
+                  </div>
+                  <div className="mini-card">
+                    <span className="mini-label">Bullets with numbers</span>
+                    <span className="mini-val">
+                      {report.findings.metricsCount}/
+                      {report.findings.totalBulletsCount}
+                    </span>
+                  </div>
+                  <div className="mini-card">
+                    <span className="mini-label">
+                      Exported-file reading order
+                    </span>
+                    <span className="mini-val clean">Not checked</span>
+                  </div>
+                </div>
+              </div>
+              {report.findings.issues.length === 0 ? (
+                <div className="empty-findings">
+                  No findings from the current rules.
+                </div>
+              ) : (
+                <ul className="issue-list">
+                  {report.findings.issues.map((issue) => (
+                    <li
+                      key={issue.id}
+                      className={`issue-item ${issue.severity}`}
+                    >
+                      <span className="issue-icon" aria-hidden="true">
+                        {issue.severity === "critical" ? "❌" : "⚠️"}
+                      </span>
+                      <div>
+                        <strong>{issue.message}</strong>
+                        {issue.suggestion && (
+                          <p className="issue-fix">{issue.suggestion}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+
+            {report.jobAnalysis && (
+              <details className="report-section">
+                <summary>
+                  Requirement-by-requirement evidence (
+                  {report.jobAnalysis.matchedCount}/
+                  {report.jobAnalysis.totalCount} requirement lines)
+                </summary>
+                <div className="keyword-section">
+                  <ul className="match-pill-list">
+                    {report.jobAnalysis.matchedRequirements.map((item) => (
+                      <li key={item.requirementId} className="matched-pill">
+                        {item.description}
+                        {item.matchedBullets.map((bullet) => (
+                          <p key={bullet.bulletId}>
+                            {bullet.entryTitle}: “{bullet.text}”
+                          </p>
+                        ))}
+                        {item.matchedSkills.length > 0 && (
+                          <p>Skills: {item.matchedSkills.join(", ")}</p>
+                        )}
                       </li>
                     ))}
                   </ul>
-                )}
-              </div>
-
-              {report.jobAnalysis && (
-                <div className="findings-col">
-                  <h3>🎯 Keyword & Requirements Breakdown</h3>
-                  <div className="keyword-section">
-                    <p className="box-hint">
-                      Rules detect requirement lines and compare skill aliases
-                      and token fragments. A partial match may leave other parts
-                      of a requirement unmet. Review the candidate text for each
-                      match; no qualifications have been verified.
-                    </p>
-                    <h4>
-                      Candidate text overlaps (
-                      {report.jobAnalysis.matchedRequirements.length})
-                    </h4>
-                    <ul className="match-pill-list">
-                      {report.jobAnalysis.matchedRequirements.map((item) => (
-                        <li key={item.requirementId} className="matched-pill">
-                          {item.description}
-                          {item.matchedBullets.map((bullet) => (
-                            <p key={bullet.bulletId}>
-                              {bullet.entryTitle}: “{bullet.text}”
-                            </p>
-                          ))}
-                          {item.matchedSkills.length > 0 && (
-                            <p>
-                              Listed skill terms:{" "}
-                              {item.matchedSkills.join(", ")}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-
-                    {report.jobAnalysis.skillGaps.length > 0 && (
-                      <>
-                        <h4 className="gap-heading">
-                          No text overlap found (
-                          {report.jobAnalysis.skillGaps.length})
-                        </h4>
-                        <ul className="gap-pill-list">
-                          {report.jobAnalysis.skillGaps.map((gap) => (
-                            <li key={gap.requirementId} className="gap-pill">
-                              ✗ {gap.description}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </div>
+                  {report.jobAnalysis.skillGaps.length > 0 && (
+                    <>
+                      <h4 className="gap-heading">
+                        No text overlap found (
+                        {report.jobAnalysis.skillGaps.length})
+                      </h4>
+                      <ul className="gap-pill-list">
+                        {report.jobAnalysis.skillGaps.map((gap) => (
+                          <li key={gap.requirementId} className="gap-pill">
+                            ✗ {gap.description}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              </details>
+            )}
 
-            {/* ATS Plain Text Stream Preview */}
-            <div className="plain-text-preview-box">
-              <div className="box-header">
-                <h3>Document model text</h3>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={handleOpenInStudio}
-                >
-                  Open in editor to export
-                </button>
-              </div>
+            {report.fileDiagnostics && (
+              <details className="report-section" open>
+                <summary>File diagnostics for your upload</summary>
+                <FileDiagnosticResults report={report.fileDiagnostics} />
+              </details>
+            )}
+
+            <details className="report-section plain-text-preview-box">
+              <summary>Plain-text view of your resume</summary>
               <p className="box-hint">
                 Assembled from parsed fields in section order. This does not
                 reproduce an ATS parser or validate the original file.
               </p>
               <pre className="plain-text-terminal">{report.plainText}</pre>
-            </div>
+            </details>
           </section>
         )}
-      </main>
-
-      <footer className="grader-footer">
-        <p>
-          AI CV Builder · Deterministic content checks · Pasted text is analyzed
-          in your browser. File uploads are processed by this application
-          server.
-        </p>
-      </footer>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

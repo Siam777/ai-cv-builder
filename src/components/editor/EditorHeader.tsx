@@ -149,7 +149,7 @@ export function EditorHeader({
         </div>
       </header>
       <div
-        className="workspace-heading no-print"
+        className={`workspace-heading no-print${libraryMode ? "" : " is-editing"}`}
         style={{ display: showAccount ? "none" : undefined }}
       >
         <div>
