@@ -33,7 +33,7 @@ async function setup(page: Page) {
 }
 async function openCoach(page: Page) {
   await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page
     .getByLabel("Job Description", { exact: true })

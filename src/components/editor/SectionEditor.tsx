@@ -16,6 +16,7 @@ import { PhotoUploader } from "./PhotoUploader";
 import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import type { FocusTarget } from "./types";
+import { ArrowDown, ArrowUp, Check, Lightbulb, Save, Trash2, X } from "lucide-react";
 
 export interface SectionEditorProps {
   doc: ResumeDocument;
@@ -26,6 +27,7 @@ export interface SectionEditorProps {
   onUpdateDocument: (mutator: (draft: ResumeDocument) => void) => void;
   onDeleteSection?: (sectionId: string) => void;
   onDeleteResume: () => void;
+  onOpenPhotoDesigns?: () => void;
   onWritingAction?: (
     bulletId: string | undefined,
     action: "improve" | "concise" | "metric" | "summary",
@@ -42,10 +44,14 @@ export function SectionEditor({
   onDeleteSection,
   onDeleteResume,
   onWritingAction,
+  onOpenPhotoDesigns,
 }: SectionEditorProps) {
   const containerRef = useRef<HTMLElement>(null);
   const [librarySaved, setLibrarySaved] = useState(false);
   const activeSection = doc.sections.find((s) => s.id === sectionId);
+  const activeTemplate = templates.find(
+    (t) => t.id === doc.presentation.template,
+  );
 
   // Smooth scroll and focus on target when focusTarget changes
   useEffect(() => {
@@ -160,7 +166,7 @@ export function SectionEditor({
         {sectionId === "contact" ? (
           <>
             <div className="panel-heading">
-              <p className="eyebrow">THE INTRODUCTION</p>
+              <p className="eyebrow">The introduction</p>
               <h2>Personal details</h2>
               <p>Make it easy for your next team to find you.</p>
             </div>
@@ -179,34 +185,22 @@ export function SectionEditor({
             <PhotoUploader
               value={doc.contact.photoUrl || ""}
               disabled={busy}
+              templateName={activeTemplate?.name ?? "this design"}
+              photoSupported={Boolean(activeTemplate?.photoSupported)}
+              photoHidden={doc.presentation.showPhoto === false}
               onChange={(value) =>
                 onUpdateDocument((d) => {
                   d.contact.photoUrl = value;
                   d.presentation.showPhoto = Boolean(value);
                 })
               }
+              onSwitchDesign={onOpenPhotoDesigns}
+              onKeepDesign={() =>
+                onUpdateDocument((d) => {
+                  d.presentation.showPhoto = false;
+                })
+              }
             />
-            {doc.contact.photoUrl &&
-              !templates.find((t) => t.id === doc.presentation.template)
-                ?.photoSupported && (
-                <div className="assistant-next-step">
-                  <p>
-                    Your current design omits photos. Your uploaded photo is
-                    kept.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onUpdateDocument((d) => {
-                        d.presentation.template = "modern";
-                        d.presentation.showPhoto = true;
-                      })
-                    }
-                  >
-                    Use Modern design with photo
-                  </button>
-                </div>
-              )}
             <div className="form-divider" />
 
             <Field
@@ -278,7 +272,7 @@ export function SectionEditor({
               }
             />
             <div className="editor-tip">
-              <span>✦</span>
+              <Lightbulb size={18} aria-hidden />
               <p>
                 A city and country are usually enough. Include the contact
                 details you want to share.
@@ -298,10 +292,10 @@ export function SectionEditor({
               <div className="panel-heading">
                 <p className="eyebrow">
                   {activeSection.type === "custom"
-                    ? "CUSTOM SECTION"
+                    ? "Custom section"
                     : activeSection.type === "summary"
-                      ? "THE INTRODUCTION"
-                      : "YOUR EXPERIENCE"}
+                      ? "The introduction"
+                      : "Your experience"}
                 </p>
                 <h2>{activeSection.label || labels[activeSection.type]}</h2>
                 <p>
@@ -353,7 +347,11 @@ export function SectionEditor({
                       }
                       onClick={() => moveSection(delta)}
                     >
-                      {delta === -1 ? "↑" : "↓"}
+                      {delta === -1 ? (
+                        <ArrowUp size={16} aria-hidden />
+                      ) : (
+                        <ArrowDown size={16} aria-hidden />
+                      )}
                     </button>
                   ))}
                   {activeSection.type === "custom" && (
@@ -373,7 +371,8 @@ export function SectionEditor({
                         setTimeout(() => setLibrarySaved(false), 2000);
                       }}
                     >
-                      {librarySaved ? "✓ Saved" : "💾 Save"}
+                      {librarySaved ? <Check size={16} aria-hidden /> : <Save size={16} aria-hidden />}
+                      {librarySaved ? "Saved" : "Save"}
                     </button>
                   )}
                   {activeSection.type === "custom" && onDeleteSection && (
@@ -394,7 +393,7 @@ export function SectionEditor({
                         }
                       }}
                     >
-                      🗑️
+                      <Trash2 size={16} aria-hidden />
                     </button>
                   )}
                 </div>
@@ -430,7 +429,11 @@ export function SectionEditor({
                           }
                           onClick={() => moveEntry(index, delta)}
                         >
-                          {delta === -1 ? "↑" : "↓"}
+                          {delta === -1 ? (
+                            <ArrowUp size={16} aria-hidden />
+                          ) : (
+                            <ArrowDown size={16} aria-hidden />
+                          )}
                         </button>
                       ))}
                       <button
@@ -438,7 +441,7 @@ export function SectionEditor({
                         aria-label="Remove entry"
                         onClick={() => removeEntry(entry.id)}
                       >
-                        ×
+                        <X size={14} aria-hidden />
                       </button>
                     </div>
                   </div>

@@ -12,7 +12,7 @@ import {
 } from "@/lib/document";
 import { createRepository } from "@/lib/repository";
 import { ResumePreview, type PreviewHandle } from "./resume-preview";
-import { DesignPanel } from "./design-panel";
+import { DesignPanel, type TemplateFilter } from "./design-panel";
 import { templates } from "@/lib/presentation";
 import { AccountPanel } from "./account-panel";
 import { AIPanel, type AiPanelMode } from "./ai-panel";
@@ -24,7 +24,7 @@ import {
   transferLocalResumes,
   CloudRequestError,
 } from "@/lib/cloud-repository";
-import type { AccountUser } from "@/lib/cloud-contract";
+import { userCanExport, type AccountUser } from "@/lib/cloud-contract";
 import { EditorHeader } from "./editor/EditorHeader";
 import { DocumentToolbar } from "./editor/DocumentToolbar";
 import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
@@ -67,6 +67,7 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { watchSessionChanges } from "@/lib/session-events";
 import { GuidedStartModal } from "./editor/GuidedStartModal";
 import { PanelDialog } from "./editor/PanelDialog";
+import { Palette, Sparkles } from "lucide-react";
 
 function download(
   content: string | Uint8Array | BlobPart,
@@ -116,6 +117,7 @@ export function ResumeStudio({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDesign, setShowDesign] = useState(false);
+  const [designFilter, setDesignFilter] = useState<TemplateFilter>("all");
   const [showAccount, setShowAccount] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [writingTarget, setWritingTarget] = useState<{
@@ -209,7 +211,7 @@ export function ResumeStudio({
     setSectionId("contact");
     setFocusTarget(null);
     setError("");
-    setStatus("Saved on this device");
+    setStatus("Saved in this browser");
   }
 
   useEffect(() => {
@@ -224,10 +226,13 @@ export function ResumeStudio({
         )) as { user: AccountUser | null } | null;
         if (!active) return;
         setSessionUser(session?.user ?? null);
-        if (
-          session?.user &&
-          sessionStorage.getItem("cv-workspace") !== "device"
-        ) {
+        // A device-workspace request (from the grader hand-off or an explicit
+        // switch) applies to this page load only; signed-in users otherwise
+        // always open their account.
+        const deviceRequested =
+          sessionStorage.getItem("cv-workspace") === "device";
+        sessionStorage.removeItem("cv-workspace");
+        if (session?.user && !deviceRequested) {
           const cloud = createCloudRepository(session.user.id);
           const cloudList = await cloud.list();
           if (!active) return;
@@ -237,7 +242,7 @@ export function ResumeStudio({
         }
         list.forEach((d) => revisions.current.set(d.id, d.revision));
         setDocuments(list);
-        setStatus("Saved on this device");
+        setStatus("Saved in this browser");
       })
       .catch((e) => {
         if (active) {
@@ -268,7 +273,8 @@ export function ResumeStudio({
           const user = (value as { user: AccountUser | null }).user;
           setSessionUser((previous) =>
             previous?.id === user?.id &&
-            previous?.emailVerified === user?.emailVerified
+            previous?.emailVerified === user?.emailVerified &&
+            previous?.canExport === user?.canExport
               ? previous
               : user,
           );
@@ -369,7 +375,7 @@ export function ResumeStudio({
           setError("");
           setStatus(
             version === change.current
-              ? "Saved on this device"
+              ? "Saved in this browser"
               : "Unsaved changes",
           );
         } catch (e) {
@@ -691,6 +697,7 @@ export function ResumeStudio({
     setShowAts(false);
     setShowHistory(false);
     setShowDesign(false);
+    setDesignFilter("all");
     setShowTailor(false);
     setReviewedVariantUndo(null);
     setStaged(null);
@@ -706,7 +713,7 @@ export function ResumeStudio({
       revisions.current = new Map(list.map((d) => [d.id, d.revision]));
       setDocuments(list);
       setError("");
-      setStatus("Saved on this device");
+      setStatus("Saved in this browser");
     } catch (error) {
       setStatus("Save failed");
       setError((error as Error).message);
@@ -782,7 +789,7 @@ export function ResumeStudio({
     setDocuments((list) => [saved, ...list.filter((d) => d.id !== saved.id)]);
     savedChange.current = change.current;
     setError("");
-    setStatus("Saved on this device");
+    setStatus("Saved in this browser");
   }
 
   function checkedExport(format: ExportFormat | "print", recovery = false) {
@@ -817,7 +824,7 @@ export function ResumeStudio({
         throw new Error(
           "This CV belongs to a different account workspace. Sign in to the original account; your edits are kept.",
         );
-      if (!user.emailVerified) {
+      if (!userCanExport(user)) {
         setPendingExport(pending);
         setShowCoverLetter(false);
         setShowAccount(true);
@@ -1019,12 +1026,21 @@ export function ResumeStudio({
         doc={doc}
         libraryMode={showLibrary}
         cloudUser={cloudUser}
+        sessionUser={sessionUser}
         status={status}
         busy={busy}
         ready={ready}
         showAccount={showAccount}
         showAI={showAI}
         onOpenAccount={() => setShowAccount(true)}
+        onUseAccount={
+          sessionUser && !sessionPaused
+            ? () => {
+                const user = sessionUser;
+                void action(() => switchWorkspace(user));
+              }
+            : undefined
+        }
         onOpenLibrary={() => {
           void action(async () => {
             setShowLibrary(true);
@@ -1065,7 +1081,7 @@ export function ResumeStudio({
                 setSessionPaused(false);
               }
               if (pendingExport) {
-                if (user.emailVerified) setShowAccount(false);
+                if (userCanExport(user)) setShowAccount(false);
                 await performExport(pendingExport, user);
               }
             }}
@@ -1375,7 +1391,11 @@ export function ResumeStudio({
               Object.assign(d.presentation, settings);
             })
           }
-          onClose={() => setShowDesign(false)}
+          initialFilter={designFilter}
+          onClose={() => {
+            setShowDesign(false);
+            setDesignFilter("all");
+          }}
           onOpenDemoGallery={() => setShowDemoGallery(true)}
         />
       )}
@@ -1540,8 +1560,8 @@ export function ResumeStudio({
           </>
         ) : !doc ? (
           <main id="workspace-main" tabIndex={-1} className="welcome no-print">
-            <span className="welcome-symbol">✦</span>
-            <p className="eyebrow">A FRESH START</p>
+            <Sparkles className="welcome-symbol" size={40} aria-hidden />
+            <p className="eyebrow">A fresh start</p>
             <h2>
               Your experience deserves
               <br />a thoughtful introduction.
@@ -1606,11 +1626,6 @@ export function ResumeStudio({
                     ? "Practice / fictional content"
                     : "Older draft · needs review"}
               </span>
-              <span>
-                {cloudUser
-                  ? `Saved in ${cloudUser.email}`
-                  : "On this device · not saved to an account"}
-              </span>
               {doc.provenance.purpose !== "personal" && (
                 <button
                   onClick={() => {
@@ -1620,11 +1635,6 @@ export function ResumeStudio({
                   Review and mark as my CV
                 </button>
               )}
-              <span>
-                {sessionUser
-                  ? `Signed in as ${sessionUser.email}`
-                  : "Sign in to export"}
-              </span>
             </div>
             <DocumentToolbar
               doc={doc}
@@ -1732,7 +1742,7 @@ export function ResumeStudio({
                 Review resume
               </button>
               <span className="mobile-save-feedback">
-                {cloudUser && status === "Saved on this device"
+                {cloudUser && status === "Saved in this browser"
                   ? "Saved to your account"
                   : status}
               </span>
@@ -1758,6 +1768,10 @@ export function ResumeStudio({
                 cloudUser={cloudUser}
                 focusTarget={focusTarget}
                 onWritingAction={openWriting}
+                onOpenPhotoDesigns={() => {
+                  setDesignFilter("photo");
+                  setShowDesign(true);
+                }}
                 onUpdateDocument={(mutator) => update(mutator)}
                 onDeleteSection={(secId) => {
                   update((d) => {
@@ -1778,14 +1792,14 @@ export function ResumeStudio({
               >
                 <div className="preview-toolbar no-print">
                   <div className="preview-toolbar-left">
-                    <span className="eyebrow">LIVE PREVIEW</span>
+                    <span className="eyebrow">Live preview</span>
                     <span className="template-label">
+                      Design:{" "}
                       {
                         templates.find(
                           (t) => t.id === doc.presentation.template,
                         )!.name
-                      }{" "}
-                      <span>✓</span>
+                      }
                     </span>
                     <button
                       type="button"
@@ -1793,7 +1807,7 @@ export function ResumeStudio({
                       onClick={() => setShowDesign(true)}
                       title="Change template, colors, and typography"
                     >
-                      🎨 Change style
+                      <Palette size={16} aria-hidden /> Change style
                     </button>
                   </div>
                   {!showDesign && (
@@ -1838,10 +1852,9 @@ export function ResumeStudio({
             </main>
 
             <footer className="app-footer no-print">
-              <span>YOUR STORY, IN YOUR HANDS.</span>
+              <span>Your story, in your hands.</span>
               <span>
-                {cloudUser ? "Account editor" : "Local editor"} · AI suggestions
-                require your review
+                Developed by Elfasys Solution
               </span>
             </footer>
             <style>{`@page { size: ${doc.presentation.pageSize}; margin: 0; }`}</style>

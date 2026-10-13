@@ -1,0 +1,274 @@
+.workspace-body {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.account-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.account-navigation a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+.account-signin-options {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.account-signin-options h3 { margin: 0 0 8px; }
+.google-auth { margin-top: 12px; }
+.google-auth button { min-height: 44px; }
+.google-auth p { margin: 8px 0 0; font-size: var(--text-xs); line-height: 1.6; }
+.google-complete { max-width: 620px; margin: 40px auto; }
+.google-complete > a { display: block; margin-top: 20px; }
+.account-panel {
+  overflow-wrap: anywhere;
+  max-width: 1050px;
+  margin: 0 auto 28px;
+  padding: 30px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-250);
+  border-radius: var(--radius-md);
+}
+.account-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.account-heading h2 {
+  margin: 8px 0;
+}
+.storage-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0;
+}
+.storage-card {
+  padding: 20px;
+  border: 1px solid var(--gray-250);
+  border-radius: var(--radius-md);
+}
+.storage-card.active {
+  border-color: var(--green-600);
+  background: var(--green-25);
+}
+.account-email {
+  display: block;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.account-form {
+  max-width: 620px;
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+.account-form label {
+  display: grid;
+  gap: 6px;
+}
+.account-form input {
+  width: 100%;
+  border: 1px solid var(--gray-300);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+}
+.account-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.account-deletion {
+  border-top: 1px solid var(--gray-250);
+  padding-top: 20px;
+  margin-top: 28px;
+}
+.account-error {
+  color: var(--red-800);
+  padding: 14px;
+  background: var(--red-50);
+}
+.account-message {
+  color: var(--green-600);
+  padding: 14px;
+  background: var(--green-50);
+}
+.transfer-review {
+  margin: 24px 0;
+}
+.transfer-row {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--gray-250);
+}
+.transfer-row input {
+  width: 18px;
+}
+.transfer-row small {
+  display: block;
+  margin-top: 5px;
+}
+@media (max-width: 650px) {
+  .account-panel {
+    overflow-wrap: anywhere;
+    margin: 12px;
+    padding: 18px;
+  }
+  .storage-options {
+    grid-template-columns: 1fr;
+  }
+}
+/* Standalone Profile & Upgrade Layouts */
+.profile-page-container,
+.upgrade-page-container {
+  min-height: 100vh;
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+}
+.profile-main-content,
+.upgrade-main-content {
+  flex: 1;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px var(--page-gutter) 80px;
+}
+.profile-hero,
+.upgrade-hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 40px;
+}
+.profile-badge,
+.upgrade-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--green);
+  background: var(--green-50);
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+.profile-hero h1,
+.upgrade-hero h1 {
+  font-family: var(--serif);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  letter-spacing: -0.8px;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.profile-hero .hero-lead,
+.upgrade-hero .hero-lead {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+.profile-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  gap: 32px;
+  align-items: flex-start;
+}
+.profile-panel-column .account-panel {
+  margin: 0;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+}
+.profile-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.profile-info-card {
+  background: var(--gray-0);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-2);
+}
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.info-card-header h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+.workspace-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: var(--text-xs);
+}
+.stat-label {
+  color: var(--muted);
+}
+.stat-value {
+  font-weight: 600;
+  color: var(--ink);
+}
+.user-email-val {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-action-row,
+.plan-badge-row {
+  margin-top: 16px;
+}
+.privacy-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+}
+.profile-footer,
+.upgrade-footer {
+  text-align: center;
+  padding: 30px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 900px) {
+  .profile-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.account-dialog-body .account-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.account-dialog-body {
+  overscroll-behavior: contain;
+}

@@ -91,7 +91,7 @@ for (const width of [360, 768, 1440]) {
 
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await page.goto("/auth/complete");
     await expect(
@@ -102,7 +102,7 @@ for (const width of [360, 768, 1440]) {
     await capture("verification-without-session", true);
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("library-empty", true);
     await page.getByRole("button", { name: "Browse demo examples" }).click();
@@ -149,7 +149,7 @@ for (const width of [360, 768, 1440]) {
     }
     await openAndCapture("Design & templates", "design-gallery");
     const upgrade = page.getByRole("button", {
-      name: "⭐ Upgrade",
+      name: "Upgrade",
       exact: true,
     });
     if (await upgrade.isVisible()) {
@@ -162,7 +162,10 @@ for (const width of [360, 768, 1440]) {
     }
     await openEditorTools(page);
     await page
-      .getByRole("button", { name: "📊 Role Benchmark & Gaps", exact: true })
+      .getByRole("button", { name: "Role Benchmark & Gaps", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Role checklist", exact: true })
       .click();
     await capture("analyzer-confirmation");
     await page
@@ -183,14 +186,14 @@ for (const width of [360, 768, 1440]) {
     await capture("keyboard-shortcuts");
     await closeDialog();
     await openEditorTools(page);
-    await page.getByRole("button", { name: "⏱️ History", exact: true }).click();
+    await page.getByRole("button", { name: "History", exact: true }).click();
     await capture("history-empty");
     await page.getByRole("button", { name: "+ Save Checkpoint" }).click();
     await expect(page.locator(".snapshots-list")).toBeVisible();
     await capture("history-saved");
     await closeDialog();
     await openEditorTools(page);
-    await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+    await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
     await capture("tailor-input");
     await page.getByLabel("Target Job Title").fill("Product Designer");
     await page.getByLabel("Use this target role, seniority and language").check();
@@ -208,7 +211,7 @@ for (const width of [360, 768, 1440]) {
     await capture("tailor-results");
     await closeDialog();
     await openEditorTools(page);
-    await page.getByRole("button", { name: "✉️ Cover letter" }).click();
+    await page.getByRole("button", { name: "Cover letter", exact: true }).click();
     await capture("letter-input");
     await page
       .getByRole("button", { name: /Generate Grounded Cover Letter/ })

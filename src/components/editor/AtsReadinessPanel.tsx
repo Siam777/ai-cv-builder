@@ -12,6 +12,7 @@ import {
   analyzeResumeForRole,
   detectAppliedRoleFromDocument,
 } from "@/lib/linter/role-analyzer";
+import { X } from "lucide-react";
 
 export interface AtsReadinessPanelProps {
   doc: ResumeDocument;
@@ -70,7 +71,7 @@ export function AtsReadinessPanel({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
         <div className="ats-content">

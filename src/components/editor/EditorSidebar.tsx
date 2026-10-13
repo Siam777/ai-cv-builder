@@ -2,6 +2,7 @@
 
 import { labels, type ResumeDocument } from "@/lib/document";
 import type { AccountUser } from "@/lib/cloud-contract";
+import { EyeOff, Plus, Sparkles } from "lucide-react";
 
 export interface EditorSidebarProps {
   doc: ResumeDocument;
@@ -20,7 +21,7 @@ export function EditorSidebar({
 }: EditorSidebarProps) {
   return (
     <aside className="section-nav no-print" aria-label="Resume sections">
-      <p className="eyebrow">BUILD YOUR RESUME</p>
+      <p className="eyebrow">Build your resume</p>
       <button
         className={sectionId === "contact" ? "selected" : ""}
         aria-current={sectionId === "contact" ? "true" : undefined}
@@ -37,7 +38,9 @@ export function EditorSidebar({
         >
           <span>{String(i + 2).padStart(2, "0")}</span>
           <span className="nav-label">{s.label || labels[s.type]}</span>
-          {!s.visible && <span title="Hidden">○</span>}
+          {!s.visible && (
+            <EyeOff size={14} aria-label="Hidden from CV" />
+          )}
         </button>
       ))}
       {onAddSection && (
@@ -47,12 +50,12 @@ export function EditorSidebar({
           onClick={onAddSection}
           title="Add a custom section or preset"
         >
-          <span>＋</span>
+          <Plus size={16} aria-hidden />
           <span className="nav-label">Add section</span>
         </button>
       )}
       <div className="sidebar-note">
-        <span>✧</span>
+        <Sparkles size={18} aria-hidden />
         <strong>Make it yours.</strong>
         <p>Keep your story clear, specific, and true to your experience.</p>
       </div>

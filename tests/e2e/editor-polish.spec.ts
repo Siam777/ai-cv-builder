@@ -128,19 +128,19 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
   await page.goto("/builder");
   await startSampleResume(page);
   await page.getByLabel("Full name", { exact: true }).fill("Focus-check candidate");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await openEditorTools(page);
   const dialogs = [
     ["Design & templates", "Design & Templates"],
     ["Keyboard shortcuts", "Keyboard Navigation & Actions"],
-    ["⭐ Upgrade", "Subscription Pricing"],
-    ["📊 Role Benchmark & Gaps", "Resume content review"],
-    ["🎯 Tailor for job", "Job Tailoring Engine"],
-    ["✉️ Cover letter", "Tailored Cover Letter Generator"],
-    ["⏱️ History", "Resume Version History"],
+    ["Upgrade", "Subscription Pricing"],
+    ["Role Benchmark & Gaps", "Resume content review"],
+    ["Tailor for job", "Job Tailoring Engine"],
+    ["Cover letter", "Tailored Cover Letter Generator"],
+    ["History", "Resume Version History"],
     ["Create practice example", "Create fictional practice CV"],
     ["Demo examples", "Demo Resume Gallery"],
-    ["＋ Add section", "Add Section to Resume"],
+    ["Add section", "Add Section to Resume"],
   ];
   for (const [buttonName, dialogName] of dialogs) {
     const launcher = page.getByRole("button", {
@@ -167,7 +167,7 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
     name: "Design & Templates",
     exact: true,
   });
-  const nestedLauncher = designDialog.getByRole("button", { name: /Demo/ });
+  const nestedLauncher = designDialog.getByRole("button", { name: /demo/i });
   await nestedLauncher.click();
   const gallery = page.getByRole("dialog", { name: "Demo Resume Gallery" });
   await checkDialogFocus(page, gallery);

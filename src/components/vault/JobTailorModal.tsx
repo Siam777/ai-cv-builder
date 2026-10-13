@@ -16,6 +16,7 @@ import {
   type JobEvidenceReview,
   type Priority,
 } from "@/lib/vault/job-evidence";
+import { X } from "lucide-react";
 
 export interface JobTailorModalProps {
   doc: ResumeDocument;
@@ -188,7 +189,7 @@ export function JobTailorModal({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
         <div className="tailor-content">

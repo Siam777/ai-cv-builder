@@ -5,6 +5,7 @@ import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { PLANS, type PlanId } from "@/lib/billing-plans";
 import type { AccountUser } from "@/lib/cloud-contract";
+import { Check, X } from "lucide-react";
 
 export interface PricingModalProps {
   cloudUser: AccountUser | null;
@@ -71,7 +72,7 @@ export function PricingModal({
       <div className="modal-card pricing-modal">
         <header className="modal-header">
           <div>
-            <p className="eyebrow">PROPOSED PLANS & CONFIGURED LIMITS</p>
+            <p className="eyebrow">Proposed plans & configured limits</p>
             <h2>Review plans and current limits</h2>
           </div>
           <button
@@ -80,7 +81,7 @@ export function PricingModal({
             onClick={onClose}
             aria-label="Close pricing dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -103,7 +104,7 @@ export function PricingModal({
               className={`pricing-card ${currentPlanId === "free" ? "current" : ""}`}
             >
               <div className="card-top">
-                <span className="plan-badge">DEVICE EDITING</span>
+                <span className="plan-badge">Device editing</span>
                 <h3>Free / Local</h3>
                 <div className="plan-price">
                   <span className="price-val">$0</span>
@@ -113,12 +114,12 @@ export function PricingModal({
                 </p>
               </div>
               <ul className="plan-features">
-                <li>✓ Multiple independent device drafts</li>
-                <li>✓ Unlimited browser editing & autosave</li>
-                <li>✓ Standard PDF print export (with watermark)</li>
-                <li>✓ Plain-text & JSON backup export</li>
-                <li className="dimmed">✓ Local rule-based job tailoring</li>
-                <li className="dimmed">✗ Watermark-free PDF exports</li>
+                <li><Check size={16} aria-hidden /> Multiple independent device drafts</li>
+                <li><Check size={16} aria-hidden /> Unlimited browser editing & autosave</li>
+                <li><Check size={16} aria-hidden /> Standard PDF print export (with watermark)</li>
+                <li><Check size={16} aria-hidden /> Plain-text & JSON backup export</li>
+                <li className="dimmed"><Check size={16} aria-hidden /> Local rule-based job tailoring</li>
+                <li className="dimmed"><X size={16} aria-hidden /> Watermark-free PDF exports</li>
               </ul>
               <button type="button" disabled className="plan-button outline">
                 {currentPlanId === "free" ? "Current Plan" : "Included"}
@@ -129,7 +130,7 @@ export function PricingModal({
             <div
               className={`pricing-card featured ${currentPlanId === "job_hunter_monthly" ? "current" : ""}`}
             >
-              <div className="popular-ribbon">MONTHLY PLAN</div>
+              <div className="popular-ribbon">Monthly plan</div>
               <div className="card-top">
                 <span className="plan-badge featured-badge">
                   JOB HUNTER PASS
@@ -157,10 +158,10 @@ export function PricingModal({
                   tailoring uses/month
                 </li>
                 <li>
-                  ✓ <strong>Clean, watermark-free</strong> PDF & DOCX export
+                  <Check size={16} aria-hidden /> <strong>Clean, watermark-free</strong> PDF & DOCX export
                 </li>
                 <li>Eight current editor designs</li>
-                <li>✓ Master Career Vault & Google XYZ Impact Coach</li>
+                <li><Check size={16} aria-hidden /> Master Career Vault & Google XYZ Impact Coach</li>
                 <li>Cancellation flow requires live validation</li>
               </ul>
               <button
@@ -184,7 +185,7 @@ export function PricingModal({
               className={`pricing-card ${currentPlanId === "lifetime" ? "current" : ""}`}
             >
               <div className="card-top">
-                <span className="plan-badge">ONE-TIME PLAN</span>
+                <span className="plan-badge">One-time plan</span>
                 <h3>Power Pass</h3>
                 <div className="plan-price">
                   <span className="price-val">$79</span>
@@ -202,7 +203,7 @@ export function PricingModal({
                   tailoring uses/month
                 </li>
                 <li>Eight current editor designs</li>
-                <li>✓ Watermark-free PDF/DOCX while entitlement is active</li>
+                <li><Check size={16} aria-hidden /> Watermark-free PDF/DOCX while entitlement is active</li>
                 <li>Provider features await live validation</li>
               </ul>
               <button
@@ -228,7 +229,7 @@ export function PricingModal({
           <a
             href="/upgrade"
             style={{
-              fontSize: "11px",
+              fontSize: "var(--text-xs)",
               color: "var(--green)",
               fontWeight: 600,
               textDecoration: "underline",

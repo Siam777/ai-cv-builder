@@ -273,7 +273,7 @@ test("account UI explicitly copies local resumes and returns to local after dele
   await page.setExtraHTTPHeaders({ "x-forwarded-for": testIp() });
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await page.getByRole("button", { name: "Create account instead" }).click();
   const email = `ui-${randomUUID()}@example.test`;

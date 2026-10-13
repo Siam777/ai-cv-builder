@@ -8,6 +8,7 @@ import {
   synthesizeVerifiedXyzBullet,
   type MetricTemplateOption,
 } from "@/lib/vault/impact-coach";
+import { Lock, X } from "lucide-react";
 
 export interface XyzCoachModalProps {
   initialBulletText: string;
@@ -42,7 +43,7 @@ export function XyzCoachModal({
       <div className="modal-card xyz-modal">
         <header className="modal-header">
           <div>
-            <p className="eyebrow">GOOGLE XYZ IMPACT FORMULA</p>
+            <p className="eyebrow">Google XYZ impact formula</p>
             <h2>Accomplished [X], as measured by [Y], by doing [Z]</h2>
           </div>
           <button
@@ -51,7 +52,7 @@ export function XyzCoachModal({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -99,7 +100,7 @@ export function XyzCoachModal({
               />
             </label>
             <p className="hint">
-              🔒 <strong>Strict Invariant:</strong> Only enter real numbers from your work. Never
+              <Lock size={14} aria-hidden /> <strong>Strict Invariant:</strong> Only enter real numbers from your work. Never
               guess or fabricate metrics.
             </p>
           </div>

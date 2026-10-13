@@ -156,7 +156,7 @@ for (const template of templates)
     fixture.presentation.font = template.id === "classic" ? "serif" : "sans";
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await page.getByLabel("Import JSON backup").setInputFiles({
       name: "fixture.json",
@@ -235,7 +235,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
   fixture.sections.reverse();
   fixture.sections[0].visible = false;
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByLabel("Import JSON backup").setInputFiles({
     name: "facts.json",
     mimeType: "application/json",
@@ -265,7 +265,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
     );
   }
   await page.getByLabel("Accent color").selectOption("rust");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page, "Practice copies");
   await page.getByRole("button", { name: "Design & templates" }).click();

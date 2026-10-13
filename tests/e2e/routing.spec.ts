@@ -83,7 +83,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
   }) => {
     await page.goto("/builder");
     await startSampleResume(page);
-    await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+    await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
     // Before opening account, editor layout and toolbar are visible
     await expect(page.locator(".workspace-body")).toBeVisible();
@@ -109,7 +109,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
   }) => {
     await page.goto("/builder");
     await startSampleResume(page);
-    await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+    await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
     // Body should not have modal-open initially
     const initialOverflow = await page.evaluate(() => document.body.style.overflow);
@@ -127,6 +127,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // 2. Verify modal content is internally scrollable
     const atsContent = page.locator(".ats-content");
+    await dialog.getByRole("button", { name: "Role checklist", exact: true }).click();
     await dialog.getByRole("button", { name: "Review selected checklist" }).click();
     await expect(atsContent).toBeVisible();
     const isScrollable = await atsContent.evaluate((el) => el.scrollHeight > el.clientHeight);

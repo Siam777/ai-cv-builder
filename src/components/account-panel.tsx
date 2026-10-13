@@ -3,10 +3,15 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { accountRequest, importReceipts } from "@/lib/cloud-repository";
-import { userSchema, type AccountUser } from "@/lib/cloud-contract";
+import {
+  userCanExport,
+  userSchema,
+  type AccountUser,
+} from "@/lib/cloud-contract";
 import type { ResumeDocument } from "@/lib/document";
 import { notifySessionChange, watchSessionChanges } from "@/lib/session-events";
 import { GoogleSignIn } from "./GoogleSignIn";
+import { X } from "lucide-react";
 
 const sessionSchema = z.object({
   configured: z.boolean(),
@@ -122,7 +127,7 @@ export function AccountPanel({
     >
       <div className="account-heading">
         <div>
-          <p className="eyebrow">YOUR WORKSPACE</p>
+          <p className="eyebrow">Your workspace</p>
           <h2>Keep your next chapter close.</h2>
           <p>Choose where your resumes are saved.</p>
         </div>
@@ -132,7 +137,7 @@ export function AccountPanel({
             disabled={working}
             aria-label="Close account settings"
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </div>
       </div>
@@ -197,7 +202,7 @@ export function AccountPanel({
               {user && (
                 <>
                   <span className="account-email">{user.email}</span>
-                  {pendingAction && onAuthenticated && <button className="primary" disabled={working || !user.emailVerified} onClick={() => void run(() => onAuthenticated(user))}>{pendingAction}</button>}
+                  {pendingAction && onAuthenticated && <button className="primary" disabled={working || !userCanExport(user)} onClick={() => void run(() => onAuthenticated(user))}>{pendingAction}</button>}
                   <button
                     disabled={working || cloudOwner === user.id}
                     onClick={() => void run(() => onCloud(user))}
@@ -238,7 +243,7 @@ export function AccountPanel({
                   const signedIn = await refresh();
                   notifySessionChange();
                   if (signedIn.user && onAuthenticated) await onAuthenticated(signedIn.user);
-                  setMessage(result.message || (signedIn.user?.emailVerified === false ? "Signed in. Verify your email before exporting; your draft is kept." : "Request completed."));
+                  setMessage(result.message || (signedIn.user && !userCanExport(signedIn.user) ? "Signed in. Verify your email before exporting; your draft is kept." : "Request completed."));
                 });
               }}
             >
@@ -325,10 +330,9 @@ export function AccountPanel({
                 {!session.googleLinked && <p>Verify your email and sign in recently, then link the Google account with the same email. Accounts are not merged automatically.</p>}
               </div>
               <div className="account-verification">
-                <p>{user.emailVerified ? "Email verified." : "Verify your email to download CVs and cover letters. You can keep editing and download your stored account data."}</p>
-                {session.emailDelivery === "unconfigured" && <p>Email delivery is not configured on this installation.</p>}
+                <p>{user.emailVerified ? "Email verified." : userCanExport(user) ? "You can download CVs and cover letters." : "Verify your email to download CVs and cover letters. You can keep editing and download your stored account data."}</p>
                 {session.emailDelivery === "file" && <p>Local development uses a private email test outbox. No email is delivered.</p>}
-                {!user.emailVerified && <button disabled={working || session.emailDelivery === "unconfigured"} onClick={() => void run(async () => {
+                {!user.emailVerified && session.emailDelivery !== "unconfigured" && <button disabled={working} onClick={() => void run(async () => {
                   await accountRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "verify" }) }, user.id);
                   setMessage("Verification email requested. Open its link, then refresh verification status here.");
                 })}>Send verification email</button>}

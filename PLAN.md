@@ -1211,3 +1211,30 @@ Delivered:
 
 
 
+
+## 37. UX Redesign — Phases 0–1 delivered, Phases 2–6 planned — 2026-10-13
+
+Detailed plan: [docs/plans/2026-10-13-ux-redesign-plan.md](docs/plans/2026-10-13-ux-redesign-plan.md).
+
+Audit findings to fix first (Phase 0): the photo is silently hidden on templates without photo support (`layoutBlocks`); signed-in users get stuck in device mode through the sticky `cv-workspace` session flag; exports are blocked by email verification even when email delivery is unconfigured; the avatar shows the CV's name instead of the user's; the toolbar and task strip are misaligned; the "Developed by Elfasys Solution" credit is missing. Later phases: design tokens and CSS consolidation, a simplified editor shell, a docked Check panel, a single AI Assistant, a unified start flow, and usability testing.
+
+Phase 0 delivered (2026-10-13):
+- Photo: the uploader warns "Your current design (X) doesn't show photos." with **Switch to a photo design** (opens Design filtered to "Supports photo") and **Keep design without photo** (sets `showPhoto: false`). The misleading "Photo added" text only shows when the photo is visible. Design cards carry a "Photo" badge.
+- Workspace: the `cv-workspace=device` flag now applies to one page load only (grader hand-off, explicit switch). Signed-in users otherwise always open their account; a local workspace while signed in shows **Open my account CVs**.
+- Export: `exportVerificationSatisfied` allows exports without verification only when email delivery is unconfigured, and logs a one-time `auth_email_unconfigured` warning. `/api/account` returns `user.canExport` for the client gate.
+- Decision: Google sign-ins are **not** treated as verified unconditionally. Better Auth already copies Google's `email_verified` claim, and the existing unverified-Google export boundary test stays.
+- Header: the avatar shows the signed-in user's initial (hidden when signed out); the workspace badge and the duplicate context-line status text are removed. One save indicator: "Saved to your account", or "Saved in this browser" with **Sign in to back up**.
+- Footer credit "Developed by Elfasys Solution" in the editor and public footers, `/help` About and `<meta name="author">`. Developer-facing footer copy removed.
+- Layout: one `--page-gutter` token (4%, 16px at ≤600px) for every editor block, including the task strip.
+- Tests: unit tests for the photo layout rule and the export rule; `tests/e2e/account-workspace.spec.ts`; photo e2e tests in `usability.spec.ts`. The no-email-service download test runs with `E2E_EMAIL=unconfigured npx playwright test tests/e2e/account-workspace.spec.ts`.
+
+Phase 1 delivered (2026-10-13):
+- CSS structure: `src/app/app.css` is the single global entry and `@import`s, in cascade order, `styles/tokens.css`, `base`, `dialogs`, `app-shell`, `library`, `editor`, `design-panel`, `account`, `ai`, `check`, `billing`, `grader`, `print`, then `templates.css` and `resume-fonts.css`. `globals.css`, `library.css`, `editor-polish.css` and `usability.css` are gone. Separate global imports in `layout.tsx` were reordered by the bundler, so the single `@import` entry is required.
+- The split was checked to be pixel-identical (about 135 captured states at 360/768/1440) before any intended visual change. Four overrides that depended on the old file order were folded into the rules they overrode.
+- `templates.css` and `resume-fonts.css` are also read by the HTML/PDF exporter, so they must not reference app tokens. Only design-dialog and zoom UI rules moved out of `templates.css`; the page rendering rules stay.
+- Tokens: colour primitives (slate greys, brand green, blue, red, amber) with a semantic layer (`--color-*`), type scale 13/14/16/20/28/36, radius 8/12/full, two shadows, 4px spacing, `--focus-ring`. About 560 colour literals, every font size, radius and shadow in the app styles now use tokens. No hex colours remain outside `tokens.css`.
+- Decisions: primary actions use brand green everywhere (the editor was blue); focus rings stay blue. Old warm greys were unified to the slate greys. UI text is at least 13px. Letter-spaced uppercase micro labels are now sentence case.
+- `!important` remains only in print rules and the reduced-motion block. The others were replaced by scoped selectors, by narrowing a rival rule, or by load order; the jump-target ring uses `--focus-ring` instead of out-ranking focus styles.
+- Icons: `lucide-react` replaces every emoji and glyph icon in the UI (header, toolbar, sidebar, dialogs, pricing, grader, profile, section presets, skill categories). Icon-only buttons have `aria-label`s; two delete buttons that only had a `title` gained one. The preview header now reads "Design: Classic".
+- Fixed in passing: undefined CSS variables (`--bg`, `--border`, `--foreground`, `--surface`), mis-encoded Arabic/Hebrew text in the direction picker, and the mis-encoded page title.
+- Visual regression: `tests/e2e/visual-regression.spec.ts` snapshots the library, editor, preview, design panel and check panel at 360/768/1440. Refresh with `--update-snapshots` only after an intended change.

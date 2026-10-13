@@ -28,7 +28,7 @@ test("cover letter copy requires sign-in and Markdown uses reviewed edits", asyn
   await page.goto("/builder");
   await startSampleResume(page);
   await openEditorTools(page);
-  await page.getByRole("button", { name: "✉️ Cover letter" }).click();
+  await page.getByRole("button", { name: "Cover letter", exact: true }).click();
   await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   await page.getByRole("button", { name: "Copy to clipboard" }).click();
@@ -36,7 +36,7 @@ test("cover letter copy requires sign-in and Markdown uses reviewed edits", asyn
   await page.getByRole("button", { name: "Close account settings" }).click();
   await authenticateForExport(page);
   await openEditorTools(page);
-  await page.getByRole("button", { name: "✉️ Cover letter" }).click();
+  await page.getByRole("button", { name: "Cover letter", exact: true }).click();
   await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   const downloading = page.waitForEvent("download");
@@ -54,7 +54,7 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   await page.getByRole("button", { name: "Close demo gallery" }).click();
   await expect(page.locator(".library-card")).toHaveCount(0);
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(page.locator(".library-card")).toHaveCount(0);
   await page.getByRole("button", { name: "Browse demo examples" }).click();
   await page.locator(".demo-profile-card").first().getByRole("button").click();
@@ -86,7 +86,7 @@ test("legacy records retain content and require explicit classification; practic
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const { provenance: _, ...legacy } = createDocument(true);
   legacy.contact.name = "Preserved legacy identity";
   await page.evaluate(async (document) => {
@@ -106,7 +106,7 @@ test("legacy records retain content and require explicit classification; practic
     });
   }, legacy);
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(page.locator(".library-card")).toHaveCount(0);
   await page.getByRole("button", { name: /Review older drafts 1/ }).click();
   await expect(page.locator(".library-card")).toContainText(

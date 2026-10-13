@@ -19,6 +19,7 @@ import {
 } from "@/lib/vault/job-tailoring";
 import { createRepository } from "@/lib/repository";
 import type { ResumeDocument } from "@/lib/document";
+import { CircleX, FileText, Lightbulb, Search, Target, TriangleAlert, X } from "lucide-react";
 
 const SAMPLE_RESUME_TEXT = `Alex Morgan
 alex.morgan@example.com · San Francisco, CA · github.com/alexmorgan
@@ -196,7 +197,7 @@ export default function GraderPage() {
             cv<span>·</span>
           </span>
           <span>
-            Resume Reviewer<small>AI CV BUILDER</small>
+            Resume Reviewer<small>AI CV Builder</small>
           </span>
         </Link>
         <div className="grader-header-actions">
@@ -268,7 +269,7 @@ export default function GraderPage() {
                       }}
                     />
                     <label htmlFor="resume-file" className="dropzone-label">
-                      <span className="upload-icon">📄</span>
+                      <FileText className="upload-icon" size={32} aria-hidden />
                       <strong>
                         {file ? file.name : "Choose a PDF, DOCX or TXT resume"}
                       </strong>
@@ -332,7 +333,7 @@ export default function GraderPage() {
           <section className="grader-report-card">
             <div className="report-top-banner">
               <div>
-                <p className="eyebrow">DIAGNOSTIC REPORT FOR</p>
+                <p className="eyebrow">Diagnostic report for</p>
                 <h2>{report.doc.contact.name || "Candidate Resume"}</h2>
               </div>
               <button
@@ -365,7 +366,7 @@ export default function GraderPage() {
             {/* Observed counts */}
             <div className="scoreboard-grid">
               <div className="score-card primary-score">
-                <span className="score-label">WRITING FINDINGS</span>
+                <span className="score-label">Writing findings</span>
                 <div className="score-number">
                   {report.findings.issues.length}
                 </div>
@@ -377,7 +378,7 @@ export default function GraderPage() {
 
               {report.jobAnalysis && (
                 <div className="score-card role-match-score">
-                  <span className="score-label">JOB REQUIREMENT OVERLAP</span>
+                  <span className="score-label">Job requirement overlap</span>
                   <div className="score-number">
                     {report.jobAnalysis.totalCount > 0
                       ? `${report.jobAnalysis.matchedCount}/${report.jobAnalysis.totalCount}`
@@ -440,7 +441,8 @@ export default function GraderPage() {
             </p>
             <div className="findings-section">
               <div className="findings-col">
-                <h3>🔍 Writing findings ({report.findings.issues.length})</h3>
+                <h3>
+                    <Search size={18} aria-hidden /> Writing findings ({report.findings.issues.length})</h3>
                 {report.findings.issues.length === 0 ? (
                   <div className="empty-findings">
                     No findings from the current rules. File compatibility
@@ -454,13 +456,18 @@ export default function GraderPage() {
                         className={`issue-item ${issue.severity}`}
                       >
                         <span className="issue-icon">
-                          {issue.severity === "critical" ? "❌" : "⚠️"}
+                          {issue.severity === "critical" ? (
+                            <CircleX size={18} aria-label="Critical" />
+                          ) : (
+                            <TriangleAlert size={18} aria-label="Warning" />
+                          )}
                         </span>
                         <div>
                           <strong>{issue.message}</strong>
                           {issue.suggestion && (
                             <p className="issue-fix">
-                              💡 Suggestion: {issue.suggestion}
+                              <Lightbulb size={14} aria-hidden /> Suggestion:{" "}
+                              {issue.suggestion}
                             </p>
                           )}
                         </div>
@@ -472,7 +479,10 @@ export default function GraderPage() {
 
               {report.jobAnalysis && (
                 <div className="findings-col">
-                  <h3>🎯 Keyword & Requirements Breakdown</h3>
+                  <h3>
+                    <Target size={18} aria-hidden /> Keyword & Requirements
+                    Breakdown
+                  </h3>
                   <div className="keyword-section">
                     <p className="box-hint">
                       Rules detect requirement lines and compare skill aliases
@@ -512,7 +522,7 @@ export default function GraderPage() {
                         <ul className="gap-pill-list">
                           {report.jobAnalysis.skillGaps.map((gap) => (
                             <li key={gap.requirementId} className="gap-pill">
-                              ✗ {gap.description}
+                              <X size={16} aria-hidden /> {gap.description}
                             </li>
                           ))}
                         </ul>

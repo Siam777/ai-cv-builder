@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ResumeDocument } from "@/lib/document";
+import { ChartColumn, ChevronDown, History, Mail, Target, Undo2 } from "lucide-react";
 
 export type ExportFormat = "json" | "txt" | "md" | "html" | "docx" | "pdf";
 
@@ -80,7 +81,7 @@ export function DocumentToolbar({
         </div>
         <div className="button-row">
           <button type="button" disabled={busy || !undoCount} onClick={onUndo}>
-            ↶ Undo
+            <Undo2 size={16} aria-hidden /> Undo
           </button>
           <button
             type="button"
@@ -126,7 +127,7 @@ export function DocumentToolbar({
               }}
               aria-disabled={busy}
             >
-              Export <span aria-hidden="true">↓</span>
+              Export <ChevronDown size={16} aria-hidden />
             </summary>
             <div>
               <button
@@ -206,7 +207,7 @@ export function DocumentToolbar({
             </button>
             {onOpenHistory && (
               <button type="button" disabled={busy} onClick={onOpenHistory}>
-                ⏱️ History
+                <History size={16} aria-hidden /> History
               </button>
             )}
           </div>
@@ -225,7 +226,7 @@ export function DocumentToolbar({
                 onClick={onOpenAts}
                 title="Review content findings and confirm a curated role checklist"
               >
-                📊 Role Benchmark & Gaps
+                <ChartColumn size={16} aria-hidden /> Role Benchmark & Gaps
               </button>
             )}
             <button type="button" disabled={busy} onClick={onOpenAI}>
@@ -233,12 +234,12 @@ export function DocumentToolbar({
             </button>
             {onOpenTailor && (
               <button type="button" disabled={busy} onClick={onOpenTailor}>
-                🎯 Tailor for job
+                <Target size={16} aria-hidden /> Tailor for job
               </button>
             )}
             {onOpenCoverLetter && (
               <button type="button" disabled={busy} onClick={onOpenCoverLetter}>
-                ✉️ Cover letter
+                <Mail size={16} aria-hidden /> Cover letter
               </button>
             )}
           </div>

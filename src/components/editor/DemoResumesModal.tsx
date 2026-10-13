@@ -6,6 +6,7 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { DEMO_PROFILES, type DemoResumeMeta } from "@/lib/demo-resumes";
 import type { ResumeDocument } from "@/lib/document";
 import { ResumePreview } from "../resume-preview";
+import { Camera, FileText, X } from "lucide-react";
 
 interface DemoResumesModalProps {
   isOpen: boolean;
@@ -66,7 +67,7 @@ export function DemoResumesModal({
             onClick={onClose}
             aria-label="Close demo gallery"
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </div>
 
@@ -84,11 +85,11 @@ export function DemoResumesModal({
         <div className="demo-category-tabs">
           {[
             { id: "all", label: "All Profiles (5)" },
-            { id: "tech", label: "💻 Engineering" },
-            { id: "design", label: "🎨 Product & UX" },
-            { id: "executive", label: "🏛️ Solutions Architecture" },
-            { id: "business", label: "📊 Business Analysis" },
-            { id: "marketing", label: "📈 Digital Growth" },
+            { id: "tech", label: "Engineering" },
+            { id: "design", label: "Product & UX" },
+            { id: "executive", label: "Solutions Architecture" },
+            { id: "business", label: "Business Analysis" },
+            { id: "marketing", label: "Digital Growth" },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -110,7 +111,11 @@ export function DemoResumesModal({
             >
               <div className="demo-card-top">
                 <div className="demo-avatar-badge">
-                  {profile.hasPhoto ? "📷" : "📄"}
+                  {profile.hasPhoto ? (
+                    <Camera size={20} aria-label="Photo design" />
+                  ) : (
+                    <FileText size={20} aria-label="Text-only design" />
+                  )}
                 </div>
                 <div className="demo-meta-titles">
                   <h3 className="demo-name">{profile.name}</h3>

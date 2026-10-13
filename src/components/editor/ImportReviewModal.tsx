@@ -4,6 +4,7 @@ import type { ResumeDocument } from "@/lib/document";
 import { labels } from "@/lib/document";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { X } from "lucide-react";
 
 export interface StagedImportData {
   document: ResumeDocument;
@@ -52,9 +53,9 @@ export function ImportReviewModal({
       >
         <header className="modal-header">
           <div>
-            <p className="eyebrow">COLD-START ONBOARDING · REVIEW IMPORT</p>
+            <p className="eyebrow">Review import</p>
             <h2>{doc.name}</h2>
-            <p className="import-meta" style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--muted)" }}>
+            <p className="import-meta" style={{ margin: "4px 0 0", fontSize: "var(--text-xs)", color: "var(--muted)" }}>
               Extracted from <strong>{staged.sourceFile}</strong> · {populatedSections.length} sections ·{" "}
               {totalEntries} entries
             </p>
@@ -66,7 +67,7 @@ export function ImportReviewModal({
             aria-label="Close dialog"
             disabled={busy}
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 

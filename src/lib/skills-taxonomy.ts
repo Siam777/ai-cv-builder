@@ -26,7 +26,6 @@ export interface TaxonomySkill {
 export interface SkillCategoryMeta {
   id: SkillCategory;
   label: string;
-  icon: string;
   popularSkills: string[];
 }
 
@@ -34,7 +33,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "frontend",
     label: "Frontend & Web",
-    icon: "🌐",
     popularSkills: [
       "React",
       "TypeScript",
@@ -50,7 +48,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "backend",
     label: "Backend & Systems",
-    icon: "⚙️",
     popularSkills: [
       "Node.js",
       "Python",
@@ -67,7 +64,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "cloud_devops",
     label: "Cloud & DevOps",
-    icon: "☁️",
     popularSkills: [
       "AWS",
       "Kubernetes",
@@ -83,7 +79,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "database",
     label: "Databases & Storage",
-    icon: "🗄️",
     popularSkills: [
       "PostgreSQL",
       "MySQL",
@@ -99,7 +94,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "data_ai",
     label: "Data Science & AI",
-    icon: "🧠",
     popularSkills: [
       "Python",
       "SQL",
@@ -116,7 +110,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "mobile",
     label: "Mobile Development",
-    icon: "📱",
     popularSkills: [
       "React Native",
       "Flutter",
@@ -128,7 +121,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "product_design",
     label: "Product & Design",
-    icon: "🎨",
     popularSkills: [
       "Figma",
       "UI/UX Design",
@@ -143,7 +135,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "testing_qa",
     label: "Testing & Quality",
-    icon: "🧪",
     popularSkills: [
       "Jest",
       "Playwright",
@@ -157,7 +148,6 @@ export const SKILL_CATEGORIES: SkillCategoryMeta[] = [
   {
     id: "management_agile",
     label: "Leadership & Agile",
-    icon: "👥",
     popularSkills: [
       "Technical Leadership",
       "Agile / Scrum",

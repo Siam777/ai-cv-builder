@@ -9,6 +9,7 @@ import {
 } from "@/lib/document";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { X } from "lucide-react";
 
 export function GuidedStartModal({
   onClose,
@@ -99,7 +100,7 @@ export function GuidedStartModal({
             onClick={onClose}
             disabled={saving}
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </header>
         <div className="modal-body">

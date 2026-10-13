@@ -33,7 +33,7 @@ async function openReview(
   language = "english",
 ) {
   await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page.getByLabel("Analysis language").selectOption(language);
   await page.getByLabel("Job Description", { exact: true }).fill(posting);
@@ -159,7 +159,7 @@ test("review rejects a source changed in another tab without saving a variant an
     .getByLabel("Full name", { exact: true })
     .fill("A later source revision");
   await expect(other.locator(".save-status")).toHaveText(
-    "Saved on this device",
+    "Saved in this browser",
   );
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
   await expect(page.getByRole("dialog")).toContainText(
@@ -216,7 +216,7 @@ test("undo cannot delete later edits to a reviewed variant", async ({
   await page
     .getByLabel("Full name", { exact: true })
     .fill("My newer variant edits");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page
     .getByRole("button", { name: "Undo reviewed variant creation" })
     .click();

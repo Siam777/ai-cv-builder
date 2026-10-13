@@ -9,7 +9,7 @@ export async function startSampleResume(
   fixture: ResumeDocument = createDocument(true),
 ) {
   fixture.provenance = { purpose: "personal", origin: "import" };
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByLabel("Import JSON backup").setInputFiles({
     name: "fixture.json",
     mimeType: "application/json",

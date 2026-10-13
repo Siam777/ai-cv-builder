@@ -9,6 +9,7 @@ import {
   generateCoverLetter,
   type GeneratedCoverLetter,
 } from "@/lib/vault/cover-letter";
+import { Printer, X } from "lucide-react";
 
 export interface CoverLetterModalProps {
   doc: ResumeDocument;
@@ -91,7 +92,7 @@ export function CoverLetterModal({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -152,13 +153,13 @@ export function CoverLetterModal({
                 style={{ padding: "0.85rem 1rem", marginBottom: "1rem" }}
               >
                 <div className="score-summary">
-                  <h3 style={{ margin: 0, fontSize: "1.05rem" }}>
+                  <h3 style={{ margin: 0, fontSize: "var(--text-md)" }}>
                     Letter for {jobTitle || "Role"} at {company || "Company"}
                   </h3>
                   <p
                     style={{
                       margin: "0.25rem 0 0",
-                      fontSize: "0.85rem",
+                      fontSize: "var(--text-xs)",
                       color: "var(--muted)",
                     }}
                   >
@@ -258,7 +259,7 @@ export function CoverLetterModal({
                 disabled={busy}
                 title="Print or Save as PDF"
               >
-                🖨️ Print / Save as PDF
+                <Printer size={16} aria-hidden /> Print / Save as PDF
               </button>
               <button
                 type="button"

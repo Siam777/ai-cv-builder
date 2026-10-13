@@ -4,6 +4,7 @@ import { useRef } from "react";
 import type { Bullet } from "@/lib/document";
 import { uid } from "@/lib/document";
 import { InlineAiMagicBar } from "./InlineAiMagicBar";
+import { X } from "lucide-react";
 
 export interface BulletListProps {
   bullets: Bullet[];
@@ -194,7 +195,7 @@ export function BulletList({
                 onClick={() => removeBullet(bi)}
                 disabled={disabled}
               >
-                ×
+                <X size={14} aria-hidden />
               </button>
             </div>
             <InlineAiMagicBar

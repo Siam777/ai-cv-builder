@@ -8,6 +8,7 @@ import {
   parseLinkedInArchive,
   isLinkedInCsv,
 } from "@/lib/importers/linkedin-importer";
+import { FileText, FolderOpen } from "lucide-react";
 
 export interface ColdStartImporterProps {
   disabled?: boolean;
@@ -141,9 +142,7 @@ export function ColdStartImporter({
         }}
       />
       <div className="dropzone-content">
-        <span className="dropzone-icon" aria-hidden="true">
-          📄
-        </span>
+        <FileText className="dropzone-icon" size={32} aria-hidden />
         <div className="dropzone-text">
           <strong>
             {isProcessing
@@ -183,14 +182,14 @@ export function ColdStartImporter({
               type="button"
               className="dropzone-browse-button"
               style={{
-                background: "#eff6ff",
-                color: "#1e3a8a",
-                borderColor: "#bfdbfe",
+                background: "var(--color-info-soft)",
+                color: "var(--color-info)",
+                borderColor: "var(--blue-100)",
               }}
               disabled={disabled || isProcessing}
               onClick={onOpenDemoGallery}
             >
-              📂 Explore Demo CVs
+              <FolderOpen size={16} aria-hidden /> Explore Demo CVs
             </button>
           )}
           {onOpenAiGenerator && (
@@ -198,9 +197,9 @@ export function ColdStartImporter({
               type="button"
               className="dropzone-browse-button"
               style={{
-                background: "#ecfdf5",
-                color: "#065f46",
-                borderColor: "#a7f3d0",
+                background: "var(--color-brand-soft)",
+                color: "var(--color-brand)",
+                borderColor: "var(--green-200)",
               }}
               disabled={disabled || isProcessing}
               onClick={onOpenAiGenerator}

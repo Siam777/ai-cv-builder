@@ -164,13 +164,13 @@ test("the landing route preserves existing IndexedDB drafts; explicit design sta
   await page
     .getByLabel("Full name", { exact: true })
     .fill("Existing draft · Zoë");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const before = await records(page);
   await page.goto("/");
   await page
     .getByRole("link", { name: "Already have a draft? Open my CVs" })
     .click();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   expect(await records(page)).toEqual(before);
   await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
@@ -183,10 +183,10 @@ test("the landing route preserves existing IndexedDB drafts; explicit design sta
   await expect(
     page.getByRole("region", { name: "Selected starting design" }),
   ).toContainText("Alex Rowan");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   expect(await records(page)).toEqual(before);
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   expect(await records(page)).toEqual(before);
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -224,7 +224,7 @@ test("the landing route preserves existing IndexedDB drafts; explicit design sta
     exampleId: "siam-riaz",
   });
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   expect(await records(page)).toHaveLength(2);
 });
 
@@ -232,7 +232,7 @@ test("design links are bounded; selection and cancellation never mutate existing
   page,
 }) => {
   await page.goto("/builder?template=made-up&example=foreign-id");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(
     page.getByRole("region", { name: "Selected starting design" }),
   ).toHaveCount(0);
@@ -244,7 +244,7 @@ test("design links are bounded; selection and cancellation never mutate existing
   await expect(
     page.getByRole("region", { name: "Selected starting design" }),
   ).toContainText("Modern");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   expect(await records(page)).toHaveLength(0);
   await page.getByRole("button", { name: "Clear design choice" }).click();
   await expect(page).toHaveURL("/builder");

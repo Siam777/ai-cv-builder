@@ -22,11 +22,11 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     ).toBeVisible();
     await openEditorTools(page);
     await expect(
-      page.getByRole("button", { name: "📊 Role Benchmark & Gaps" }),
+      page.getByRole("button", { name: "Role Benchmark & Gaps" }),
     ).toBeVisible();
     await openEditorTools(page);
     await expect(
-      page.getByRole("button", { name: "✉️ Cover letter" }),
+      page.getByRole("button", { name: "Cover letter", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Design & templates" }),
@@ -35,7 +35,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     // 2. Open Role Benchmark & Gaps Audit Panel
     await openEditorTools(page);
     await page
-      .getByRole("button", { name: "📊 Role Benchmark & Gaps" })
+      .getByRole("button", { name: "Role Benchmark & Gaps" })
       .click();
     const atsModal = page.getByRole("dialog", {
       name: "Resume content review",
@@ -104,7 +104,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
 
     // 4. Open Tailored Cover Letter Studio
     await openEditorTools(page);
-    await page.getByRole("button", { name: "✉️ Cover letter" }).click();
+    await page.getByRole("button", { name: "Cover letter", exact: true }).click();
     const clModal = page.getByRole("dialog", {
       name: "Tailored Cover Letter Generator",
     });
@@ -118,7 +118,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
       clModal.getByRole("button", { name: "Copy to clipboard" }),
     ).toBeVisible();
     await expect(
-      clModal.getByRole("button", { name: "🖨️ Print / Save as PDF" }),
+      clModal.getByRole("button", { name: "Print / Save as PDF" }),
     ).toBeVisible();
 
     // Close Cover Letter Studio

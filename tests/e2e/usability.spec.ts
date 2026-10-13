@@ -34,7 +34,7 @@ test("guided start creates only supplied facts and retains them after reload", a
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Fictional Guide Candidate",
   );
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page);
   await page.getByRole("button", { name: /Experience/ }).click();
@@ -69,9 +69,29 @@ test("photo errors are recoverable and uploading enables preview on a supported 
     ),
   });
   await expect(page.getByAltText("Your resume photo")).toBeVisible();
-  await page
-    .getByRole("button", { name: "Use Modern design with photo" })
+  // The sample uses Classic, which cannot show a photo: say so instead of
+  // claiming the photo was added.
+  const warning = page.locator(".photo-design-warning");
+  await expect(warning).toContainText(
+    "Your current design (Classic) doesn't show photos.",
+  );
+  await expect(page.locator('[data-block-id="photo"]')).toHaveCount(0);
+  await warning
+    .getByRole("button", { name: "Switch to a photo design" })
     .click();
+  const designs = page.getByRole("dialog", { name: "Design & Templates" });
+  await expect(
+    designs.getByRole("tab", { name: "Supports photo" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    designs.getByRole("button", { name: "Classic template" }),
+  ).toHaveCount(0);
+  await designs
+    .getByRole("button", { name: "Modern template", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Close design dialog" }).click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByText("Photo added. It shows on your CV preview.")).toBeVisible();
   await expect(page.locator('[data-block-id="photo"]').first()).toBeVisible();
   await page.getByRole("button", { name: "Remove photo", exact: true }).click();
   await expect(page.getByAltText("Your resume photo")).toHaveCount(0);
@@ -221,4 +241,32 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await page.screenshot({ path: "test-results/usability/job-mobile.png" });
   await page.keyboard.press("Escape");
   await expect(page.locator("body")).not.toHaveClass(/modal-open/);
+});
+
+test("a photo on Brand shows the design warning and keeping the design hides it", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  const fixture = createDocument(true);
+  fixture.presentation.template = "bold";
+  await startSampleResume(page, fixture);
+  await page.getByLabel("Choose resume photo").setInputFiles({
+    name: "pixel.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jh1sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  const warning = page.locator(".photo-design-warning");
+  await expect(warning).toContainText(
+    "Your current design (Brand) doesn't show photos.",
+  );
+  await expect(page.getByText("Photo added", { exact: false })).toHaveCount(0);
+  await warning
+    .getByRole("button", { name: "Keep design without photo" })
+    .click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByText("Photo saved but hidden on your CV")).toBeVisible();
+  await expect(page.locator('[data-block-id="photo"]')).toHaveCount(0);
 });

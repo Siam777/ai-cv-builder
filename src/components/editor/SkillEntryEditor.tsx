@@ -13,6 +13,24 @@ import {
   removeSkillFromText,
   formatSkillsList,
 } from "@/lib/skills-taxonomy";
+import { Brain, Check, Cloud, Database, FlaskConical, Globe, Palette, Search, Settings, Smartphone, Sparkles, Users, X, type LucideIcon } from "lucide-react";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  frontend: Globe,
+  backend: Settings,
+  cloud_devops: Cloud,
+  database: Database,
+  data_ai: Brain,
+  mobile: Smartphone,
+  product_design: Palette,
+  testing_qa: FlaskConical,
+  management_agile: Users,
+};
+
+function CategoryIcon({ id, size = 16 }: { id: string; size?: number }) {
+  const Icon = CATEGORY_ICONS[id] ?? Sparkles;
+  return <Icon size={size} aria-hidden />;
+}
 
 export interface SkillEntryEditorProps {
   entry: Entry;
@@ -166,7 +184,7 @@ export function SkillEntryEditor({
                 onClick={() => handleSelectCategoryPreset(cat)}
                 aria-pressed={isSelected}
               >
-                <span>{cat.icon}</span>
+                <CategoryIcon id={cat.id} />
                 <span>{cat.label}</span>
               </button>
             );
@@ -177,9 +195,7 @@ export function SkillEntryEditor({
       {/* Autocomplete Search Bar */}
       <div className="skill-search-container">
         <div className="skill-search-input-wrapper">
-          <span className="search-icon" aria-hidden="true">
-            🔍
-          </span>
+          <Search className="search-icon" size={16} aria-hidden />
           <input
             ref={searchInputRef}
             type="text"
@@ -218,7 +234,7 @@ export function SkillEntryEditor({
               }}
               aria-label="Clear search"
             >
-              ×
+              <X size={14} aria-hidden />
             </button>
           )}
         </div>
@@ -255,12 +271,15 @@ export function SkillEntryEditor({
                     <span className="skill-name">{skill.name}</span>
                     {catMeta && (
                       <span className="skill-cat-badge">
-                        {catMeta.icon} {catMeta.label}
+                        <CategoryIcon id={catMeta.id} size={12} />{" "}
+                        {catMeta.label}
                       </span>
                     )}
                   </div>
                   {alreadyAdded ? (
-                    <span className="skill-added-tag">✓ Added</span>
+                    <span className="skill-added-tag">
+                      <Check size={14} aria-hidden /> Added
+                    </span>
                   ) : (
                     <span className="skill-add-action">+ Add</span>
                   )}
@@ -312,7 +331,7 @@ export function SkillEntryEditor({
                   aria-label={`Remove ${skill}`}
                   onClick={() => handleRemoveSkill(skill)}
                 >
-                  ×
+                  <X size={14} aria-hidden />
                 </button>
               </span>
             ))}

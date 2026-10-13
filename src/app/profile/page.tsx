@@ -7,6 +7,7 @@ import { accountRequest, transferLocalResumes } from "@/lib/cloud-repository";
 import { createRepository } from "@/lib/repository";
 import type { AccountUser } from "@/lib/cloud-contract";
 import type { ResumeDocument } from "@/lib/document";
+import { Briefcase, Check, Lock, Star } from "lucide-react";
 
 export default function ProfilePage() {
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
@@ -54,7 +55,7 @@ export default function ProfilePage() {
             cv<span>·</span>
           </span>
           <span>
-            Profile & Account<small>AI CV BUILDER</small>
+            Profile & Account<small>AI CV Builder</small>
           </span>
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
@@ -77,7 +78,7 @@ export default function ProfilePage() {
 
       <main className="profile-main-content">
         <div className="profile-hero">
-          <span className="profile-badge">STORAGE & ACCOUNT WORKSPACE</span>
+          <span className="profile-badge">Storage & account workspace</span>
           <h1>Your Profile & Account Settings</h1>
           <p className="hero-lead">
             Manage your account credentials, cloud synchronization, and local
@@ -140,7 +141,7 @@ export default function ProfilePage() {
             {/* Workspace Status Card */}
             <div className="profile-info-card workspace-summary-card">
               <div className="info-card-header">
-                <span className="card-icon">💼</span>
+                <Briefcase className="card-icon" size={20} aria-hidden />
                 <h3>Workspace Overview</h3>
               </div>
               <div className="workspace-stat-row">
@@ -175,7 +176,7 @@ export default function ProfilePage() {
             {/* Subscription & Entitlements Card */}
             <div className="profile-info-card subscription-card">
               <div className="info-card-header">
-                <span className="card-icon">⭐</span>
+                <Star className="card-icon" size={20} aria-hidden />
                 <h3>Subscription & Plans</h3>
               </div>
               <p>
@@ -195,7 +196,7 @@ export default function ProfilePage() {
             {/* Privacy & Sovereignty Card */}
             <div className="profile-info-card privacy-card">
               <div className="info-card-header">
-                <span className="card-icon">🔒</span>
+                <Lock className="card-icon" size={20} aria-hidden />
                 <h3>Privacy & Data Control</h3>
               </div>
               <p>
@@ -204,9 +205,9 @@ export default function ProfilePage() {
                 uploads are processed on the application server.
               </p>
               <ul className="privacy-feature-list">
-                <li>✓ JSON backups require sign-in and verified email</li>
-                <li>✓ Account deletion requires explicit confirmation</li>
-                <li>✓ AI provider requests require explicit consent</li>
+                <li><Check size={16} aria-hidden /> JSON backups require sign-in and verified email</li>
+                <li><Check size={16} aria-hidden /> Account deletion requires explicit confirmation</li>
+                <li><Check size={16} aria-hidden /> AI provider requests require explicit consent</li>
               </ul>
             </div>
           </aside>

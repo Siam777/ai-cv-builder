@@ -23,7 +23,7 @@ async function setup(page: Page) {
 }
 async function open(page: Page) {
   await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
 }
 async function analyze(page: Page) {
   await open(page);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { accountRequest } from "@/lib/cloud-repository";
 import type { AccountUser } from "@/lib/cloud-contract";
 import { PLANS, type PlanId } from "@/lib/billing-plans";
+import { Check, TriangleAlert, X } from "lucide-react";
 
 export default function UpgradePage() {
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
@@ -95,7 +96,7 @@ export default function UpgradePage() {
             cv<span>·</span>
           </span>
           <span>
-            Plans & Pricing<small>AI CV BUILDER</small>
+            Plans & Pricing<small>AI CV Builder</small>
           </span>
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
@@ -120,7 +121,7 @@ export default function UpgradePage() {
         {/* Hero Section */}
         <section className="upgrade-hero">
           <span className="upgrade-badge">
-            PROPOSED PLANS & CONFIGURED LIMITS
+            Proposed plans & configured limits
           </span>
           <h1>Invest In Your Next Career Chapter</h1>
           <p className="hero-lead">
@@ -142,7 +143,9 @@ export default function UpgradePage() {
 
         {error && (
           <div className="upgrade-alert" role="alert">
-            <span>⚠️ {error}</span>
+            <span>
+              <TriangleAlert size={16} aria-hidden /> {error}
+            </span>
             {!cloudUser && (
               <Link href="/profile" className="alert-action-link">
                 Go to Profile to Sign In →
@@ -163,7 +166,7 @@ export default function UpgradePage() {
             {/* Free Forever */}
             <div className="pricing-card">
               <div className="card-top">
-                <span className="plan-badge">DEVICE EDITING</span>
+                <span className="plan-badge">Device editing</span>
                 <h3>Free / Local</h3>
                 <div className="plan-price">
                   <span className="price-val">$0</span>
@@ -174,15 +177,15 @@ export default function UpgradePage() {
                 </p>
               </div>
               <ul className="plan-features">
-                <li>✓ Multiple independent device drafts</li>
-                <li>✓ Browser editing and device autosave</li>
-                <li>✓ Standard PDF print export (subtle watermark)</li>
-                <li>✓ Plain-text & JSON backup export</li>
-                <li>✓ Explicit device or account storage</li>
-                <li className="dimmed">✓ Local rule-based job tailoring</li>
-                <li className="dimmed">✗ Watermark-free PDF & DOCX exports</li>
+                <li><Check size={16} aria-hidden /> Multiple independent device drafts</li>
+                <li><Check size={16} aria-hidden /> Browser editing and device autosave</li>
+                <li><Check size={16} aria-hidden /> Standard PDF print export (subtle watermark)</li>
+                <li><Check size={16} aria-hidden /> Plain-text & JSON backup export</li>
+                <li><Check size={16} aria-hidden /> Explicit device or account storage</li>
+                <li className="dimmed"><Check size={16} aria-hidden /> Local rule-based job tailoring</li>
+                <li className="dimmed"><X size={16} aria-hidden /> Watermark-free PDF & DOCX exports</li>
                 <li className="dimmed">
-                  ✓ Local career vault and writing tools
+                  <Check size={16} aria-hidden /> Local career vault and writing tools
                 </li>
               </ul>
               <Link href="/builder" className="plan-button outline">
@@ -192,7 +195,7 @@ export default function UpgradePage() {
 
             {/* Job Hunter Monthly Pass */}
             <div className="pricing-card featured">
-              <div className="popular-ribbon">MONTHLY PLAN</div>
+              <div className="popular-ribbon">Monthly plan</div>
               <div className="card-top">
                 <span className="plan-badge featured-badge">
                   JOB HUNTER PASS
@@ -220,18 +223,18 @@ export default function UpgradePage() {
                   tailoring uses/month
                 </li>
                 <li>
-                  ✓ <strong>Clean, watermark-free</strong> PDF & DOCX export
+                  <Check size={16} aria-hidden /> <strong>Clean, watermark-free</strong> PDF & DOCX export
                 </li>
                 <li>
-                  ✓ <strong>All 8 designer templates</strong> (Classic, Modern,
+                  <Check size={16} aria-hidden /> <strong>All 8 designer templates</strong> (Classic, Modern,
                   Tech, Executive, etc.)
                 </li>
                 <li>
-                  ✓{" "}
+                  <Check size={16} aria-hidden />{" "}
                   <strong>Master Career Vault & Google XYZ Impact Coach</strong>
                 </li>
-                <li>✓ Writing findings and term observations</li>
-                <li>✓ Cover Letter Studio with 1-click matching</li>
+                <li><Check size={16} aria-hidden /> Writing findings and term observations</li>
+                <li><Check size={16} aria-hidden /> Cover Letter Studio with 1-click matching</li>
                 <li>Cancellation flow requires live validation</li>
               </ul>
               <button
@@ -249,7 +252,7 @@ export default function UpgradePage() {
             {/* Lifetime Access */}
             <div className="pricing-card">
               <div className="card-top">
-                <span className="plan-badge">ONE-TIME PLAN</span>
+                <span className="plan-badge">One-time plan</span>
                 <h3>Power Pass</h3>
                 <div className="plan-price">
                   <span className="price-val">$79</span>
@@ -269,13 +272,13 @@ export default function UpgradePage() {
                 </li>
                 <li>Eight current editor designs</li>
                 <li>
-                  ✓{" "}
+                  <Check size={16} aria-hidden />{" "}
                   <strong>
                     Watermark-free PDF/DOCX while entitlement is active
                   </strong>
                 </li>
                 <li>
-                  ✓ Multi-format exports (PDF, DOCX, Markdown, HTML, JSON)
+                  <Check size={16} aria-hidden /> Multi-format exports (PDF, DOCX, Markdown, HTML, JSON)
                 </li>
                 <li>Provider features await live validation</li>
                 <li>Future features are separately planned</li>
@@ -338,28 +341,28 @@ export default function UpgradePage() {
                 <tr>
                   <td>Clean, Watermark-Free PDF Exports</td>
                   <td>—</td>
-                  <td className="highlight-col">✓ Included</td>
-                  <td>✓ Included</td>
+                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
+                  <td><Check size={16} aria-hidden /> Included</td>
                 </tr>
                 <tr>
                   <td>DOCX, Markdown & HTML Exporters</td>
                   <td>
                     Available with verified email; PDF/DOCX use a watermark
                   </td>
-                  <td className="highlight-col">✓ Included</td>
-                  <td>✓ Included</td>
+                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
+                  <td><Check size={16} aria-hidden /> Included</td>
                 </tr>
                 <tr>
                   <td>All 8 Designer Templates</td>
                   <td>All 8 current designs</td>
-                  <td className="highlight-col">✓ All 8 Templates</td>
+                  <td className="highlight-col"><Check size={16} aria-hidden /> All 8 Templates</td>
                   <td>All 8 current designs</td>
                 </tr>
                 <tr>
                   <td>Google XYZ Impact Bullet Coach</td>
                   <td>Available locally; review every factual claim</td>
-                  <td className="highlight-col">✓ Included</td>
-                  <td>✓ Included</td>
+                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
+                  <td><Check size={16} aria-hidden /> Included</td>
                 </tr>
                 <tr>
                   <td>Master Career Vault</td>

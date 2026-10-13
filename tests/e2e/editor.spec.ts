@@ -18,7 +18,7 @@ test("creation, save/reload, independent variants, undo, imports and exports", a
     page.getByRole("article", { name: "Resume preview" }),
   ).toContainText("Alex Morgan");
   await page.getByLabel("Full name", { exact: true }).fill("নাদিয়া Morgan");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
@@ -27,7 +27,7 @@ test("creation, save/reload, independent variants, undo, imports and exports", a
   await openEditorTools(page);
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
   await page.getByLabel("Full name", { exact: true }).fill("Variant Name");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "নাদিয়া Morgan",
@@ -106,7 +106,7 @@ test("concurrent tab edits cannot overwrite saved content", async ({
     "Alex Morgan",
   );
   await page.getByLabel("Full name", { exact: true }).fill("First writer");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await other.getByLabel("Full name", { exact: true }).fill("Stale writer");
   await expect(other.locator(".alert")).toContainText("another tab");
   await page.reload();
@@ -199,7 +199,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
     .getByRole("button", { name: /Experience/ })
     .click();
   await page.getByLabel("Description", { exact: true }).fill(longText);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.pdf({
     path: "test-results/resume-long-a4.pdf",
     preferCSSPageSize: true,
@@ -218,9 +218,9 @@ test("reviewed job evidence creates an isolated fact-preserving variant and supp
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
   await page.getByLabel("Target Job Title").fill("Senior Product Designer");
   await page.getByLabel("Company Name").fill("Acme Corp");
   await page
@@ -270,7 +270,7 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Check that ATS pill is visible in header
   const atsPill = page.getByRole("button", { name: "Review writing" });
@@ -369,7 +369,7 @@ test("Pricing modal displays commercial tiers, entitlement benefits, and initiat
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click Upgrade pill in header
   const upgradeBtn = page.getByRole("button", { name: /Upgrade/ });
@@ -453,7 +453,7 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   await authenticateForExport(page);
   // Test Direct PDF download
@@ -505,11 +505,11 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click Cover Letter button in toolbar
   await openEditorTools(page);
-  const coverLetterBtn = page.getByRole("button", { name: "✉️ Cover letter" });
+  const coverLetterBtn = page.getByRole("button", { name: "Cover letter", exact: true });
   await expect(coverLetterBtn).toBeVisible();
   await coverLetterBtn.click();
 
@@ -559,7 +559,7 @@ test("Preview zoom controls adjust scale and support fit to width", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Verify zoom controls bar
   const zoomBar = page.locator(".preview-zoom-bar");
@@ -587,7 +587,7 @@ test("Version history modal creates checkpoints and forks variants", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click History button
   await openEditorTools(page);
@@ -655,7 +655,7 @@ test("Custom sections: add preset section, edit entry, save to library, preview,
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click "+ Add section" in sidebar
   const addSecBtn = page.getByRole("button", { name: /Add section/ });
@@ -723,7 +723,7 @@ test("Skills taxonomy: autocomplete search, tag chips, category filters, and liv
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Navigate to Skills section
   await page
@@ -799,7 +799,7 @@ test("Contextual AI Assistant: summary drafting, impact interview, and skill dis
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Open AI assistant
   await openEditorTools(page);
@@ -874,7 +874,7 @@ test("Studio Accessibility: global keyboard shortcuts (?, Esc, Ctrl+Z) and short
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Open shortcuts modal via header pill button
   await page.getByRole("button", { name: "Keyboard shortcuts" }).click();

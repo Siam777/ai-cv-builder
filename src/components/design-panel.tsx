@@ -18,6 +18,7 @@ import {
   presentationStyle,
   ResumeBlock,
 } from "./resume-preview";
+import { Check, FolderOpen, Info, X } from "lucide-react";
 
 export interface DesignPanelProps {
   doc: ResumeDocument;
@@ -25,7 +26,10 @@ export interface DesignPanelProps {
   disabled?: boolean;
   onClose?: () => void;
   onOpenDemoGallery?: () => void;
+  initialFilter?: TemplateFilter;
 }
+
+export type TemplateFilter = "all" | "photo" | "ats" | "modern" | "executive" | "creative";
 
 const ACCENT_PALETTE: { id: Presentation["accent"]; name: string; hex: string }[] = [
   { id: "forest", name: "Forest", hex: "#285641" },
@@ -105,17 +109,19 @@ export function DesignPanel({
   disabled = false,
   onClose,
   onOpenDemoGallery,
+  initialFilter = "all",
 }: DesignPanelProps) {
   useBodyScrollLock(true);
   const thumbnailBlocks = useMemo(() => layoutBlocks(doc).slice(0, 18), [doc]);
   const p = doc.presentation;
   const modalCardRef = useModalFocus(() => onClose?.());
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "ats" | "modern" | "executive" | "creative">("all");
+  const [categoryFilter, setCategoryFilter] = useState<TemplateFilter>(initialFilter);
 
   const activeTemplateObj = templates.find((t) => t.id === p.template) || templates[0];
 
   const filteredTemplates = useMemo(() => {
     if (categoryFilter === "all") return templates;
+    if (categoryFilter === "photo") return templates.filter((t) => t.photoSupported);
     return templates.filter((t) => t.category === categoryFilter);
   }, [categoryFilter]);
 
@@ -139,7 +145,7 @@ export function DesignPanel({
         {/* Modal Header */}
         <div className="design-modal-header">
           <div className="design-modal-header-info">
-            <span className="eyebrow">CUSTOMIZE YOUR RESUME</span>
+            <span className="eyebrow">Customize your resume</span>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <h2 id="design-modal-title" style={{ margin: 0 }}>Design & Templates</h2>
               {onOpenDemoGallery && (
@@ -149,10 +155,10 @@ export function DesignPanel({
                     onOpenDemoGallery();
                   }}
                   style={{
-                    background: "#eff6ff",
-                    border: "1px solid #bfdbfe",
-                    color: "#1e3a8a",
-                    fontSize: "12px",
+                    background: "var(--color-info-soft)",
+                    border: "1px solid var(--blue-100)",
+                    color: "var(--color-info)",
+                    fontSize: "var(--text-xs)",
                     fontWeight: 600,
                     padding: "3px 10px",
                     borderRadius: "6px",
@@ -160,7 +166,7 @@ export function DesignPanel({
                   }}
                   title="Switch to another realistic demo resume profile"
                 >
-                  📂 Switch Demo CV ▾
+                  <FolderOpen size={14} aria-hidden /> Switch demo CV
                 </button>
               )}
             </div>
@@ -175,7 +181,7 @@ export function DesignPanel({
             aria-label="Close design dialog"
             title="Close dialog (Esc)"
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </div>
 
@@ -203,6 +209,15 @@ export function DesignPanel({
                       onClick={() => setCategoryFilter("all")}
                     >
                       All ({templates.length})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={categoryFilter === "photo"}
+                      className={`cat-tab-btn ${categoryFilter === "photo" ? "active" : ""}`}
+                      onClick={() => setCategoryFilter("photo")}
+                    >
+                      Supports photo
                     </button>
                     <button
                       type="button"
@@ -259,7 +274,9 @@ export function DesignPanel({
                         <div className="template-card-preview">
                           <TemplateThumbnail settings={settings} blocks={thumbnailBlocks} />
                           {isSelected ? (
-                            <span className="template-active-badge">✓ Active</span>
+                            <span className="template-active-badge">
+                              <Check size={12} aria-hidden /> Active
+                            </span>
                           ) : (
                             <span className="template-ats-badge">{template.badge}</span>
                           )}
@@ -272,6 +289,9 @@ export function DesignPanel({
                             </span>
                           </div>
                           <span className="template-style-pill">{template.badge}</span>
+                          {template.photoSupported && (
+                            <span className="template-style-pill template-photo-pill">Photo</span>
+                          )}
                         </div>
                         <p className="template-desc">{template.description}</p>
                       </button>
@@ -303,7 +323,7 @@ export function DesignPanel({
                             className="swatch-bubble"
                             style={{ backgroundColor: acc.hex }}
                           >
-                            {isSelected && <span className="swatch-check-mark">✓</span>}
+                            {isSelected && <Check className="swatch-check-mark" size={14} aria-hidden />}
                           </span>
                           <span className="swatch-label">{acc.name}</span>
                         </button>
@@ -349,7 +369,7 @@ export function DesignPanel({
                         >
                           <div className="typography-card-header">
                             <strong className="font-name">{f.name}</strong>
-                            {isSelected && <span className="font-check">✓</span>}
+                            {isSelected && <Check className="font-check" size={14} aria-hidden />}
                           </div>
                           <span className="font-sublabel">{f.label}</span>
                           <p className="font-sample-preview" style={{ fontFamily: f.family }}>
@@ -499,7 +519,7 @@ export function DesignPanel({
                         className={`segmented-btn ${p.direction !== "rtl" ? "active" : ""}`}
                         onClick={() => onChange({ direction: "ltr" })}
                       >
-                        <strong>➔ LTR</strong>
+                        <strong>LTR</strong>
                         <small>Left to right</small>
                       </button>
                       <button
@@ -507,8 +527,8 @@ export function DesignPanel({
                         className={`segmented-btn ${p.direction === "rtl" ? "active" : ""}`}
                         onClick={() => onChange({ direction: "rtl" })}
                       >
-                        <strong>⬅ RTL</strong>
-                        <small>Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© / ×¢×‘×¨×™×ª</small>
+                        <strong>RTL</strong>
+                        <small lang="ar">العربية / עברית</small>
                       </button>
                     </div>
                     <select
@@ -567,7 +587,7 @@ export function DesignPanel({
               </section>
 
               <div className="design-notice-card">
-                <span className="notice-icon">✦</span>
+                <Info className="notice-icon" size={18} aria-hidden />
                 <p>
                   <strong>Live Preview Active:</strong> The main editor stage updates immediately behind this dialog.
                   All formatting changes preserve your exact accomplishments and bullet points.

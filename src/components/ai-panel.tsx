@@ -19,6 +19,7 @@ import {
 import { addSkillToText } from "@/lib/skills-taxonomy";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { Bot, Check, Plus, X } from "lucide-react";
 
 export type AiPanelMode = "bullet" | "summary" | "interview" | "skills";
 
@@ -338,7 +339,7 @@ export function AIPanel({
             </p>
           </div>
           <button onClick={close} aria-label="Close AI assistant">
-            ×
+            <X size={18} aria-hidden />
           </button>
         </div>
         <div className="ai-panel-body">
@@ -927,7 +928,7 @@ export function AIPanel({
 
                             <div className="ai-prompt-box">
                               <p className="interview-question">
-                                🤖 {q.questionPrompt}
+                                <Bot size={16} aria-hidden /> {q.questionPrompt}
                               </p>
                               <p className="helper-text">
                                 Think about time saved, fewer errors, work
@@ -1051,7 +1052,8 @@ export function AIPanel({
                       className="primary"
                       onClick={handleAddAllSkills}
                     >
-                      ＋ Add All {discoveredSkills.length} Skills
+                      <Plus size={14} aria-hidden /> Add All{" "}
+                      {discoveredSkills.length} Skills
                     </button>
                   )}
                 </div>
@@ -1086,7 +1088,12 @@ export function AIPanel({
                               className={isAdded ? "btn-added" : "primary"}
                               onClick={() => handleAddSkill(item.skill)}
                             >
-                              {isAdded ? "✓ Added" : "+ Add"}
+                              {isAdded ? (
+                                <Check size={14} aria-hidden />
+                              ) : (
+                                <Plus size={14} aria-hidden />
+                              )}
+                              {isAdded ? "Added" : "Add"}
                             </button>
                           </div>
                           <p className="skill-evidence-quote">

@@ -4,17 +4,20 @@ import type { ResumeDocument } from "@/lib/document";
 import type { AccountUser } from "@/lib/cloud-contract";
 import type { SaveState } from "./types";
 import type { MouseEvent } from "react";
+import { Keyboard, Star } from "lucide-react";
 
 export interface EditorHeaderProps {
   doc: ResumeDocument | null;
   libraryMode?: boolean;
   cloudUser: AccountUser | null;
+  sessionUser: AccountUser | null;
   status: SaveState;
   busy: boolean;
   ready: boolean;
   showAccount: boolean;
   showAI: boolean;
   onOpenAccount: () => void;
+  onUseAccount?: () => void;
   onOpenLibrary?: () => void;
   onOpenAts?: () => void;
   onOpenPricing?: () => void;
@@ -27,12 +30,14 @@ export function EditorHeader({
   doc,
   libraryMode = false,
   cloudUser,
+  sessionUser,
   status,
   busy,
   ready,
   showAccount,
   showAI,
   onOpenAccount,
+  onUseAccount,
   onOpenLibrary,
   onOpenAts,
   onOpenPricing,
@@ -119,7 +124,8 @@ export function EditorHeader({
                   : "Job Hunter Pass & Pricing"
               }
             >
-              {isSubscriber ? "⭐ Pass Active" : "⭐ Upgrade"}
+              <Star size={16} aria-hidden />
+              {isSubscriber ? "Pass Active" : "Upgrade"}
             </button>
           )}
           {onOpenShortcuts && (
@@ -131,7 +137,7 @@ export function EditorHeader({
               title="Keyboard Shortcuts (? or Ctrl+/)"
               aria-label="Keyboard shortcuts"
             >
-              ⌨️
+              <Keyboard size={18} aria-hidden />
             </button>
           )}
           <button
@@ -140,12 +146,17 @@ export function EditorHeader({
           >
             Account
           </button>
-          <span className="local-badge">
-            <span /> {cloudUser ? "Account workspace" : "Local workspace"}
-          </span>
-          <span className="avatar" aria-hidden="true">
-            {doc?.contact.name.charAt(0) || "Y"}
-          </span>
+          {sessionUser && (
+            <span
+              className="avatar"
+              title={`Signed in as ${sessionUser.email}`}
+              aria-hidden="true"
+            >
+              {(sessionUser.name?.trim() || sessionUser.email)
+                .charAt(0)
+                .toUpperCase()}
+            </span>
+          )}
         </div>
       </header>
       <div
@@ -165,11 +176,35 @@ export function EditorHeader({
               : "Your details, your wording. Review the saved file before sending."}
           </p>
         </div>
-        <div className="save-status" role="status" aria-live="polite">
-          <span className={status === "Save failed" ? "dot failed" : "dot"} />
-          {cloudUser && status === "Saved on this device"
-            ? "Saved to your account"
-            : status}
+        <div className="save-indicator">
+          <div className="save-status" role="status" aria-live="polite">
+            <span className={status === "Save failed" ? "dot failed" : "dot"} />
+            {cloudUser && status === "Saved in this browser"
+              ? "Saved to your account"
+              : status}
+          </div>
+          {!cloudUser && status !== "Loading" &&
+            (sessionUser && onUseAccount ? (
+              <button
+                type="button"
+                className="save-indicator-action"
+                disabled={busy || !ready}
+                onClick={onUseAccount}
+              >
+                Open my account CVs
+              </button>
+            ) : (
+              !sessionUser && (
+                <button
+                  type="button"
+                  className="save-indicator-action"
+                  disabled={busy || !ready || showAccount}
+                  onClick={onOpenAccount}
+                >
+                  Sign in to back up
+                </button>
+              )
+            ))}
         </div>
       </div>
     </>

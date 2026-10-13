@@ -105,7 +105,7 @@ for (const width of [360, 768, 1440]) {
     }
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("empty");
     await page
@@ -141,7 +141,7 @@ for (const width of [360, 768, 1440]) {
       page.getByRole("button", { name: "Show start guide" }),
     ).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("editor");
     if (width <= 900) {
@@ -153,7 +153,7 @@ for (const width of [360, 768, 1440]) {
         "true",
       );
       await expect(page.locator(".mobile-save-feedback")).toHaveText(
-        "Saved on this device",
+        "Saved in this browser",
       );
       await capture("preview");
       await page
@@ -205,7 +205,7 @@ test("dashboard sorting, duplicate independence, delete cancellation and collect
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const alpha = personal("Alpha");
   alpha.updatedAt = "2026-10-09T10:00:00.000Z";
   const zeta = personal("Zeta");
@@ -267,7 +267,7 @@ test("a stale dashboard cannot delete a newer revision; duplication reads the la
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const source = personal("Concurrent draft");
   await deviceDocuments(page, [source]);
   await page.reload();
@@ -297,7 +297,7 @@ test("account dashboard duplicate/delete affect account CVs and preserve indepen
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const device = personal("Device original");
   await deviceDocuments(page, [device]);
   const deviceBefore = await deviceDocuments(page);
