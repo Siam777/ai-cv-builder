@@ -11,7 +11,7 @@ import styles from "@/components/public/public-site.module.css";
 export const metadata: Metadata = {
   title: "AI CV Builder · Your experience, clearly presented",
   description:
-    "Explore resume designs, draft with your own details, and review your content. Sign in and verify your email to export.",
+    "Explore resume designs, draft with your own details, and review your content. Sign in to download.",
 };
 export default function Home() {
   return (

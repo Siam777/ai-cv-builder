@@ -7,7 +7,10 @@ import {
   requireSameOrigin,
 } from "@/lib/server/http";
 import { auth, authorized, origin } from "@/lib/server/auth";
-import { emailDeliveryMode } from "@/lib/server/auth-email";
+import {
+  emailDeliveryMode,
+  exportVerificationSatisfied,
+} from "@/lib/server/auth-email";
 import { googleProvider } from "@/lib/server/google-config";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -22,7 +25,9 @@ export async function GET(request: Request) {
         ? {
             id: value.user.id,
             email: value.user.email,
+            name: value.user.name,
             emailVerified: value.user.emailVerified,
+            canExport: exportVerificationSatisfied(value.user.emailVerified),
           }
         : null,
       emailDelivery: emailDeliveryMode(),

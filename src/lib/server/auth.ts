@@ -5,7 +5,11 @@ import { database } from "./database";
 import * as schema from "./schema";
 import { HttpError } from "./http";
 import { after } from "next/server";
-import { emailDeliveryMode, sendAuthEmail } from "./auth-email";
+import {
+  emailDeliveryMode,
+  exportVerificationSatisfied,
+  sendAuthEmail,
+} from "./auth-email";
 import { googleProvider } from "./google-config";
 
 export const origin = () => process.env.APP_ORIGIN || "http://localhost:3000";
@@ -72,7 +76,7 @@ function createAuth() {
 }
 export async function authorizedExport(request: Request) {
   const session = await authorized(request);
-  if (!session.user.emailVerified)
+  if (!exportVerificationSatisfied(session.user.emailVerified))
     throw new HttpError(
       403,
       "EMAIL_VERIFICATION_REQUIRED",

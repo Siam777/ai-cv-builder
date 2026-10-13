@@ -76,8 +76,7 @@ export function EditorStartGuide({
           <div>
             <h2>Review before sending</h2>
             <p>
-              Preview the pages and review the wording. Sign in and verify your
-              email to export.
+              Preview the pages and review the wording. Sign in to download.
             </p>
             <button disabled={busy} onClick={onReview}>
               Open content review
