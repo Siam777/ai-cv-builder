@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
-import { startSampleResume, openFirstCv } from "./helpers";
+import { startSampleResume, openFirstCv, editorTool } from "./helpers";
 
 test("guided start creates only supplied facts and retains them after reload", async ({
   page,
@@ -79,7 +79,7 @@ test("photo errors are recoverable and uploading enables preview on a supported 
   await warning
     .getByRole("button", { name: "Switch to a photo design" })
     .click();
-  const designs = page.getByRole("dialog", { name: "Design & Templates" });
+  const designs = page.getByRole("complementary", { name: "Design" });
   await expect(
     designs.getByRole("tab", { name: "Supports photo" }),
   ).toHaveAttribute("aria-selected", "true");
@@ -89,7 +89,7 @@ test("photo errors are recoverable and uploading enables preview on a supported 
   await designs
     .getByRole("button", { name: "Modern template", exact: true })
     .click();
-  await page.getByRole("button", { name: "Close design dialog" }).click();
+  await page.getByRole("button", { name: "Close Design" }).click();
   await expect(warning).toHaveCount(0);
   await expect(page.getByText("Photo added. It shows on your CV preview.")).toBeVisible();
   await expect(page.locator('[data-block-id="photo"]').first()).toBeVisible();
@@ -121,7 +121,8 @@ for (const width of [360, 1440]) {
       .getByRole("button", { name: "Rewrite with AI", exact: true })
       .first()
       .click();
-    const dialog = page.getByRole("dialog", { name: "Writing assistant" });
+    // Docked beside the form on wide screens, a bottom sheet on phones.
+    const dialog = page.locator("#side-panel");
     await expect(dialog.locator(".selected-bullet")).toHaveText(
       await bullet.inputValue(),
     );
@@ -131,14 +132,17 @@ for (const width of [360, 1440]) {
     ).toBeVisible();
     await dialog.getByRole("tab", { name: "Write a summary" }).click();
     await expect(dialog).toContainText("No AI request is made");
-    const body = dialog.locator(".ai-panel-body");
-    await body.hover();
-    await page.mouse.wheel(0, 900);
-    await expect
-      .poll(() => body.evaluate((el) => el.scrollTop))
-      .toBeGreaterThan(0);
+    const body = dialog.locator(".side-panel-body");
+    // Long content scrolls inside the panel, never the page behind a sheet.
+    if (await body.evaluate((el) => el.scrollHeight > el.clientHeight + 1)) {
+      await body.hover();
+      await page.mouse.wheel(0, 900);
+      await expect
+        .poll(() => body.evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(0);
+    }
     await expect(
-      dialog.getByRole("button", { name: "Done & return to editor" }),
+      dialog.getByRole("button", { name: "Close AI Assistant" }),
     ).toBeInViewport();
     expect(
       await page.evaluate(
@@ -196,17 +200,16 @@ test("a pending AI suggestion can be closed without applying or locking the page
   try {
     await page.goto("/builder");
     await openFirstCv(page, "Practice copies");
-    await page
-      .getByRole("button", { name: "Writing help", exact: false })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "Writing assistant" });
+    await editorTool(page, "Writing help");
+    // Docked beside the form on wide screens, a bottom sheet on phones.
+    const dialog = page.locator("#side-panel");
     await dialog
       .getByLabel("Send this evidence and instruction to OpenAI.")
       .check();
     await dialog.getByRole("button", { name: "Suggest a rewrite" }).click();
     await expect.poll(() => calls).toBe(1);
     await expect(dialog).toContainText("No change is applied automatically");
-    await dialog.getByRole("button", { name: "Close AI assistant" }).click();
+    await dialog.getByRole("button", { name: "Close AI Assistant" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.locator("body")).not.toHaveClass(/modal-open/);
     await expect(page.getByLabel("Full name", { exact: true })).toBeEnabled();
@@ -225,13 +228,14 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await page.setViewportSize({ width: 360, height: 620 });
   await page.goto("/builder");
   await startSampleResume(page);
-  await page.getByRole("button", { name: /Check my CV/ }).click();
-  const check = page.getByRole("dialog", { name: "Resume content review" });
+  await page.getByRole("button", { name: /^Check/ }).click();
+  // At this width the panel is a bottom sheet.
+  const check = page.getByRole("dialog", { name: "Check my CV" });
   await expect(
     check.getByRole("button", { name: /Writing findings/ }),
   ).toHaveClass(/active/);
-  await check.getByRole("button", { name: "Done", exact: true }).click();
-  await page.getByRole("button", { name: /Compare with a job/ }).click();
+  await check.getByRole("button", { name: "Close Check my CV" }).click();
+  await editorTool(page, "Match a job");
   const dialog = page.getByRole("dialog", { name: "Job Tailoring Engine" });
   await expect(dialog).toContainText("See what your CV supports");
   for (const label of ["Target Job Title", "Company Name"]) {

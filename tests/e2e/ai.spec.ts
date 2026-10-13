@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import { startSampleResume, openFirstCv, authenticateForExport } from "./helpers";
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
@@ -10,17 +10,14 @@ test("AI controls keep local data private and require account storage", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await openEditorTools(page);
-  await page
-    .getByRole("button", { name: "AI bullet assistant", exact: true })
-    .click();
+  await editorTool(page, "Writing help");
   await expect(
     page.getByRole("region", { name: "AI bullet assistant" }),
   ).toContainText("Local resumes are never uploaded automatically");
   await expect(
     page.getByRole("button", { name: "Suggest a rewrite" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Close AI assistant" }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Alex Morgan",
   );
@@ -137,10 +134,7 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
     ).toBe(403);
     await page.goto("/builder");
     await openFirstCv(page, "Practice copies");
-    await openEditorTools(page);
-    await page
-      .getByRole("button", { name: "AI bullet assistant", exact: true })
-      .click();
+    await editorTool(page, "Writing help");
     const generate = page.getByRole("button", { name: "Suggest a rewrite" });
     await expect(generate).toBeDisabled();
     expect(providerRequests).toBe(0);
@@ -183,7 +177,7 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
     });
     await accept.click();
     await expect(page.locator(".ai-panel")).toContainText("Suggestion saved");
-    await page.getByRole("button", { name: "Close AI assistant" }).click();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
     await page.setViewportSize({ width: 1440, height: 1050 });
     await page.getByRole("button", { name: "Undo", exact: false }).click();
     await expect(page.locator(".save-status")).toHaveText(

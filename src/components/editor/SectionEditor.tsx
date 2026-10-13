@@ -16,7 +16,7 @@ import { PhotoUploader } from "./PhotoUploader";
 import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import type { FocusTarget } from "./types";
-import { ArrowDown, ArrowUp, Check, Lightbulb, Save, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Save, Trash2, X } from "lucide-react";
 
 export interface SectionEditorProps {
   doc: ResumeDocument;
@@ -28,6 +28,11 @@ export interface SectionEditorProps {
   onDeleteSection?: (sectionId: string) => void;
   onDeleteResume: () => void;
   onOpenPhotoDesigns?: () => void;
+  /** Every step in order, for the Back and Next buttons. */
+  steps?: { id: string; label: string }[];
+  onStep?: (id: string) => void;
+  /** Called by Next on the last step. */
+  onFinish?: () => void;
   onWritingAction?: (
     bulletId: string | undefined,
     action: "improve" | "concise" | "metric" | "summary",
@@ -45,7 +50,13 @@ export function SectionEditor({
   onDeleteResume,
   onWritingAction,
   onOpenPhotoDesigns,
+  steps = [],
+  onStep,
+  onFinish,
 }: SectionEditorProps) {
+  const stepIndex = steps.findIndex((step) => step.id === sectionId);
+  const previousStep = stepIndex > 0 ? steps[stepIndex - 1] : null;
+  const nextStep = stepIndex >= 0 ? steps[stepIndex + 1] : null;
   const containerRef = useRef<HTMLElement>(null);
   const [librarySaved, setLibrarySaved] = useState(false);
   const activeSection = doc.sections.find((s) => s.id === sectionId);
@@ -170,18 +181,6 @@ export function SectionEditor({
               <h2>Personal details</h2>
               <p>Make it easy for your next team to find you.</p>
             </div>
-            <Field
-              label="Resume name"
-              value={doc.name}
-              maxLength={200}
-              onChange={(v) =>
-                onUpdateDocument((d) => {
-                  d.name = v || "Untitled resume";
-                })
-              }
-            />
-            <div className="form-divider" />
-
             <PhotoUploader
               value={doc.contact.photoUrl || ""}
               disabled={busy}
@@ -582,6 +581,30 @@ export function SectionEditor({
           )
         )}
       </fieldset>
+      {onStep && stepIndex >= 0 && (
+        <nav className="step-footer" aria-label="Steps">
+          <button
+            type="button"
+            disabled={!previousStep}
+            onClick={() => previousStep && onStep(previousStep.id)}
+          >
+            <ArrowLeft size={16} aria-hidden /> Back
+          </button>
+          {nextStep ? (
+            <button
+              type="button"
+              className="primary"
+              onClick={() => onStep(nextStep.id)}
+            >
+              Next: {nextStep.label} <ArrowRight size={16} aria-hidden />
+            </button>
+          ) : (
+            <button type="button" className="primary" onClick={onFinish}>
+              Next: Check my CV <ArrowRight size={16} aria-hidden />
+            </button>
+          )}
+        </nav>
+      )}
     </section>
   );
 }

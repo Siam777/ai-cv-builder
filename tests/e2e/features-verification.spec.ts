@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import {
   startSampleResume,
   openFirstCv,
@@ -15,30 +15,22 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
 
     await startSampleResume(page);
 
-    // 1. Verify Toolbar Buttons
-    await openEditorTools(page);
+    // 1. Verify the toolbar: Design, Check, AI Assistant and Download
+    for (const name of ["Design", "AI Assistant", "CV options"])
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Check/ })).toBeVisible();
+    await page.getByRole("button", { name: "AI Assistant", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Create practice example" }),
+      page.getByRole("menuitem", { name: /^Cover letter/ }),
     ).toBeVisible();
-    await openEditorTools(page);
-    await expect(
-      page.getByRole("button", { name: "Role Benchmark & Gaps" }),
-    ).toBeVisible();
-    await openEditorTools(page);
-    await expect(
-      page.getByRole("button", { name: "Cover letter", exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Design & templates" }),
-    ).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // 2. Open Role Benchmark & Gaps Audit Panel
-    await openEditorTools(page);
-    await page
-      .getByRole("button", { name: "Role Benchmark & Gaps" })
-      .click();
-    const atsModal = page.getByRole("dialog", {
-      name: "Resume content review",
+    await editorTool(page, "Check");
+    const atsModal = page.getByRole("complementary", {
+      name: "Check my CV",
     });
     await expect(atsModal).toBeVisible();
 
@@ -81,12 +73,11 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(page.getByText(/Role numeric patterns/i)).toBeVisible();
 
     // Close dialog
-    await atsModal.getByRole("button", { name: "Done" }).click();
+    await atsModal.getByRole("button", { name: "Close Check my CV" }).click();
     await expect(atsModal).not.toBeVisible();
 
     // 3. Open AI Quick-Start Generator
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "Create practice example" }).click();
+    await editorTool(page, "Create practice example");
     await expect(
       page.getByRole("dialog", { name: "Create fictional practice CV" }),
     ).toBeVisible();
@@ -103,8 +94,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     ).not.toBeVisible({ timeout: 10000 });
 
     // 4. Open Tailored Cover Letter Studio
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "Cover letter", exact: true }).click();
+    await editorTool(page, "Cover letter");
     const clModal = page.getByRole("dialog", {
       name: "Tailored Cover Letter Generator",
     });
@@ -126,9 +116,9 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(clModal).not.toBeVisible();
 
     // 5. Open Design & Templates Modal (Confirm No Squished Live Preview & 8 Templates)
-    await page.getByRole("button", { name: "Design & templates" }).click();
+    await page.getByRole("button", { name: "Design", exact: true }).click();
     await expect(
-      page.getByRole("dialog", { name: "Design & Templates" }),
+      page.getByRole("complementary", { name: "Design" }),
     ).toBeVisible();
     await expect(page.locator(".design-modal-body")).toBeVisible();
     // Modal should NOT contain the redundant live document preview
@@ -146,10 +136,10 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     // Click Tech Startup template
     await page.getByRole("button", { name: /Tech Startup/i }).click();
 
-    // Close design modal
-    await page.getByRole("button", { name: "Done & Return to Editor" }).click();
+    // Close the design panel
+    await page.getByRole("button", { name: "Close Design" }).click();
     await expect(
-      page.getByRole("dialog", { name: "Design & Templates" }),
+      page.getByRole("complementary", { name: "Design" }),
     ).not.toBeVisible();
   });
 });

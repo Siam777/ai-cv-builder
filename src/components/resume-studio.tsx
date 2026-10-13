@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createDocument,
   duplicateDocument,
@@ -8,6 +8,7 @@ import {
   documentSchema,
   uid,
   newEntry,
+  labels,
   type ResumeDocument,
 } from "@/lib/document";
 import { createRepository } from "@/lib/repository";
@@ -26,7 +27,14 @@ import {
 } from "@/lib/cloud-repository";
 import { userCanExport, type AccountUser } from "@/lib/cloud-contract";
 import { EditorHeader } from "./editor/EditorHeader";
-import { DocumentToolbar } from "./editor/DocumentToolbar";
+import {
+  EditorToolbar,
+  type ExportFormat,
+  type SidePanelId,
+} from "./editor/EditorToolbar";
+import { SidePanel, useSheetLayout } from "./editor/SidePanel";
+import { cvStrength } from "@/lib/cv-strength";
+import { lintResumeDocument } from "@/lib/linter/ats-linter";
 import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
 import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
@@ -51,7 +59,6 @@ import { PricingModal } from "./billing/PricingModal";
 import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
 import { DemoResumesModal } from "./editor/DemoResumesModal";
 import { DocumentLibrary } from "./editor/DocumentLibrary";
-import { EditorStartGuide } from "./editor/EditorStartGuide";
 import { documentsInCollection, startFromDesign } from "@/lib/document-library";
 import {
   requestExport,
@@ -62,9 +69,11 @@ import type { ExportRequest, ExportSource } from "@/lib/export-contract";
 import type { PlanId } from "@/lib/billing-plans";
 import type { StartingDesign } from "@/lib/public-catalog";
 import type { FocusTarget, SaveState } from "./editor/types";
-import type { ExportFormat } from "./editor/DocumentToolbar";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { watchSessionChanges } from "@/lib/session-events";
+import {
+  notifySessionChange,
+  watchSessionChanges,
+} from "@/lib/session-events";
 import { GuidedStartModal } from "./editor/GuidedStartModal";
 import { PanelDialog } from "./editor/PanelDialog";
 import { Palette, Sparkles } from "lucide-react";
@@ -116,10 +125,25 @@ export function ResumeStudio({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showDesign, setShowDesign] = useState(false);
+  // Design, Check and AI share one side panel that replaces the preview.
+  const [activePanel, setActivePanel] = useState<SidePanelId | null>(null);
+  const showDesign = activePanel === "design";
+  const showAts = activePanel === "check";
+  const showAI = activePanel === "ai";
+  const panelSetter =
+    (id: SidePanelId) =>
+    (value: boolean | ((previous: boolean) => boolean)) =>
+      setActivePanel((previous) => {
+        const open =
+          typeof value === "function" ? value(previous === id) : value;
+        return open ? id : previous === id ? null : previous;
+      });
+  const setShowDesign = panelSetter("design");
+  const setShowAts = panelSetter("check");
+  const setShowAI = panelSetter("ai");
+  const sheetLayout = useSheetLayout();
   const [designFilter, setDesignFilter] = useState<TemplateFilter>("all");
   const [showAccount, setShowAccount] = useState(false);
-  const [showAI, setShowAI] = useState(false);
   const [writingTarget, setWritingTarget] = useState<{
     mode: AiPanelMode;
     bulletId?: string;
@@ -153,7 +177,6 @@ export function ResumeStudio({
     revision: number;
     sourceId: string;
   } | null>(null);
-  const [showAts, setShowAts] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -166,19 +189,19 @@ export function ResumeStudio({
   const paused = useRef(false);
   const preview = useRef<PreviewHandle>(null);
   const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
+  const future = useRef<ResumeDocument[]>([]);
   const [mobileTab, setMobileTab] = useState("editor");
   const [staged, setStaged] = useState<StagedImportData | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
 
+  // Docked side panels leave the editor usable, so they are not modal.
   const isModalActive = Boolean(
-    showDesign ||
     showAccount ||
-    showAI ||
     showAiGen ||
     showGuidedStart ||
     showDemoGallery ||
     showTailor ||
-    showAts ||
     showPricing ||
     showCoverLetter ||
     showHistory ||
@@ -205,7 +228,9 @@ export function ResumeStudio({
     current.current = next;
     setDoc(next);
     history.current = [];
+    future.current = [];
     setUndoCount(0);
+    setRedoCount(0);
     change.current = 0;
     savedChange.current = 0;
     setSectionId("contact");
@@ -410,11 +435,13 @@ export function ResumeStudio({
     if (record) {
       history.current.push(before);
       if (history.current.length > 80) history.current.shift();
+      future.current = [];
     }
     current.current = next;
     change.current++;
     setDoc(next);
     setUndoCount(history.current.length);
+    setRedoCount(future.current.length);
     setStatus("Unsaved changes");
     clearTimeout(timer.current);
     if (!paused.current)
@@ -425,7 +452,16 @@ export function ResumeStudio({
 
   function handleUndo() {
     const old = history.current.pop();
-    if (old) update((d) => Object.assign(d, old), false);
+    if (!old || !current.current) return;
+    future.current.push(current.current);
+    update((d) => Object.assign(d, old), false);
+  }
+
+  function handleRedo() {
+    const next = future.current.pop();
+    if (!next || !current.current) return;
+    history.current.push(current.current);
+    update((d) => Object.assign(d, next), false);
   }
 
   useEffect(() => {
@@ -476,9 +512,9 @@ export function ResumeStudio({
           setShowDemoGallery(false);
           return;
         }
-        if (showAI) {
+        if (activePanel) {
           e.preventDefault();
-          setShowAI(false);
+          setActivePanel(null);
           return;
         }
         if (staged) {
@@ -497,23 +533,20 @@ export function ResumeStudio({
           target.tagName === "SELECT" ||
           target.isContentEditable);
 
-      // Global Undo: Ctrl+Z or Cmd+Z when NOT typing inside an editable field
-      if (
+      // Global Undo/Redo: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y when NOT typing in a field
+      const key = e.key.toLowerCase();
+      const redo =
         (e.ctrlKey || e.metaKey) &&
-        e.key.toLowerCase() === "z" &&
-        !e.shiftKey
-      ) {
+        ((key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey));
+      if ((e.ctrlKey || e.metaKey) && (redo || (key === "z" && !e.shiftKey))) {
         const isAnyModalOpen =
           showAccount ||
-          showAI ||
           showTailor ||
-          showAts ||
           showPricing ||
           showCoverLetter ||
           showHistory ||
           showAddSection ||
           showShortcuts ||
-          showDesign ||
           showAiGen ||
           showGuidedStart ||
           showDemoGallery ||
@@ -521,7 +554,10 @@ export function ResumeStudio({
 
         if (!isEditable) {
           e.preventDefault();
-          if (!isAnyModalOpen) handleUndo();
+          if (!isAnyModalOpen) {
+            if (redo) handleRedo();
+            else handleUndo();
+          }
           return;
         }
       }
@@ -549,6 +585,7 @@ export function ResumeStudio({
     showGuidedStart,
     isModalActive,
     showDesign,
+    activePanel,
     showAiGen,
     showDemoGallery,
     staged,
@@ -666,6 +703,34 @@ export function ResumeStudio({
     });
   }
 
+  async function handleSignedOut(deleted?: boolean) {
+    setSessionUser(null);
+    if (deleted) {
+      paused.current = false;
+      setSessionPaused(false);
+    }
+    if (!deleted && cloudUser && current.current) {
+      paused.current = true;
+      setSessionPaused(true);
+      setError(
+        "Signed out. Your account draft is kept in this tab. Sign in again or keep a copy on this device.",
+      );
+    } else await switchWorkspace(null, false);
+  }
+
+  /** Sign out from the account menu, keeping the current draft safe first. */
+  async function signOut() {
+    await action(async () => {
+      await accountRequest("/api/auth", {
+        method: "POST",
+        body: JSON.stringify({ action: "signout" }),
+      });
+      notifySessionChange();
+      await handleSignedOut();
+      setNotice("Signed out. CVs saved in this browser stay here.");
+    });
+  }
+
   async function switchWorkspace(user: AccountUser | null, save = true) {
     if (cloudUser && current.current && paused.current) {
       if (user?.id === cloudUser.id) {
@@ -702,7 +767,9 @@ export function ResumeStudio({
     setReviewedVariantUndo(null);
     setStaged(null);
     history.current = [];
+    future.current = [];
     setUndoCount(0);
+    setRedoCount(0);
     change.current = savedChange.current = 0;
     const next = user ? createCloudRepository(user.id) : createRepository();
     repository.current = next;
@@ -1000,6 +1067,32 @@ export function ResumeStudio({
   }
 
   const ready = status !== "Loading";
+  const strength = useMemo(
+    () =>
+      doc
+        ? cvStrength(doc, lintResumeDocument(doc).issues)
+        : { percent: 0, items: [], next: null, steps: {} },
+    [doc],
+  );
+  const steps = doc
+    ? [
+        { id: "contact", label: "Personal details" },
+        ...doc.sections.map((s) => ({
+          id: s.id,
+          label: s.label || labels[s.type],
+        })),
+      ]
+    : [];
+  /** Show a step and, unless a field will take focus, move focus to its form. */
+  function goToStep(id: string, focusForm = true) {
+    setSectionId(id);
+    setMobileTab("editor");
+    requestAnimationFrame(() => {
+      const form = document.querySelector<HTMLElement>(".editor-panel");
+      form?.scrollIntoView({ block: "start", behavior: "instant" });
+      if (focusForm) form?.focus({ preventScroll: true });
+    });
+  }
 
   return (
     <div
@@ -1023,7 +1116,6 @@ export function ResumeStudio({
         </a>
       )}
       <EditorHeader
-        doc={doc}
         libraryMode={showLibrary}
         cloudUser={cloudUser}
         sessionUser={sessionUser}
@@ -1031,8 +1123,8 @@ export function ResumeStudio({
         busy={busy}
         ready={ready}
         showAccount={showAccount}
-        showAI={showAI}
         onOpenAccount={() => setShowAccount(true)}
+        onSignOut={() => void signOut()}
         onUseAccount={
           sessionUser && !sessionPaused
             ? () => {
@@ -1046,7 +1138,6 @@ export function ResumeStudio({
             setShowLibrary(true);
           });
         }}
-        onOpenAts={() => setShowAts(true)}
         onOpenPricing={() => setShowPricing(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
         isSubscriber={isSubscriber}
@@ -1087,20 +1178,7 @@ export function ResumeStudio({
             }}
             onLocal={() => switchWorkspace(null)}
             onCloud={(user) => switchWorkspace(user)}
-            onSignedOut={async (deleted) => {
-              setSessionUser(null);
-              if (deleted) {
-                paused.current = false;
-                setSessionPaused(false);
-              }
-              if (!deleted && cloudUser && current.current) {
-                paused.current = true;
-                setSessionPaused(true);
-                setError(
-                  "Signed out. Your account draft is kept in this tab. Sign in again or keep a copy on this device.",
-                );
-              } else await switchWorkspace(null, false);
-            }}
+            onSignedOut={handleSignedOut}
             onClose={() => {
               setShowAccount(false);
               setPendingExport(null);
@@ -1164,30 +1242,6 @@ export function ResumeStudio({
             Keep draft on this device
           </button>
         </div>
-      )}
-
-      {showAI && doc && (
-        <AIPanel
-          key={`${cloudUser?.id ?? "local"}:${doc.id}`}
-          doc={doc}
-          owner={cloudUser?.id ?? null}
-          prepare={prepareAI}
-          accept={acceptAI}
-          onClose={() => setShowAI(false)}
-          onUpdateDocument={update}
-          initialMode={writingTarget.mode}
-          initialBulletId={writingTarget.bulletId}
-          initialInstruction={writingTarget.instruction}
-          onOpenAccount={() => {
-            setShowAI(false);
-            setShowAccount(true);
-          }}
-          onEditSection={(id) => {
-            setShowAI(false);
-            setMobileTab("editor");
-            setSectionId(id);
-          }}
-        />
       )}
 
       {showAiGen && (
@@ -1298,24 +1352,6 @@ export function ResumeStudio({
         />
       )}
 
-      {showAts && doc && (
-        <AtsReadinessPanel
-          doc={doc}
-          onNavigateToIssue={(issue) => {
-            if (issue.sectionId) setSectionId(issue.sectionId);
-            if (issue.sectionId || issue.bulletId || issue.entryId) {
-              setFocusTarget({
-                sectionId: issue.sectionId || "contact",
-                entryId: issue.entryId,
-                bulletId: issue.bulletId,
-              });
-            }
-            setShowAts(false);
-          }}
-          onClose={() => setShowAts(false)}
-        />
-      )}
-
       {showPricing && (
         <PricingModal
           cloudUser={cloudUser}
@@ -1382,24 +1418,6 @@ export function ResumeStudio({
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
-      {showDesign && doc && (
-        <DesignPanel
-          doc={doc}
-          disabled={busy}
-          onChange={(settings) =>
-            update((d) => {
-              Object.assign(d.presentation, settings);
-            })
-          }
-          initialFilter={designFilter}
-          onClose={() => {
-            setShowDesign(false);
-            setDesignFilter("all");
-          }}
-          onOpenDemoGallery={() => setShowDemoGallery(true)}
-        />
-      )}
-
       {staged && (
         <ImportReviewModal
           staged={staged}
@@ -1439,9 +1457,7 @@ export function ResumeStudio({
         style={{ display: showAccount ? "none" : undefined }}
         disabled={
           showAccount ||
-          showAI ||
           showTailor ||
-          showAts ||
           showPricing ||
           showCoverLetter ||
           showHistory ||
@@ -1454,9 +1470,7 @@ export function ResumeStudio({
         }
         inert={
           showAccount ||
-          showAI ||
           showTailor ||
-          showAts ||
           showPricing ||
           showCoverLetter ||
           showHistory ||
@@ -1618,33 +1632,42 @@ export function ResumeStudio({
           </main>
         ) : (
           <>
-            <div className="document-context no-print">
-              <span className="library-kind">
-                {doc.provenance.purpose === "personal"
-                  ? "Personal CV"
-                  : doc.provenance.purpose === "practice"
-                    ? "Practice / fictional content"
-                    : "Older draft · needs review"}
-              </span>
-              {doc.provenance.purpose !== "personal" && (
-                <button
-                  onClick={() => {
-                    void classifyDocument(doc, "personal");
-                  }}
-                >
-                  Review and mark as my CV
-                </button>
-              )}
-            </div>
-            <DocumentToolbar
+            <EditorToolbar
               doc={doc}
               documents={documentsInCollection(
                 documents,
                 doc.provenance.purpose,
               )}
               busy={busy}
-              undoCount={undoCount}
-              showDesign={showDesign}
+              canUndo={undoCount > 0}
+              canRedo={redoCount > 0}
+              status={status}
+              savedToAccount={!!cloudUser}
+              saveAction={
+                cloudUser
+                  ? undefined
+                  : sessionUser
+                    ? sessionPaused
+                      ? undefined
+                      : {
+                          label: "Open my account CVs",
+                          onClick: () => {
+                            const user = sessionUser;
+                            void action(() => switchWorkspace(user));
+                          },
+                        }
+                    : {
+                        label: "Sign in to back up",
+                        onClick: () => setShowAccount(true),
+                      }
+              }
+              strength={strength.percent}
+              activePanel={activePanel}
+              onRename={(name) =>
+                update((d) => {
+                  d.name = name || "Untitled resume";
+                })
+              }
               onSelectDocument={(id) => {
                 void action(async () => {
                   const list = await repository.current!.list();
@@ -1667,60 +1690,24 @@ export function ResumeStudio({
                 );
               }}
               onImportClick={() => fileInput.current?.click()}
-              onUndo={handleUndo}
-              onToggleDesign={() => setShowDesign((val) => !val)}
-              onOpenAI={() => openWriting()}
-              onOpenAiGenerator={() => setShowAiGen(true)}
-              onOpenDemoGallery={() => setShowDemoGallery(true)}
-              onOpenAts={() => setShowAts(true)}
-              onOpenTailor={() => setShowTailor(true)}
-              onOpenCoverLetter={() => setShowCoverLetter(true)}
               onOpenHistory={() => setShowHistory(true)}
+              onOpenDemoGallery={() => setShowDemoGallery(true)}
+              onOpenAiGenerator={() => setShowAiGen(true)}
+              onMarkPersonal={
+                doc.provenance.purpose !== "personal"
+                  ? () => void classifyDocument(doc, "personal")
+                  : undefined
+              }
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onTogglePanel={(panel) =>
+                setActivePanel((open) => (open === panel ? null : panel))
+              }
+              onWritingHelp={() => openWriting()}
+              onMatchJob={() => setShowTailor(true)}
+              onCoverLetter={() => setShowCoverLetter(true)}
               onPrint={() => checkedExport("print")}
               onExport={checkedExport}
-            />
-
-            <nav
-              className="editor-taskbar no-print"
-              aria-label="Help with this CV"
-            >
-              <button
-                disabled={busy}
-                onClick={() => {
-                  setSectionId("contact");
-                  setMobileTab("editor");
-                  setFocusTarget({ sectionId: "contact", field: "photo" });
-                }}
-              >
-                <strong>Add or change photo</strong>
-                <span>In Personal details</span>
-              </button>
-              <button disabled={busy} onClick={() => openWriting()}>
-                <strong>Writing help</strong>
-                <span>Bullets, summary, results and skills</span>
-              </button>
-              <button disabled={busy} onClick={() => setShowAts(true)}>
-                <strong>Check my CV</strong>
-                <span>Find issues and jump to a fix</span>
-              </button>
-              <button disabled={busy} onClick={() => setShowTailor(true)}>
-                <strong>Compare with a job</strong>
-                <span>See matches and missing evidence</span>
-              </button>
-            </nav>
-            <EditorStartGuide
-              key={doc.id}
-              doc={doc}
-              busy={busy}
-              onSection={(id) => {
-                setMobileTab("editor");
-                setSectionId(id);
-                setFocusTarget({
-                  sectionId: id,
-                  field: id === "contact" ? "name" : undefined,
-                });
-              }}
-              onReview={() => setShowAts(true)}
             />
 
             <div className="mobile-tabs no-print">
@@ -1738,27 +1725,26 @@ export function ResumeStudio({
               >
                 Preview resume
               </button>
-              <button disabled={busy} onClick={() => setShowAts(true)}>
-                Review resume
-              </button>
-              <span className="mobile-save-feedback">
-                {cloudUser && status === "Saved in this browser"
-                  ? "Saved to your account"
-                  : status}
-              </span>
             </div>
 
             <main
               id="workspace-main"
               tabIndex={-1}
-              className={`editor-layout show-${mobileTab}`}
+              className={`editor-layout show-${mobileTab}${activePanel && !sheetLayout ? " has-panel" : ""}`}
             >
               <EditorSidebar
                 doc={doc}
                 sectionId={sectionId}
-                cloudUser={cloudUser}
-                onSelectSection={(id) => setSectionId(id)}
+                strength={strength}
+                onSelectSection={goToStep}
                 onAddSection={() => setShowAddSection(true)}
+                onNextStep={(id) => {
+                  goToStep(id, false);
+                  setFocusTarget({
+                    sectionId: id,
+                    field: id === "contact" ? "name" : undefined,
+                  });
+                }}
               />
 
               <SectionEditor
@@ -1783,12 +1769,86 @@ export function ResumeStudio({
                   setSectionId("contact");
                 }}
                 onDeleteResume={() => deleteSavedDocument(doc)}
+                steps={steps}
+                onStep={goToStep}
+                onFinish={() => setShowAts(true)}
               />
+
+              {activePanel && (
+                <SidePanel
+                  key={activePanel}
+                  title={
+                    activePanel === "design"
+                      ? "Design"
+                      : activePanel === "check"
+                        ? "Check my CV"
+                        : "AI Assistant"
+                  }
+                  onClose={() => {
+                    setActivePanel(null);
+                    setDesignFilter("all");
+                  }}
+                >
+                  {activePanel === "design" && (
+                    <DesignPanel
+                      doc={doc}
+                      disabled={busy}
+                      onChange={(settings) =>
+                        update((d) => {
+                          Object.assign(d.presentation, settings);
+                        })
+                      }
+                      initialFilter={designFilter}
+                    />
+                  )}
+                  {activePanel === "check" && (
+                    <AtsReadinessPanel
+                      doc={doc}
+                      onNavigateToIssue={(issue) => {
+                        if (issue.sectionId) setSectionId(issue.sectionId);
+                        setMobileTab("editor");
+                        if (issue.sectionId || issue.bulletId || issue.entryId) {
+                          setFocusTarget({
+                            sectionId: issue.sectionId || "contact",
+                            entryId: issue.entryId,
+                            bulletId: issue.bulletId,
+                          });
+                        }
+                        // The docked panel stays open; a bottom sheet would hide the field.
+                        if (sheetLayout) setShowAts(false);
+                      }}
+                    />
+                  )}
+                  {activePanel === "ai" && (
+                    <AIPanel
+                      key={`${cloudUser?.id ?? "local"}:${doc.id}`}
+                      doc={doc}
+                      owner={cloudUser?.id ?? null}
+                      prepare={prepareAI}
+                      accept={acceptAI}
+                      onUpdateDocument={update}
+                      initialMode={writingTarget.mode}
+                      initialBulletId={writingTarget.bulletId}
+                      initialInstruction={writingTarget.instruction}
+                      onOpenAccount={() => {
+                        setShowAI(false);
+                        setShowAccount(true);
+                      }}
+                      onEditSection={(id) => {
+                        setMobileTab("editor");
+                        setSectionId(id);
+                        if (sheetLayout) setShowAI(false);
+                      }}
+                    />
+                  )}
+                </SidePanel>
+              )}
 
               <section
                 id="resume-preview-panel"
                 className="preview-panel"
                 aria-label="Live preview"
+                hidden={!!activePanel && !sheetLayout}
               >
                 <div className="preview-toolbar no-print">
                   <div className="preview-toolbar-left">
@@ -1811,23 +1871,24 @@ export function ResumeStudio({
                     </button>
                   </div>
                   {!showDesign && (
-                    <label>
-                      Page size{" "}
-                      <select
-                        aria-label="Page size"
-                        disabled={busy}
-                        value={doc.presentation.pageSize}
-                        onChange={(e) =>
-                          update((d) => {
-                            d.presentation.pageSize = e.target.value as
-                              "A4" | "Letter";
-                          })
-                        }
-                      >
-                        <option>A4</option>
-                        <option>Letter</option>
-                      </select>
-                    </label>
+                  <label>
+                    Page size{" "}
+                    <select
+                      aria-label="Page size"
+                      disabled={busy}
+                      value={doc.presentation.pageSize}
+                      onChange={(e) =>
+                        update((d) => {
+                          d.presentation.pageSize = e.target.value as
+                            | "A4"
+                            | "Letter";
+                        })
+                      }
+                    >
+                      <option>A4</option>
+                      <option>Letter</option>
+                    </select>
+                  </label>
                   )}
                 </div>
                 <div className="paper-stage">

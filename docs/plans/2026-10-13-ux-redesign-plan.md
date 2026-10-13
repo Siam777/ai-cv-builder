@@ -1,6 +1,6 @@
 # UX Redesign Plan — "Simple enough for anyone"
 
-Status: **Phases 0–1 delivered** (2026-10-13); Phases 2–6 planned. See PLAN.md §37 for what shipped.
+Status: **Phases 0–2 delivered** (2026-10-13); Phases 3–6 planned. See PLAN.md §37 for what shipped.
 
 Goal: someone with no experience should be able to open the app and finish a good CV without wondering where to click. The editor should feel like Resume.io or FlowCV: form on the left, live CV on the right, and one obvious AI helper. It should keep this app's strengths, which are evidence-grounded AI, honest checks and local-first privacy.
 

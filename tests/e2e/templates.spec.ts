@@ -165,7 +165,7 @@ for (const template of templates)
     });
     await page.getByRole("button", { name: "Restore as new" }).click();
     await authenticateForExport(page);
-    await page.getByRole("button", { name: "Design & templates" }).click();
+    await page.getByRole("button", { name: "Design", exact: true }).click();
     const expectedShort = layoutBlocks(fixture)
       .map((b) => b.text)
       .join("");
@@ -242,7 +242,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
     buffer: Buffer.from(JSON.stringify(fixture)),
   });
   await page.getByRole("button", { name: "Restore as new" }).click();
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   for (const template of templates) {
     await page
       .getByRole("button", { name: `${template.name} template`, exact: true })
@@ -268,7 +268,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page, "Practice copies");
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   const lastTemplate = templates.at(-1)!;
   await expect(
     page.getByRole("button", {
@@ -278,7 +278,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Resume font")).toHaveValue("humanist");
   await expect(page.getByLabel("Accent color")).toHaveValue("rust");
-  await page.getByRole("button", { name: "Close design dialog" }).click();
+  await page.getByRole("button", { name: "Close Design" }).click();
   await page.locator("summary").click();
   await authenticateForExport(page);
   const downloading = page.waitForEvent("download");
@@ -318,7 +318,7 @@ test("RTL reading direction adjusts layout and preview styles", async ({
   await expect(page.locator(".paginated-resume")).not.toHaveClass(/rtl/);
 
   // Open Design & templates panel
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   await expect(page.getByLabel("Reading direction")).toHaveValue("ltr");
 
   // Switch to RTL

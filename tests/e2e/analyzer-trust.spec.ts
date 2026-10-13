@@ -10,8 +10,10 @@ test("unsupported roles stay general and checklist changes require renewed confi
   const doc = createDocument(true);
   doc.contact.headline = "Civil Engineer";
   await startSampleResume(page, doc);
-  await page.getByRole("button", { name: "Review writing" }).click();
-  const dialog = page.getByRole("dialog", { name: "Resume content review" });
+  await page.getByRole("button", { name: /^Check/ }).click();
+  // The panel is docked on wide screens and a sheet on phones; the id is stable.
+  const dialog = page.locator("#side-panel");
+  await expect(dialog).toHaveAccessibleName("Check my CV");
   await dialog
     .getByRole("button", { name: "Role checklist", exact: true })
     .click();
@@ -41,7 +43,7 @@ test("unsupported roles stay general and checklist changes require renewed confi
       .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
   await page.screenshot({ path: "test-results/analyzer-mobile.png" });
-  await dialog.getByRole("button", { name: "Done" }).click();
+  await dialog.getByRole("button", { name: "Close Check my CV" }).click();
   await expect(page.getByLabel("Professional headline")).toHaveValue(
     "Civil Engineer",
   );

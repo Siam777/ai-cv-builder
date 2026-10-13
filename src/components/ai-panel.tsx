@@ -17,9 +17,7 @@ import {
   type DiscoveredSkill,
 } from "@/lib/vault/ai-assistant";
 import { addSkillToText } from "@/lib/skills-taxonomy";
-import { useModalFocus } from "@/lib/use-modal-focus";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { Bot, Check, Plus, X } from "lucide-react";
+import { Bot, Check, Plus } from "lucide-react";
 
 export type AiPanelMode = "bullet" | "summary" | "interview" | "skills";
 
@@ -28,7 +26,6 @@ export interface AIPanelProps {
   owner: string | null;
   prepare: () => Promise<ResumeDocument>;
   accept: (proposal: Proposal) => Promise<void>;
-  onClose: () => void;
   onUpdateDocument?: (updater: (doc: ResumeDocument) => void) => void;
   initialMode?: AiPanelMode;
   initialBulletId?: string;
@@ -42,7 +39,6 @@ export function AIPanel({
   owner,
   prepare,
   accept,
-  onClose,
   onUpdateDocument,
   initialMode = "bullet",
   initialBulletId,
@@ -50,14 +46,8 @@ export function AIPanel({
   onOpenAccount,
   onEditSection,
 }: AIPanelProps) {
-  useBodyScrollLock();
   const generation = useRef<AbortController | null>(null);
   const mounted = useRef(true);
-  function close() {
-    generation.current?.abort();
-    onClose();
-  }
-  const dialogRef = useModalFocus(close);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -318,30 +308,11 @@ export function AIPanel({
   }
 
   return (
-    <div
-      className="modal-backdrop no-print"
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Writing assistant"
-    >
-      <section
-        className="account-panel ai-panel no-print"
-        aria-label="AI bullet assistant"
-      >
-        <div className="account-heading modal-header">
-          <div>
-            <h2>Help with your wording</h2>
-            <p>
-              Choose what to work on. Preview each change before adding it to
-              your CV.
-            </p>
-          </div>
-          <button onClick={close} aria-label="Close AI assistant">
-            <X size={18} aria-hidden />
-          </button>
-        </div>
+      <section className="ai-panel no-print" aria-label="AI bullet assistant">
+        <p className="panel-intro">
+          Choose what to work on. Preview each change before adding it to your
+          CV.
+        </p>
         <div className="ai-panel-body">
           <div
             className="ai-tabs"
@@ -1109,12 +1080,6 @@ export function AIPanel({
             )}
           </div>
         </div>
-        <footer className="modal-footer">
-          <button type="button" onClick={close}>
-            Done & return to editor
-          </button>
-        </footer>
       </section>
-    </div>
   );
 }

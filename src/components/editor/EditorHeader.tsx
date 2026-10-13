@@ -1,13 +1,22 @@
 "use client";
 
-import type { ResumeDocument } from "@/lib/document";
-import type { AccountUser } from "@/lib/cloud-contract";
-import type { SaveState } from "./types";
 import type { MouseEvent } from "react";
-import { Keyboard, Star } from "lucide-react";
+import {
+  CircleHelp,
+  CreditCard,
+  FolderOpen,
+  Keyboard,
+  LogIn,
+  LogOut,
+  Settings,
+  Star,
+  UserRound,
+} from "lucide-react";
+import type { AccountUser } from "@/lib/cloud-contract";
+import { Menu, type MenuItem } from "./Menu";
+import type { SaveState } from "./types";
 
 export interface EditorHeaderProps {
-  doc: ResumeDocument | null;
   libraryMode?: boolean;
   cloudUser: AccountUser | null;
   sessionUser: AccountUser | null;
@@ -15,19 +24,17 @@ export interface EditorHeaderProps {
   busy: boolean;
   ready: boolean;
   showAccount: boolean;
-  showAI: boolean;
   onOpenAccount: () => void;
   onUseAccount?: () => void;
   onOpenLibrary?: () => void;
-  onOpenAts?: () => void;
   onOpenPricing?: () => void;
   onOpenShortcuts?: () => void;
+  onSignOut?: () => void;
   isSubscriber?: boolean;
   onNavigate?: (href: string) => void;
 }
 
 export function EditorHeader({
-  doc,
   libraryMode = false,
   cloudUser,
   sessionUser,
@@ -35,13 +42,12 @@ export function EditorHeader({
   busy,
   ready,
   showAccount,
-  showAI,
   onOpenAccount,
   onUseAccount,
   onOpenLibrary,
-  onOpenAts,
   onOpenPricing,
   onOpenShortcuts,
+  onSignOut,
   isSubscriber = false,
   onNavigate,
 }: EditorHeaderProps) {
@@ -50,6 +56,35 @@ export function EditorHeader({
     event.preventDefault();
     if (!busy && ready) onNavigate(event.currentTarget.getAttribute("href")!);
   }
+  const go = (href: string) => () => {
+    if (onNavigate) onNavigate(href);
+    else window.location.assign(href);
+  };
+  const initial = sessionUser
+    ? (sessionUser.name?.trim() || sessionUser.email).charAt(0).toUpperCase()
+    : null;
+
+  const accountItems: MenuItem[] = [
+    ...(onOpenLibrary
+      ? [{ label: "My CVs", icon: <FolderOpen size={16} aria-hidden />, onSelect: onOpenLibrary }]
+      : []),
+    sessionUser
+      ? { label: "Account settings", icon: <Settings size={16} aria-hidden />, onSelect: onOpenAccount }
+      : { label: "Sign in", hint: "Back up your CVs", icon: <LogIn size={16} aria-hidden />, onSelect: onOpenAccount },
+    {
+      label: "Plans & billing",
+      icon: <CreditCard size={16} aria-hidden />,
+      onSelect: onOpenPricing ?? go("/upgrade"),
+    },
+    ...(onOpenShortcuts
+      ? [{ label: "Keyboard shortcuts", hint: "Press ?", icon: <Keyboard size={16} aria-hidden />, onSelect: onOpenShortcuts }]
+      : []),
+    { label: "Help", icon: <CircleHelp size={16} aria-hidden />, onSelect: go("/help") },
+    ...(sessionUser && onSignOut
+      ? [{ label: "Sign out", icon: <LogOut size={16} aria-hidden />, onSelect: onSignOut, separated: true }]
+      : []),
+  ];
+
   return (
     <>
       <header className="app-header no-print">
@@ -63,150 +98,93 @@ export function EditorHeader({
         </a>
         <nav className="header-nav" aria-label="Main navigation">
           {onOpenLibrary && (
-            <button disabled={busy || !ready} onClick={onOpenLibrary}>
-              {cloudUser ? "My CVs" : "On this device"}
+            <button type="button" disabled={busy || !ready} onClick={onOpenLibrary}>
+              My CVs
             </button>
           )}
-          <a
-            href="/profile"
-            onClick={navigate}
-            className="header-nav-link"
-            title="Open Profile & Account Page"
-          >
-            Profile
+          <a href="/templates" onClick={navigate} className="header-nav-link">
+            Templates
           </a>
-          <a
-            href="/upgrade"
-            onClick={navigate}
-            className="header-nav-link"
-            title="Open Plans & Pricing Page"
-          >
+          <a href="/upgrade" onClick={navigate} className="header-nav-link">
             Pricing
-          </a>
-          <a
-            href="/grader"
-            onClick={navigate}
-            className="header-nav-link"
-            title="Open resume content review"
-          >
-            Resume review
           </a>
         </nav>
         <div className="header-right">
-          {onOpenLibrary && (
-            <button
-              className="header-library-shortcut"
-              disabled={busy || !ready || showAccount || showAI}
-              onClick={onOpenLibrary}
-            >
-              My library
-            </button>
-          )}
-          {doc && !libraryMode && onOpenAts && (
+          {onOpenPricing && !isSubscriber && (
             <button
               type="button"
-              className="ats-score-pill"
-              onClick={onOpenAts}
-              title="Review writing findings and confirm a role checklist"
-            >
-              Review writing
-            </button>
-          )}
-          {onOpenPricing && (
-            <button
-              type="button"
-              className={`pricing-pill${isSubscriber ? " active-pass" : ""}`}
+              className="pricing-pill"
               disabled={busy || !ready}
               onClick={onOpenPricing}
-              title={
-                isSubscriber
-                  ? "Job Hunter Pass Active · View Subscription"
-                  : "Job Hunter Pass & Pricing"
-              }
+              title="Job Hunter Pass & Pricing"
             >
               <Star size={16} aria-hidden />
-              {isSubscriber ? "Pass Active" : "Upgrade"}
+              Upgrade
             </button>
           )}
-          {onOpenShortcuts && (
-            <button
-              type="button"
-              className="shortcuts-pill"
-              disabled={busy || !ready}
-              onClick={onOpenShortcuts}
-              title="Keyboard Shortcuts (? or Ctrl+/)"
-              aria-label="Keyboard shortcuts"
-            >
-              <Keyboard size={18} aria-hidden />
-            </button>
-          )}
-          <button
-            disabled={busy || !ready || showAccount || showAI}
-            onClick={onOpenAccount}
-          >
-            Account
-          </button>
-          {sessionUser && (
-            <span
-              className="avatar"
-              title={`Signed in as ${sessionUser.email}`}
-              aria-hidden="true"
-            >
-              {(sessionUser.name?.trim() || sessionUser.email)
-                .charAt(0)
-                .toUpperCase()}
-            </span>
-          )}
+          <Menu
+            ariaLabel="Account menu"
+            className="account-menu"
+            align="end"
+            disabled={busy || !ready || showAccount}
+            label={
+              <span className={initial ? "avatar" : "avatar signed-out"} aria-hidden="true">
+                {initial ?? <UserRound size={18} aria-hidden />}
+              </span>
+            }
+            header={
+              sessionUser ? (
+                <>
+                  <strong>{sessionUser.name?.trim() || "Signed in"}</strong>
+                  <span>{sessionUser.email}</span>
+                  {isSubscriber && <span className="menu-badge">Pass active</span>}
+                </>
+              ) : (
+                <>
+                  <strong>Not signed in</strong>
+                  <span>Your CVs are saved in this browser.</span>
+                </>
+              )
+            }
+            items={accountItems}
+          />
         </div>
       </header>
-      <div
-        className="workspace-heading no-print"
-        style={{ display: showAccount ? "none" : undefined }}
-      >
-        <div>
-          <h1>
-            {libraryMode
-              ? "Your CVs, clearly organized."
-              : doc?.name || "Import your experience."}
-          </h1>
-          <p>
-            {libraryMode
-              ? cloudUser?.email ||
-                "Personal drafts on this device. Demo examples have their own gallery."
-              : "Your details, your wording. Review the saved file before sending."}
-          </p>
-        </div>
-        <div className="save-indicator">
-          <div className="save-status" role="status" aria-live="polite">
-            <span className={status === "Save failed" ? "dot failed" : "dot"} />
-            {cloudUser && status === "Saved in this browser"
-              ? "Saved to your account"
-              : status}
+      {libraryMode && (
+        <div className="workspace-heading no-print" style={{ display: showAccount ? "none" : undefined }}>
+          <div>
+            <h1>My CVs</h1>
+            <p>
+              {cloudUser?.email
+                ? `Saved to your account · ${cloudUser.email}`
+                : "Saved in this browser. Demo examples have their own gallery."}
+            </p>
           </div>
-          {!cloudUser && status !== "Loading" &&
-            (sessionUser && onUseAccount ? (
-              <button
-                type="button"
-                className="save-indicator-action"
-                disabled={busy || !ready}
-                onClick={onUseAccount}
-              >
-                Open my account CVs
-              </button>
-            ) : (
-              !sessionUser && (
-                <button
-                  type="button"
-                  className="save-indicator-action"
-                  disabled={busy || !ready || showAccount}
-                  onClick={onOpenAccount}
-                >
-                  Sign in to back up
+          <div className="save-indicator">
+            <div className="save-status" role="status" aria-live="polite">
+              <span className={status === "Save failed" ? "dot failed" : "dot"} />
+              {cloudUser && status === "Saved in this browser" ? "Saved to your account" : status}
+            </div>
+            {!cloudUser && status !== "Loading" &&
+              (sessionUser && onUseAccount ? (
+                <button type="button" className="save-indicator-action" disabled={busy || !ready} onClick={onUseAccount}>
+                  Open my account CVs
                 </button>
-              )
-            ))}
+              ) : (
+                !sessionUser && (
+                  <button
+                    type="button"
+                    className="save-indicator-action"
+                    disabled={busy || !ready || showAccount}
+                    onClick={onOpenAccount}
+                  >
+                    Sign in to back up
+                  </button>
+                )
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

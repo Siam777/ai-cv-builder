@@ -6,7 +6,7 @@ import { bulletEvidence, proposalSchema } from "../../src/lib/ai-proposals";
 import { generateSchema } from "../../src/lib/ai-contract";
 import { createCoachingProposal } from "../../src/lib/job-coach";
 import { jobCoachContext } from "../../src/lib/server/job-coach-context";
-import { authenticateForExport, openFirstCv, openEditorTools } from "./helpers";
+import { authenticateForExport, openFirstCv, editorTool } from "./helpers";
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 const consent =
   "Send this criterion, target context, entry bullets and instruction to OpenAI.";
@@ -32,8 +32,7 @@ async function setup(page: Page) {
   return { owner, doc, headers: { origin, "X-Workspace-User": owner.id } };
 }
 async function openCoach(page: Page) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
+  await editorTool(page, "Match a job");
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page
     .getByLabel("Job Description", { exact: true })

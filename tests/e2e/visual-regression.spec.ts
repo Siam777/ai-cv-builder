@@ -13,7 +13,8 @@ async function snap(page: Page, name: string) {
     caret: "hide",
     // The Next.js dev-tools badge is not part of the app.
     mask: [page.locator("nextjs-portal")],
-    maxDiffPixels: 40,
+    // Allows text anti-aliasing noise; layout changes are far larger.
+    maxDiffPixelRatio: 0.001,
   });
 }
 
@@ -45,17 +46,16 @@ for (const width of [360, 768, 1440]) {
         await snap(page, `editor-${width}`);
       }
 
-      await page.getByRole("button", { name: /Change style/ }).first().click();
-      const design = page.getByRole("dialog", { name: "Design & Templates" });
-      await expect(design).toBeVisible();
+      // Side panels dock beside the form on wide screens and are sheets on narrow ones.
+      const panelRole = width < 900 ? "dialog" : "complementary";
+      await page.getByRole("button", { name: "Design", exact: true }).click();
+      await expect(page.getByRole(panelRole, { name: "Design" })).toBeVisible();
       await snap(page, `design-panel-${width}`);
-      await page.getByRole("button", { name: "Close design dialog" }).click();
+      await page.getByRole("button", { name: "Close Design" }).click();
 
-      if (width < 900)
-        await page.locator(".mobile-tabs").getByRole("button", { name: "Review resume", exact: true }).click();
-      else await page.locator(".ats-score-pill").click();
+      await page.getByRole("button", { name: /^Check/ }).click();
       await expect(
-        page.getByRole("dialog", { name: "Resume content review" }),
+        page.getByRole(panelRole, { name: "Check my CV" }),
       ).toBeVisible();
       await snap(page, `check-panel-${width}`);
     });

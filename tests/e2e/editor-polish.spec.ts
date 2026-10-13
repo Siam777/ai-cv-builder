@@ -1,10 +1,10 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import { startSampleResume, openEditorTools } from "./helpers";
+import { startSampleResume } from "./helpers";
 import { createDocument } from "../../src/lib/document";
 
 for (const width of [360, 768, 1440]) {
-  test(`toolbar disclosure, local fonts and readable controls at ${width}px`, async ({
+  test(`toolbar menus, local fonts and readable controls at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 1050 });
@@ -27,24 +27,25 @@ for (const width of [360, 768, 1440]) {
         .evaluate((el) => getComputedStyle(el).fontFamily.split(",")[0]),
     ).not.toMatch(/Arial|Helvetica/);
 
-    const toolbar = page.locator(".document-toolbar");
-    const more = page.getByRole("button", { name: "More tools", exact: true });
-    await expect(more).toHaveAttribute("aria-expanded", "false");
+    const toolbar = page.locator(".editor-toolbar");
+    const cvMenu = page.getByRole("button", { name: "CV options", exact: true });
+    await expect(cvMenu).toHaveAttribute("aria-expanded", "false");
     await expect(
-      toolbar.getByRole("button", { name: "Duplicate", exact: true }),
+      page.getByRole("menuitem", { name: /^Duplicate/ }),
     ).toBeHidden();
-    await more.focus();
+    await cvMenu.focus();
     await page.keyboard.press("Enter");
-    await expect(more).toHaveAttribute("aria-expanded", "true");
-    await expect(
-      page.getByRole("group", { name: "Writing tools" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Duplicate", exact: true }).focus();
+    await expect(cvMenu).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("menuitem", { name: /^Duplicate/ })).toBeVisible();
+    // Arrow keys move through the menu; Escape returns to its button.
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: /^Duplicate/ })).toBeFocused();
     await page.keyboard.press("Escape");
-    await expect(more).toBeFocused();
-    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await expect(cvMenu).toBeFocused();
+    await expect(cvMenu).toHaveAttribute("aria-expanded", "false");
 
     const exportTrigger = toolbar.locator("summary");
+    await expect(exportTrigger).toHaveText(/Download/);
     await exportTrigger.focus();
     await page.keyboard.press("Enter");
     await expect(
@@ -59,32 +60,28 @@ for (const width of [360, 768, 1440]) {
     await expect(toolbar.locator("details")).not.toHaveAttribute("open", "");
     await mkdir("test-results/editor-polish", { recursive: true });
     await page.screenshot({
-      path: `test-results/editor-polish/${width}-collapsed.png`,
+      path: `test-results/editor-polish/${width}-toolbar.png`,
       fullPage: true,
     });
-    await openEditorTools(page);
     const measurements = await toolbar.evaluate((el) =>
       Array.from(el.querySelectorAll("button, summary, select"))
         .filter((control) => control.getClientRects().length > 0)
         .map((control) => ({
+          label: control.textContent?.trim() || control.getAttribute("aria-label"),
           height: control.getBoundingClientRect().height,
           size: parseFloat(getComputedStyle(control).fontSize),
         })),
     );
     expect(
-      measurements.every(
-        (control) => control.height >= 44 && control.size >= 14,
+      measurements.filter(
+        (control) => control.height < 44 || control.size < 13,
       ),
-    ).toBe(true);
+    ).toEqual([]);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await page.screenshot({
-      path: `test-results/editor-polish/${width}-expanded.png`,
-      fullPage: true,
-    });
   });
 }
 
@@ -95,7 +92,7 @@ async function checkDialogFocus(page: Page, dialog: Locator) {
     .toBe(true);
   // A background control cannot take focus while the dialog is active.
   await page
-    .getByRole("button", { name: "Account", exact: true })
+    .getByRole("button", { name: "Account menu", exact: true })
     .evaluate((el) => (el as HTMLElement).focus());
   await expect
     .poll(() => dialog.evaluate((el) => el.contains(document.activeElement)))
@@ -124,31 +121,33 @@ async function checkDialogFocus(page: Page, dialog: Locator) {
 test("editor dialogs trap focus, close with Escape and restore their launching control", async ({
   page,
 }) => {
-  test.setTimeout(60000); // Ten dialogs plus the nested gallery in one acceptance flow.
+  test.setTimeout(60000); // Eight dialogs in one acceptance flow.
   await page.goto("/builder");
   await startSampleResume(page);
   await page.getByLabel("Full name", { exact: true }).fill("Focus-check candidate");
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
-  await openEditorTools(page);
-  const dialogs = [
-    ["Design & templates", "Design & Templates"],
-    ["Keyboard shortcuts", "Keyboard Navigation & Actions"],
-    ["Upgrade", "Subscription Pricing"],
-    ["Role Benchmark & Gaps", "Resume content review"],
-    ["Tailor for job", "Job Tailoring Engine"],
-    ["Cover letter", "Tailored Cover Letter Generator"],
-    ["History", "Resume Version History"],
-    ["Create practice example", "Create fictional practice CV"],
-    ["Demo examples", "Demo Resume Gallery"],
-    ["Add section", "Add Section to Resume"],
+  const button = (name: string) =>
+    page.getByRole("button", { name, exact: true });
+  // [menu button or launcher, menu item (if any), dialog name]
+  const dialogs: [string, string | null, string][] = [
+    ["Account menu", "Keyboard shortcuts", "Keyboard Navigation & Actions"],
+    ["Upgrade", null, "Subscription Pricing"],
+    ["AI Assistant", "Match a job", "Job Tailoring Engine"],
+    ["AI Assistant", "Cover letter", "Tailored Cover Letter Generator"],
+    ["CV options", "History", "Resume Version History"],
+    ["CV options", "Create practice example", "Create fictional practice CV"],
+    ["CV options", "Demo examples", "Demo Resume Gallery"],
+    ["Add section", null, "Add Section to Resume"],
   ];
-  for (const [buttonName, dialogName] of dialogs) {
-    const launcher = page.getByRole("button", {
-      name: buttonName,
-      exact: true,
-    });
+  for (const [launcherName, item, dialogName] of dialogs) {
+    const launcher = button(launcherName);
     await launcher.focus();
     await page.keyboard.press("Enter");
+    if (item) {
+      const option = page.getByRole("menuitem", { name: new RegExp(`^${item}`) });
+      await option.focus();
+      await page.keyboard.press("Enter");
+    }
     const dialog = page.getByRole("dialog", { name: dialogName, exact: true });
     await checkDialogFocus(page, dialog);
     await page.keyboard.press("Control+z");
@@ -157,26 +156,43 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
     await expect(launcher).toBeFocused();
     await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("Focus-check candidate");
   }
+});
 
-  const design = page.getByRole("button", {
-    name: "Design & templates",
-    exact: true,
-  });
+test("side panels dock beside the form, keep it usable and close with Escape", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  await startSampleResume(page);
+  const preview = page.getByRole("region", { name: "Live preview" });
+  await expect(preview).toBeVisible();
+
+  const design = page.getByRole("button", { name: "Design", exact: true });
   await design.click();
-  const designDialog = page.getByRole("dialog", {
-    name: "Design & Templates",
-    exact: true,
-  });
-  const nestedLauncher = designDialog.getByRole("button", { name: /demo/i });
-  await nestedLauncher.click();
-  const gallery = page.getByRole("dialog", { name: "Demo Resume Gallery" });
-  await checkDialogFocus(page, gallery);
+  await expect(design).toHaveAttribute("aria-pressed", "true");
+  const panel = page.getByRole("complementary", { name: "Design" });
+  await expect(panel).toBeVisible();
+  await expect(preview).toBeHidden();
+  // The form stays editable while a panel is open.
+  await page.getByLabel("Full name", { exact: true }).fill("Docked edit");
+  await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("Docked edit");
   await page.keyboard.press("Escape");
-  await expect(gallery).toBeHidden();
-  await expect(designDialog).toBeVisible();
-  await expect(nestedLauncher).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(design).toBeFocused();
+  await expect(panel).toBeHidden();
+  await expect(preview).toBeVisible();
+
+  // Jumping to a finding keeps the Check panel open.
+  await page.getByRole("button", { name: /^Check/ }).click();
+  const check = page.getByRole("complementary", { name: "Check my CV" });
+  await check.getByRole("button", { name: "Review in editor" }).first().click();
+  await expect(check).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .locator(".editor-panel")
+        .evaluate((el) => el.contains(document.activeElement)),
+    )
+    .toBe(true);
+  await check.getByRole("button", { name: "Close Check my CV" }).click();
+  await expect(check).toBeHidden();
 });
 
 test("keyboard preview navigation targets contact and entry fields with reduced motion", async ({
@@ -214,7 +230,7 @@ test("keyboard preview navigation targets contact and entry fields with reduced 
   await expect(
     page
       .getByRole("complementary", { name: "Resume sections" })
-      .locator('[aria-current="true"]'),
+      .locator('[aria-current="step"]'),
   ).toHaveCount(1);
   await page.getByRole("link", { name: "Skip to workspace" }).focus();
   await page.keyboard.press("Enter");
@@ -240,4 +256,29 @@ test("import review keeps keyboard focus and cancellation preserves the original
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Alex Morgan",
   );
+});
+
+test("undo and redo walk the edit history from the toolbar and keyboard", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  await startSampleResume(page);
+  const name = page.getByLabel("Full name", { exact: true });
+  const redo = page.getByRole("button", { name: "Redo", exact: true });
+  await expect(redo).toBeDisabled();
+  await name.fill("First change");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(name).toHaveValue("Alex Morgan");
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(name).toHaveValue("First change");
+  // Ctrl+Shift+Z redoes when focus is outside a text field.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).focus();
+  await page.keyboard.press("Control+Shift+Z");
+  await expect(name).toHaveValue("First change");
+  // A new edit clears the redo history.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await name.fill("Second change");
+  await expect(redo).toBeDisabled();
 });

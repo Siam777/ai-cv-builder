@@ -1,4 +1,4 @@
-import { startSampleResume, openFirstCv, authenticateForExport } from "./helpers";
+import { startSampleResume, openFirstCv, authenticateForExport, openAccount } from "./helpers";
 import { test, expect } from "@playwright/test";
 
 test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
@@ -18,9 +18,9 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // The CV editor components must NOT be present
     await expect(page.locator(".editor-layout")).toHaveCount(0);
-    await expect(page.locator(".document-toolbar")).toHaveCount(0);
+    await expect(page.locator(".editor-toolbar")).toHaveCount(0);
     await expect(page.locator(".paper-stage")).toHaveCount(0);
-    await expect(page.locator("#resume-select")).toHaveCount(0);
+    await expect(page.locator(".cv-title")).toHaveCount(0);
 
     // Header back link to studio
     const backBtn = page.getByRole("link", { name: "← Back to Resume Studio" });
@@ -59,9 +59,9 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // The CV editor components must NOT be present
     await expect(page.locator(".editor-layout")).toHaveCount(0);
-    await expect(page.locator(".document-toolbar")).toHaveCount(0);
+    await expect(page.locator(".editor-toolbar")).toHaveCount(0);
     await expect(page.locator(".paper-stage")).toHaveCount(0);
-    await expect(page.locator("#resume-select")).toHaveCount(0);
+    await expect(page.locator(".cv-title")).toHaveCount(0);
 
     // Header back link to studio
     const backBtn = page.getByRole("link", { name: "← Back to Resume Studio" });
@@ -89,7 +89,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await expect(page.locator(".workspace-body")).toBeVisible();
 
     // Open Account settings
-    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await openAccount(page);
     await expect(page.getByRole("region", { name: "Account and storage" })).toBeVisible();
 
     // While account settings are active, workspace-body CV editor must be hidden (display: none)
@@ -104,46 +104,40 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await expect(page.getByLabel("Full name", { exact: true })).toBeVisible();
   });
 
-  test("modal open mode locks outside body scroll and enables full internal scroll to see entire modal content", async ({
+  test("docked panels leave the page scrollable; modal dialogs lock it and scroll inside", async ({
     page,
   }) => {
     await page.goto("/builder");
     await startSampleResume(page);
     await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
+    const overflow = () => page.evaluate(() => document.body.style.overflow);
+    expect(await overflow()).not.toBe("hidden");
 
-    // Body should not have modal-open initially
-    const initialOverflow = await page.evaluate(() => document.body.style.overflow);
-    expect(initialOverflow).not.toBe("hidden");
-
-    // Open CV Analyzer & Role Gap Inspector (AtsReadinessPanel)
-    await page.locator(".ats-score-pill").click();
-    const dialog = page.getByRole("dialog", { name: "Resume content review" });
-    await expect(dialog).toBeVisible();
-
-    // 1. Verify outside body is not scrollable (body scroll locked)
-    await expect(page.locator("body")).toHaveClass(/modal-open/);
-    const lockedOverflow = await page.evaluate(() => document.body.style.overflow);
-    expect(lockedOverflow).toBe("hidden");
-
-    // 2. Verify modal content is internally scrollable
-    const atsContent = page.locator(".ats-content");
-    await dialog.getByRole("button", { name: "Role checklist", exact: true }).click();
-    await dialog.getByRole("button", { name: "Review selected checklist" }).click();
-    await expect(atsContent).toBeVisible();
-    const isScrollable = await atsContent.evaluate((el) => el.scrollHeight > el.clientHeight);
-    expect(isScrollable).toBe(true);
-
-    // 3. Verify the bottom content and templates are fully reachable
+    // A docked side panel keeps the editor and page usable.
+    await page.getByRole("button", { name: /^Check/ }).click();
+    const panel = page.getByRole("complementary", { name: "Check my CV" });
+    await expect(panel).toBeVisible();
+    await expect(page.locator("body")).not.toHaveClass(/modal-open/);
+    expect(await overflow()).not.toBe("hidden");
+    await panel.getByRole("button", { name: "Role checklist", exact: true }).click();
+    await panel.getByRole("button", { name: "Review selected checklist" }).click();
+    // Long content scrolls inside the panel and stays reachable.
+    const body = panel.locator(".side-panel-body");
+    expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await page.getByText("Role numeric patterns", { exact: true }).scrollIntoViewIfNeeded();
     await expect(page.getByText("Role numeric patterns", { exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Close Check my CV" }).click();
+    await expect(panel).toHaveCount(0);
 
-    // 4. Verify the modal footer 'Done' button is visible and pinned
-    const doneBtn = page.getByRole("button", { name: "Done" });
-    await expect(doneBtn).toBeVisible();
-
-    // 5. Close modal and verify outside body scroll is restored
-    await doneBtn.click();
+    // A modal dialog locks the page behind it and restores it on close.
+    await page.getByRole("button", { name: "CV options", exact: true }).click();
+    await page.getByRole("menuitem", { name: /^History/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Resume Version History" });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator("body")).toHaveClass(/modal-open/);
+    expect(await overflow()).toBe("hidden");
+    await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
-    const restoredOverflow = await page.evaluate(() => document.body.style.overflow);
-    expect(restoredOverflow).toBe("");
+    expect(await overflow()).toBe("");
   });
 });

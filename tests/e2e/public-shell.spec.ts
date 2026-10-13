@@ -60,7 +60,7 @@ for (const width of [360, 768, 1440]) {
       }),
     ).toBeVisible();
     await expect(
-      page.locator(".document-library, .document-toolbar, .editor-layout"),
+      page.locator(".document-library, .editor-toolbar, .editor-layout"),
     ).toHaveCount(0);
     await expect(page.locator(".paginated-resume")).toHaveAttribute(
       "data-pagination-ready",

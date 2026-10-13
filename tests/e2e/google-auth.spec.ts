@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { createClient } from "@libsql/client";
 import { createDocument } from "../../src/lib/document";
-import { authenticateForExport, startSampleResume, testEmail } from "./helpers";
+import { authenticateForExport, startSampleResume, testEmail, openAccount } from "./helpers";
 
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 const configured = process.env.E2E_GOOGLE === "1";
@@ -83,7 +83,7 @@ async function google(page: Page, button: Locator, profile: Profile) {
   await expect.poll(() => child.isClosed()).toBe(true);
 }
 async function account(page: Page) {
-  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await openAccount(page);
   await expect(page.locator(".account-panel")).toBeVisible();
 }
 async function localDocuments(page: Page) {
@@ -547,8 +547,8 @@ test.describe("configured Google with a synthetic provider transport", () => {
     await page
       .getByRole("button", { name: "Keep draft on this device", exact: true })
       .click();
-    await expect(page.locator(".document-context")).toContainText(
-      "On this device",
+    await expect(page.locator(".save-status")).toHaveText(
+      "Saved in this browser",
     );
     expect((await localDocuments(page))[0].contact.name).toBe(
       "Kept original Google draft",

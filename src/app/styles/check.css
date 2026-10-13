@@ -28,18 +28,6 @@
   margin: 0 0 4px 0;
   font-size: var(--text-md);
 }
-.progress-track {
-  background: var(--green-100);
-  height: 8px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  margin-top: 8px;
-}
-.progress-fill {
-  background: var(--green-700);
-  height: 100%;
-  transition: width 0.3s ease;
-}
 .evidence-list,
 .gaps-list ul {
   list-style: none;
@@ -57,24 +45,6 @@
   padding: 12px 14px;
   font-size: var(--text-xs);
 }
-.match-tag {
-  background: var(--green-100);
-  color: var(--green-600);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  margin-right: 8px;
-}
-.gap-tag {
-  background: var(--red-100);
-  color: var(--red-700);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  margin-right: 8px;
-}
 .evidence-bullets {
   margin-top: 8px;
   padding-left: 8px;
@@ -84,11 +54,6 @@
   font-size: var(--text-xs);
   color: var(--muted);
   font-weight: 600;
-}
-.matched-skills-chips {
-  margin-top: 6px;
-  font-size: var(--text-xs);
-  color: var(--green-700);
 }
 .score-row {
   display: flex;
@@ -121,12 +86,6 @@
   font: inherit;
   font-size: var(--text-xs);
 }
-.ats-modal {
-  max-width: 860px;
-  width: 95vw;
-  display: flex;
-  flex-direction: column;
-}
 .ats-score-hero {
   display: flex;
   gap: 24px;
@@ -148,15 +107,6 @@
   color: var(--gray-0);
   background: var(--gray-700);
   flex-shrink: 0;
-}
-.ats-score-circle.score-high {
-  background: var(--green-700);
-}
-.ats-score-circle.score-mid {
-  background: var(--amber-700);
-}
-.ats-score-circle.score-low {
-  background: var(--red-800);
 }
 .big-score {
   font-size: var(--text-xl);
@@ -235,39 +185,6 @@
   border-left: 4px solid var(--color-info);
   background: var(--gray-50);
 }
-.severity-badge {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  margin-right: 8px;
-}
-.severity-badge.critical {
-  background: var(--red-100);
-  color: var(--red-700);
-}
-.severity-badge.warning {
-  background: var(--amber-50);
-  color: var(--amber-600);
-}
-.severity-badge.suggestion {
-  background: var(--color-info-soft);
-  color: var(--color-info);
-}
-.issue-head {
-  display: flex;
-  align-items: baseline;
-}
-.issue-msg {
-  margin: 0;
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-.issue-suggestion {
-  margin: 6px 0 0 0;
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
 .plaintext-terminal {
   background: var(--gray-850);
   color: var(--green-100);
@@ -280,20 +197,6 @@
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
-}
-.all-clear-banner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--green-50);
-  border: 1px solid var(--green-200);
-  border-radius: var(--radius-sm);
-  padding: 16px 20px;
-  color: var(--green-600);
-}
-.check-icon {
-  font-size: var(--text-xl);
-  font-weight: 700;
 }
 /* Role Analyzer & Market Gap Inspector */
 .role-analyzer-stage {
@@ -333,11 +236,6 @@
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--gray-900);
-}
-.role-quick-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 .role-chip-btn {
   max-width: 100%;
@@ -401,11 +299,6 @@
   padding: 2px 8px;
   border-radius: var(--radius-md);
 }
-.applied-source-badge {
-  font-size: var(--text-xs);
-  color: var(--green-500);
-  font-weight: 500;
-}
 .applied-role-name {
   font-size: var(--text-md);
   font-weight: 700;
@@ -428,18 +321,6 @@
   margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 8px;
-}
-.skills-subhead {
-  display: block;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.matched-subhead {
-  color: var(--green-500);
-}
-.missing-subhead {
-  color: var(--amber-700);
 }
 .skills-pill-cloud {
   display: flex;
@@ -471,29 +352,6 @@
   color: var(--green-500);
   border-color: var(--green-200);
 }
-.add-skill-action-btn {
-  background: var(--amber-600);
-  color: var(--gray-0);
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 2px 7px;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.add-skill-action-btn:hover {
-  background: var(--amber-600);
-}
-.add-skill-action-btn:disabled {
-  background: var(--green-500);
-  cursor: default;
-}
-.metric-benchmark-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 .metric-benchmark-item {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -507,30 +365,12 @@
   background: var(--gray-0);
   border-color: var(--amber-300);
 }
-.metric-benchmark-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.missing-tag {
-  background: var(--red-100);
-  color: var(--red-600);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-}
 .matched-note {
   font-size: var(--text-xs);
   color: var(--green-500);
   margin-left: 24px;
   margin-top: 4px;
   display: block;
-}
-.metric-desc {
-  margin: 6px 0 8px 24px;
-  font-size: var(--text-xs);
-  color: var(--muted);
 }
 .metric-example-box {
   margin-left: 24px;
@@ -731,29 +571,6 @@
   max-height: 250px;
   white-space: pre-wrap;
 }
-.raw-skills-fallback {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  background: var(--green-25);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  margin-top: 4px;
-}
-.raw-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--muted);
-}
-.raw-skills-textarea {
-  width: 100%;
-  padding: 8px;
-  font-size: var(--text-xs);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: inherit;
-}
 .raw-actions {
   display: flex;
   gap: 8px;
@@ -792,12 +609,4 @@
 .job-evidence-modal .checkbox-row input { flex: 0 0 18px; width: 18px; margin-top: 3px; }
 @media (max-width: 600px) {
   .job-evidence-modal .job-coverage, .job-evidence-modal .job-order-preview { grid-template-columns: minmax(0,1fr); }
-}
-.ats-modal .tailor-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.ats-modal .tailor-tabs button {
-  flex: 1 1 140px;
 }

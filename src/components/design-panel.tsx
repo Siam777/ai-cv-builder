@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useModalFocus } from "@/lib/use-modal-focus";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { layoutBlocks, type LayoutBlock } from "@/lib/layout";
 import {
@@ -18,14 +16,12 @@ import {
   presentationStyle,
   ResumeBlock,
 } from "./resume-preview";
-import { Check, FolderOpen, Info, X } from "lucide-react";
+import { Check, Info } from "lucide-react";
 
 export interface DesignPanelProps {
   doc: ResumeDocument;
   onChange: (change: Partial<Presentation>) => void;
   disabled?: boolean;
-  onClose?: () => void;
-  onOpenDemoGallery?: () => void;
   initialFilter?: TemplateFilter;
 }
 
@@ -107,14 +103,10 @@ export function DesignPanel({
   doc,
   onChange,
   disabled = false,
-  onClose,
-  onOpenDemoGallery,
   initialFilter = "all",
 }: DesignPanelProps) {
-  useBodyScrollLock(true);
   const thumbnailBlocks = useMemo(() => layoutBlocks(doc).slice(0, 18), [doc]);
   const p = doc.presentation;
-  const modalCardRef = useModalFocus(() => onClose?.());
   const [categoryFilter, setCategoryFilter] = useState<TemplateFilter>(initialFilter);
 
   const activeTemplateObj = templates.find((t) => t.id === p.template) || templates[0];
@@ -126,65 +118,7 @@ export function DesignPanel({
   }, [categoryFilter]);
 
   return (
-    <div
-      className="modal-backdrop design-modal-backdrop no-print"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-      role="presentation"
-    >
-      <div
-        id="design-panel"
-        ref={modalCardRef}
-        tabIndex={-1}
-        className="modal-card design-modal design-modal-spacious"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="design-modal-title"
-      >
-        {/* Modal Header */}
-        <div className="design-modal-header">
-          <div className="design-modal-header-info">
-            <span className="eyebrow">Customize your resume</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <h2 id="design-modal-title" style={{ margin: 0 }}>Design & Templates</h2>
-              {onOpenDemoGallery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenDemoGallery();
-                  }}
-                  style={{
-                    background: "var(--color-info-soft)",
-                    border: "1px solid var(--blue-100)",
-                    color: "var(--color-info)",
-                    fontSize: "var(--text-xs)",
-                    fontWeight: 600,
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                  }}
-                  title="Switch to another realistic demo resume profile"
-                >
-                  <FolderOpen size={14} aria-hidden /> Switch demo CV
-                </button>
-              )}
-            </div>
-            <p style={{ marginTop: "4px" }}>
-              Choose from twelve layouts, then adjust the typography and spacing for your experience.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close design dialog"
-            title="Close dialog (Esc)"
-          >
-            <X size={18} aria-hidden />
-          </button>
-        </div>
-
+    <div className="design-panel" id="design-panel">
         {/* Modal Body: Spacious Full-Width Studio (No Squished Live Preview) */}
         <div className="design-modal-body design-modal-full-width">
           <div className="design-modal-scroll-pane">
@@ -589,34 +523,21 @@ export function DesignPanel({
               <div className="design-notice-card">
                 <Info className="notice-icon" size={18} aria-hidden />
                 <p>
-                  <strong>Live Preview Active:</strong> The main editor stage updates immediately behind this dialog.
-                  All formatting changes preserve your exact accomplishments and bullet points.
+                  Each design card shows your own CV. Changing the design keeps
+                  your wording; close this panel to see the full preview.
                 </p>
               </div>
             </fieldset>
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="design-modal-footer">
-          <div className="active-config-summary">
-            <span className="summary-dot" style={{ backgroundColor: accents[p.accent] }} />
-            <span>
-              <strong>{activeTemplateObj.name}</strong> · {accents[p.accent]} accent ·{" "}
-              {fonts[p.font].name} ({p.fontSize} pt) · {densities[p.density].name} density · {p.pageSize}
-            </span>
-          </div>
-          <div className="footer-button-group">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={onClose}
-            >
-              Done & Return to Editor
-            </button>
-          </div>
+        <div className="design-panel-summary">
+          <span className="summary-dot" style={{ backgroundColor: accents[p.accent] }} />
+          <span>
+            <strong>{activeTemplateObj.name}</strong> · {fonts[p.font].name} ({p.fontSize} pt) ·{" "}
+            {densities[p.density].name} spacing · {p.pageSize}
+          </span>
         </div>
-      </div>
     </div>
   );
 }

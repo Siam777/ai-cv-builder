@@ -2,11 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { createDocument, type ResumeDocument } from "../../src/lib/document";
 import {
-  openEditorTools,
   startSampleResume,
   openFirstCv,
   authenticateForExport,
-} from "./helpers";
+  editorTool, cvCount } from "./helpers";
 
 async function savedDocuments(page: Page): Promise<ResumeDocument[]> {
   return page.evaluate(
@@ -32,8 +31,7 @@ async function openReview(
   posting = "Required: Experience with prototyping",
   language = "english",
 ) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
+  await editorTool(page, "Match a job");
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page.getByLabel("Analysis language").selectOption(language);
   await page.getByLabel("Job Description", { exact: true }).fill(posting);
@@ -121,7 +119,7 @@ test("mobile review exposes sources, OR and partial evidence; priority edits res
       button.click();
     });
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#resume-select option")).toHaveCount(2);
+  await expect.poll(() => cvCount(page)).toBe(2);
   const docs = await savedDocuments(page);
   expect(docs.find((doc) => doc.id === original.id)).toEqual(original);
   const variant = docs.find((doc) => doc.id !== original.id)!;
@@ -269,13 +267,13 @@ test("a lost account-save response retries the same variant once, preserves the 
   expect(saved).toHaveLength(2);
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#resume-select option")).toHaveCount(2);
+  await expect.poll(() => cvCount(page)).toBe(2);
   expect(submittedIds).toHaveLength(1);
   await page.unroute("**/api/resumes");
   await page
     .getByRole("button", { name: "Undo reviewed variant creation" })
     .click();
-  await expect(page.locator("#resume-select option")).toHaveCount(1);
+  await expect.poll(() => cvCount(page)).toBe(1);
   const after = await (
     await page.request.get("/api/resumes", {
       headers: { "X-Workspace-User": owner.id },

@@ -101,10 +101,51 @@ export async function verifyTestEmail(
   ).toBe(true);
 }
 
-// Reveal secondary editor actions through their user-facing disclosure.
-export async function openEditorTools(page: Page) {
-  const trigger = page.getByRole("button", { name: "More tools", exact: true });
-  if (await trigger.isVisible() && await trigger.getAttribute("aria-expanded") !== "true") {
-    await trigger.click();
+const CV_MENU = [
+  "New",
+  "Duplicate",
+  "Import JSON",
+  "History",
+  "Mark as my CV",
+  "Demo examples",
+  "Create practice example",
+];
+const AI_MENU = ["Writing help", "Match a job", "Cover letter"];
+
+// Run an editor toolbar action, opening its menu first when it lives in one.
+export async function editorTool(page: Page, name: string) {
+  if (name === "Check") {
+    await page.getByRole("button", { name: /^Check/ }).click();
+    return;
   }
+  const menu = CV_MENU.includes(name)
+    ? "CV options"
+    : AI_MENU.includes(name)
+      ? "AI Assistant"
+      : null;
+  if (!menu) {
+    await page.getByRole("button", { name, exact: true }).click();
+    return;
+  }
+  await page.getByRole("button", { name: menu, exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: new RegExp(`^${name}`) })
+    .first()
+    .click();
+}
+
+// How many CVs share the open CV's collection (the open one plus the switch list).
+export async function cvCount(page: Page) {
+  await page.getByRole("button", { name: "CV options", exact: true }).click();
+  const count = await page.locator(".menu-item.cv-switch").count();
+  await page.keyboard.press("Escape");
+  return count + 1;
+}
+
+// Open account settings (or sign-in) from the account menu.
+export async function openAccount(page: Page) {
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page
+    .getByRole("menuitem", { name: /^(Account settings|Sign in)/ })
+    .click();
 }

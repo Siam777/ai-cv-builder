@@ -1212,7 +1212,7 @@ Delivered:
 
 
 
-## 37. UX Redesign — Phases 0–1 delivered, Phases 2–6 planned — 2026-10-13
+## 37. UX Redesign — Phases 0–2 delivered, Phases 3–6 planned — 2026-10-13
 
 Detailed plan: [docs/plans/2026-10-13-ux-redesign-plan.md](docs/plans/2026-10-13-ux-redesign-plan.md).
 
@@ -1238,3 +1238,14 @@ Phase 1 delivered (2026-10-13):
 - Icons: `lucide-react` replaces every emoji and glyph icon in the UI (header, toolbar, sidebar, dialogs, pricing, grader, profile, section presets, skill categories). Icon-only buttons have `aria-label`s; two delete buttons that only had a `title` gained one. The preview header now reads "Design: Classic".
 - Fixed in passing: undefined CSS variables (`--bg`, `--border`, `--foreground`, `--surface`), mis-encoded Arabic/Hebrew text in the direction picker, and the mis-encoded page title.
 - Visual regression: `tests/e2e/visual-regression.spec.ts` snapshots the library, editor, preview, design panel and check panel at 360/768/1440. Refresh with `--update-snapshots` only after an intended change.
+
+Phase 2 delivered (2026-10-13):
+- Two rows of chrome. The app header has My CVs, Templates, Pricing, Upgrade and an account menu (avatar: My CVs, Account settings or Sign in, Plans & billing, Keyboard shortcuts, Help, Sign out). The Review writing, Account, My library and workspace-badge controls and the editor page heading are gone; the library keeps a "My CVs" heading.
+- `EditorToolbar` replaces `DocumentToolbar`: inline CV name (the duplicate "Resume name" field is removed), a CV options menu (switch, New, Duplicate, Import JSON, History, Mark as my CV, Demo examples, Create practice example), the save indicator, Undo and new Redo (Ctrl+Shift+Z / Ctrl+Y), Design, Check with the strength %, an AI Assistant menu (Writing help, Match a job, Cover letter) and Download (PDF first). Phones get icon-only Undo/Design and one action row.
+- Removed the task-card strip, the context line and the start-guide bar (`EditorStartGuide` deleted).
+- Steps rail: status dots (not started, in progress, complete, needs review; read after the step name), the CV strength meter and a "next best step" button. `src/lib/cv-strength.ts` computes completeness (weights total 100; hidden or removed sections drop out) and step status from the linter; it is labelled as completeness, not a hiring score.
+- Back / Next on every step; the last Next opens Check. Moving to a step moves focus to its form.
+- `SidePanel`: Design, Check and AI replace the preview column and leave the form usable (not modal). At 900px and below they are focus-trapped bottom sheets. Escape closes the open panel. Check stays open when you jump to a finding on wide screens. DesignPanel, AtsReadinessPanel and AIPanel are now content-only components.
+- `Menu` is a shared accessible menu button (arrow keys, Escape, outside click).
+- Removed 136 CSS rules for deleted UI; new shell styles live in `styles/editor-shell.css`. Toolbar controls are at least 44px.
+- Tests: `tests/cv-strength.test.ts`; e2e helpers `editorTool`, `openAccount` and `cvCount`; specs migrated to the new shell, including side-panel, redo and step-flow coverage.

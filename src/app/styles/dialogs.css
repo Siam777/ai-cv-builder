@@ -148,22 +148,6 @@ body.modal-open {
   justify-content: flex-end;
   gap: 10px;
 }
-.anti-hallucination-note {
-  background: var(--amber-50);
-  border: 1px solid var(--amber-300);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  margin-bottom: 14px;
-  color: var(--amber-800);
-}
-.bullet-preview {
-  margin: 2px 0 0 0;
-  font-style: italic;
-  font-size: var(--text-xs);
-  color: var(--ink);
-}
 .modal-card .button-row {
   padding: 16px 24px;
   border-top: 1px solid var(--line);
@@ -287,20 +271,6 @@ body.modal-open {
   background: var(--green-25);
   display: flex;
   justify-content: flex-end;
-}
-
-.modal-card.design-modal.design-modal-spacious {
-  background: var(--gray-0);
-  border-radius: var(--radius-md);
-  width: 100%;
-  max-width: 1240px;
-  max-height: 92vh;
-  box-shadow: var(--shadow-2);
-  border: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: designModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-close-btn {

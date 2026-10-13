@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import { expect, test } from "@playwright/test";
 import { createDocument } from "../../src/lib/document";
 import { readFile } from "node:fs/promises";
@@ -27,16 +27,14 @@ test("render failure preserves the draft without falling back to print", async (
 test("cover letter copy requires sign-in and Markdown uses reviewed edits", async ({ page }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Cover letter", exact: true }).click();
+  await editorTool(page, "Cover letter");
   await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   await page.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect(page.locator(".account-panel")).toBeVisible();
   await page.getByRole("button", { name: "Close account settings" }).click();
   await authenticateForExport(page);
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Cover letter", exact: true }).click();
+  await editorTool(page, "Cover letter");
   await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   const downloading = page.waitForEvent("download");
@@ -66,7 +64,7 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   await page.getByLabel("Full name", { exact: true }).fill("My own identity");
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "On this device" })
+    .getByRole("button", { name: "My CVs" })
     .click();
   await expect(page.locator(".library-card")).toHaveCount(1);
   await expect(page.locator(".library-card")).toContainText("My own identity");
@@ -125,17 +123,15 @@ test("legacy records retain content and require explicit classification; practic
   await expect(
     page.getByRole("article", { name: "Resume preview" }),
   ).toContainText("Northstar");
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Create practice example" }).click();
+  await editorTool(page, "Create practice example");
   await page
     .getByRole("button", { name: "Create fictional practice CV" })
     .click();
-  await expect(page.locator(".document-context")).toContainText("Practice");
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Duplicate", exact: true }).click();
+  await expect(page.locator(".cv-kind")).toContainText("Practice");
+  await editorTool(page, "Duplicate");
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "On this device" })
+    .getByRole("button", { name: "My CVs" })
     .click();
   await expect(page.locator(".library-card")).toHaveCount(1);
   await page.getByRole("button", { name: /Practice copies 2/ }).click();

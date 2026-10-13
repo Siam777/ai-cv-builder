@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FileDiagnostics } from "./FileDiagnostics";
-import { useModalFocus } from "@/lib/use-modal-focus";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { lintResumeDocument, type AtsLintIssue } from "@/lib/linter/ats-linter";
 import { auditAtsExtraction } from "@/lib/linter/ats-plain-text";
@@ -12,21 +10,16 @@ import {
   analyzeResumeForRole,
   detectAppliedRoleFromDocument,
 } from "@/lib/linter/role-analyzer";
-import { X } from "lucide-react";
 
 export interface AtsReadinessPanelProps {
   doc: ResumeDocument;
   onNavigateToIssue?: (issue: AtsLintIssue) => void;
-  onClose: () => void;
 }
 
 export function AtsReadinessPanel({
   doc,
   onNavigateToIssue,
-  onClose,
 }: AtsReadinessPanelProps) {
-  useBodyScrollLock(true);
-  const dialogRef = useModalFocus(onClose);
   const suggestedRole = useMemo(
     () => detectAppliedRoleFromDocument(doc),
     [doc],
@@ -52,28 +45,7 @@ export function AtsReadinessPanel({
   }
 
   return (
-    <div
-      className="modal-backdrop no-print"
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Resume content review"
-    >
-      <div className="modal-card ats-modal" style={{ maxWidth: "860px" }}>
-        <header className="modal-header">
-          <div>
-            <h2>Check your CV</h2>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
-            <X size={18} aria-hidden />
-          </button>
-        </header>
+      <div className="ats-panel">
         <div className="ats-content">
           <p className="review-start-note">
             Start with <strong>Writing findings</strong>: choose a finding to
@@ -359,12 +331,6 @@ export function AtsReadinessPanel({
             </div>
           )}
         </div>
-        <footer className="modal-footer">
-          <button type="button" className="primary" onClick={onClose}>
-            Done
-          </button>
-        </footer>
       </div>
-    </div>
   );
 }

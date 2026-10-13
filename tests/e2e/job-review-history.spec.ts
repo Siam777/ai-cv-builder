@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { createDocument } from "../../src/lib/document";
 import { reviewJobEvidence } from "../../src/lib/vault/job-evidence";
 import { reviewSaveInput } from "../../src/lib/job-review-history";
-import { authenticateForExport, openFirstCv, openEditorTools } from "./helpers";
+import { authenticateForExport, openFirstCv, editorTool } from "./helpers";
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 async function setup(page: Page) {
   await page.goto("/builder");
@@ -22,8 +22,7 @@ async function setup(page: Page) {
   return { owner, doc };
 }
 async function open(page: Page) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Tailor for job", exact: true }).click();
+  await editorTool(page, "Match a job");
 }
 async function analyze(page: Page) {
   await open(page);
