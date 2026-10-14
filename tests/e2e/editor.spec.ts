@@ -285,18 +285,17 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
   await expect(
     page.getByRole("complementary", { name: "Check my CV" }),
   ).toBeVisible();
-  await expect(page.locator(".big-score")).toBeVisible();
-  await expect(page.locator(".ats-metrics-breakdown")).toContainText(
-    "Not checked",
+  // Completeness is labelled as such, never as a hiring score.
+  await expect(page.locator(".check-summary")).toContainText(
+    "Not a hiring score",
   );
-  await expect(page.locator(".big-score")).not.toContainText("%");
-  await expect(page.locator(".ats-metrics-breakdown")).toContainText(
-    "Vague openings",
+  await expect(page.locator(".check-checklist")).toContainText(
+    "Results in bullets",
   );
 
   // Applied role banner calibrates to candidate's applied role (Product Designer)
   await page
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   await expect(page.locator(".applied-role-banner")).toBeVisible();
   await expect(page.locator(".applied-role-name")).toContainText(
@@ -305,6 +304,7 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
   await expect(page.locator(".role-chip-btn.applied-chip")).toBeVisible();
 
   // Switch to plain text robot view
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await page.getByRole("button", { name: "Document text view" }).click();
   await expect(page.locator(".plaintext-terminal")).toContainText(
     "ALEX MORGAN",
@@ -330,7 +330,7 @@ test("CV Analyzer calibrates strictly to CV applied role (Digital Growth & Marke
 
   // Applied CV role banner must explicitly display candidate's applied role
   await page
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   const appliedBanner = page.locator(".applied-role-banner");
   await expect(appliedBanner).toBeVisible();

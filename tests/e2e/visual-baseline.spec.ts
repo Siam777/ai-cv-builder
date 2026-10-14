@@ -165,15 +165,16 @@ for (const width of [360, 768, 1440]) {
     }
     await editorTool(page, "Check");
     await page
-      .getByRole("button", { name: "Role checklist", exact: true })
+      .getByRole("tab", { name: "Compare with a role" })
       .click();
     await capture("analyzer-confirmation");
     await page
       .getByRole("button", { name: "Review selected checklist" })
       .click();
     await capture("analyzer-role");
-    await page.getByRole("button", { name: /Writing findings/ }).click();
+    await page.getByRole("tab", { name: /To fix/ }).click();
     await capture("analyzer-findings");
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page.getByRole("button", { name: "Document text view" }).click();
     await capture("analyzer-text");
     await page.getByRole("button", { name: "Close Check my CV" }).click();

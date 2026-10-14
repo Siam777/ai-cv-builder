@@ -119,7 +119,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await expect(panel).toBeVisible();
     await expect(page.locator("body")).not.toHaveClass(/modal-open/);
     expect(await overflow()).not.toBe("hidden");
-    await panel.getByRole("button", { name: "Role checklist", exact: true }).click();
+    await panel.getByRole("tab", { name: "Compare with a role" }).click();
     await panel.getByRole("button", { name: "Review selected checklist" }).click();
     // Long content scrolls inside the panel and stays reachable.
     const body = panel.locator(".side-panel-body");

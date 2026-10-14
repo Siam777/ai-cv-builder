@@ -53,7 +53,9 @@ import { reviewSnapshot } from "@/lib/vault/job-evidence";
 import { CoverLetterModal } from "./vault/CoverLetterModal";
 import { VersionHistoryModal } from "./editor/VersionHistoryModal";
 import { AddSectionModal } from "./editor/AddSectionModal";
-import { AtsReadinessPanel } from "./editor/AtsReadinessPanel";
+import { CheckPanel } from "./editor/CheckPanel";
+import { loadDismissed, saveDismissed } from "@/lib/dismissed-findings";
+import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
 import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
@@ -194,6 +196,12 @@ export function ResumeStudio({
   const [mobileTab, setMobileTab] = useState("editor");
   const [staged, setStaged] = useState<StagedImportData | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  // Findings the person dismissed for the open CV (kept in this browser).
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const openDocId = doc?.id;
+  useEffect(() => {
+    setDismissed(openDocId ? loadDismissed(openDocId) : new Set());
+  }, [openDocId]);
 
   // Docked side panels leave the editor usable, so they are not modal.
   const isModalActive = Boolean(
@@ -1067,13 +1075,46 @@ export function ResumeStudio({
   }
 
   const ready = status !== "Loading";
+  const allIssues = useMemo(
+    () => (doc ? lintResumeDocument(doc).issues : []),
+    [doc],
+  );
+  const openIssues = useMemo(
+    () => allIssues.filter((issue) => !dismissed.has(issue.id)),
+    [allIssues, dismissed],
+  );
   const strength = useMemo(
     () =>
       doc
-        ? cvStrength(doc, lintResumeDocument(doc).issues)
+        ? cvStrength(doc, openIssues)
         : { percent: 0, items: [], next: null, steps: {} },
-    [doc],
+    [doc, openIssues],
   );
+  function setDismissedFor(id: string, isDismissed: boolean) {
+    if (!doc) return;
+    const next = new Set(dismissed);
+    if (isDismissed) next.add(id);
+    else next.delete(id);
+    setDismissed(next);
+    saveDismissed(doc.id, next);
+  }
+  /** Show the field a finding is about, keeping the docked panel open. */
+  function fixIssue(issue: AtsLintIssue) {
+    const sectionId = issue.sectionId || "contact";
+    setSectionId(sectionId);
+    setMobileTab("editor");
+    const contactField = issue.id.startsWith("contact-")
+      ? issue.id.slice("contact-".length)
+      : undefined;
+    setFocusTarget({
+      sectionId,
+      entryId: issue.entryId,
+      bulletId: issue.bulletId,
+      field: contactField,
+    });
+    // A bottom sheet would cover the field.
+    if (sheetLayout) setShowAts(false);
+  }
   const steps = doc
     ? [
         { id: "contact", label: "Personal details" },
@@ -1758,6 +1799,7 @@ export function ResumeStudio({
                   setDesignFilter("photo");
                   setShowDesign(true);
                 }}
+                dismissed={dismissed}
                 onUpdateDocument={(mutator) => update(mutator)}
                 onDeleteSection={(secId) => {
                   update((d) => {
@@ -1802,19 +1844,20 @@ export function ResumeStudio({
                     />
                   )}
                   {activePanel === "check" && (
-                    <AtsReadinessPanel
+                    <CheckPanel
                       doc={doc}
-                      onNavigateToIssue={(issue) => {
-                        if (issue.sectionId) setSectionId(issue.sectionId);
-                        setMobileTab("editor");
-                        if (issue.sectionId || issue.bulletId || issue.entryId) {
-                          setFocusTarget({
-                            sectionId: issue.sectionId || "contact",
-                            entryId: issue.entryId,
-                            bulletId: issue.bulletId,
-                          });
-                        }
-                        // The docked panel stays open; a bottom sheet would hide the field.
+                      strength={strength}
+                      issues={allIssues}
+                      dismissed={dismissed}
+                      onDismiss={(id) => setDismissedFor(id, true)}
+                      onRestore={(id) => setDismissedFor(id, false)}
+                      onFix={fixIssue}
+                      onOpenStep={(id) => {
+                        goToStep(id, false);
+                        setFocusTarget({
+                          sectionId: id,
+                          field: id === "contact" ? "name" : undefined,
+                        });
                         if (sheetLayout) setShowAts(false);
                       }}
                     />

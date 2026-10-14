@@ -16,6 +16,8 @@ export interface StrengthItem {
   done: boolean;
   /** Editor step that fixes this item ("contact" or a section id). */
   stepId: string;
+  /** Progress shown next to the label, such as "3/8". */
+  detail?: string;
 }
 
 export interface CvStrength {
@@ -124,6 +126,7 @@ export function cvStrength(
           weight: 15,
           done: bullets.length >= 2 && withNumbers * 2 >= bullets.length,
           stepId: experience[0].id,
+          detail: bullets.length ? `${withNumbers}/${bullets.length}` : undefined,
         }
       : null,
     education

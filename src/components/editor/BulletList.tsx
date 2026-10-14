@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef } from "react";
-import type { Bullet } from "@/lib/document";
+import { useRef, useState } from "react";
+import type { Bullet, SectionType } from "@/lib/document";
+import { lintBullet } from "@/lib/linter/ats-linter";
+import { describeFinding } from "@/lib/check-findings";
 import { uid } from "@/lib/document";
 import { InlineAiMagicBar } from "./InlineAiMagicBar";
-import { X } from "lucide-react";
+import { Lightbulb, TriangleAlert, X } from "lucide-react";
 
 export interface BulletListProps {
   bullets: Bullet[];
+  /** Section the bullets belong to; it decides which checks apply. */
+  sectionType?: SectionType;
+  dismissed?: Set<string>;
   onChange: (bullets: Bullet[]) => void;
   disabled?: boolean;
   activeBulletId?: string | null;
@@ -19,6 +24,8 @@ export interface BulletListProps {
 
 export function BulletList({
   bullets,
+  sectionType = "experience",
+  dismissed,
   onChange,
   disabled = false,
   activeBulletId,
@@ -27,6 +34,8 @@ export function BulletList({
   const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(
     new Map(),
   );
+  // Hints wait until the person leaves a bullet, so typing is not interrupted.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   function updateBulletText(bulletId: string, text: string) {
     onChange(bullets.map((b) => (b.id === bulletId ? { ...b, text } : b)));
@@ -150,6 +159,13 @@ export function BulletList({
     <div className="bullet-list-flow">
       {bullets.map((bullet, bi) => {
         const isActive = activeBulletId === bullet.id;
+        const hints =
+          editingId === bullet.id
+            ? []
+            : lintBullet(bullet.text, sectionType, { bulletId: bullet.id })
+                .issues.filter((issue) => !dismissed?.has(issue.id))
+                .map((issue) => ({ id: issue.id, ...describeFinding(issue) }));
+        const hintId = `bullet-hints-${bullet.id}`;
         return (
           <div
             className={`bullet-field ${isActive ? "bullet-highlighted" : ""}`}
@@ -178,6 +194,9 @@ export function BulletList({
                   }}
                   id={`field-bullet-${bullet.id}`}
                   aria-label={`Bullet ${bi + 1}`}
+                  aria-describedby={hints.length ? hintId : undefined}
+                  onFocus={() => setEditingId(bullet.id)}
+                  onBlur={() => setEditingId(null)}
                   className="bullet-textarea"
                   disabled={disabled}
                   rows={2}
@@ -211,6 +230,21 @@ export function BulletList({
                   : undefined
               }
             />
+            {/* Below the AI bar, so hints appearing on blur never move a button being clicked. */}
+            {hints.length > 0 && (
+              <ul className="field-hints" id={hintId}>
+                {hints.map((hint) => (
+                  <li key={hint.id} className={hint.tone}>
+                    {hint.tone === "attention" ? (
+                      <TriangleAlert size={14} aria-hidden />
+                    ) : (
+                      <Lightbulb size={14} aria-hidden />
+                    )}
+                    {hint.title}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         );
       })}

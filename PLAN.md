@@ -1212,7 +1212,7 @@ Delivered:
 
 
 
-## 37. UX Redesign — Phases 0–2 delivered, Phases 3–6 planned — 2026-10-13
+## 37. UX Redesign — Phases 0–3 delivered, Phases 4–6 planned — 2026-10-13
 
 Detailed plan: [docs/plans/2026-10-13-ux-redesign-plan.md](docs/plans/2026-10-13-ux-redesign-plan.md).
 
@@ -1249,3 +1249,13 @@ Phase 2 delivered (2026-10-13):
 - `Menu` is a shared accessible menu button (arrow keys, Escape, outside click).
 - Removed 136 CSS rules for deleted UI; new shell styles live in `styles/editor-shell.css`. Toolbar controls are at least 44px.
 - Tests: `tests/cv-strength.test.ts`; e2e helpers `editorTool`, `openAccount` and `cvCount`; specs migrated to the new shell, including side-panel, redo and step-flow coverage.
+
+Phase 3 delivered (2026-10-13):
+- `CheckPanel` replaces `AtsReadinessPanel` in the docked side panel. At the top: the CV strength meter, one sentence ("How complete your CV is, plus writing checks. Not a hiring score.") with an (i) for the longer explanation, and a checklist (Name, Contact details, Summary, Work experience, Results in bullets 3/8, and so on). Unfinished items link to their step. The raw 0/0 counters are gone.
+- Two tabs: **To fix** (default) and **Compare with a role** (the role checklist, moved unchanged into `RoleComparison`). The document text view and file diagnostics sit under a collapsed "Advanced: how a recruiter's system reads your file".
+- Findings are grouped by step in step order, most serious first. Each row has a severity icon, a one-line title, a word-boundary quote of the bullet, a muted explanation, and Fix and Dismiss on the right (wrapping below on phones). **Next issue** walks through what is left. The list updates live as you edit.
+- Fix focuses the exact field (contact fields included) and keeps the docked panel open; a bottom sheet closes so the field is visible.
+- Dismissals are stored per CV in this browser (`dismissed-findings.ts`) and apply to the panel, the inline hints and the step dots. "Show N dismissed" lists them with Restore.
+- `lintBullet` holds the per-bullet checks. The document report and inline bullet hints both use it, so they always agree. Hints appear under a bullet once you leave it (vague opening, no number in experience, too short or long) and are linked with `aria-describedby`.
+- `check-findings.ts` turns linter findings into plain-language titles and groups them.
+- Tests: `tests/check-findings.test.ts`; `tests/e2e/check-panel.spec.ts` (grouping, Fix, live clearing, Next issue, persisted Dismiss and Restore, inline hints, Advanced view); other specs migrated to the new tabs.

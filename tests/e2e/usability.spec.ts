@@ -232,8 +232,8 @@ test("CV checker starts with actionable findings and job fields fit a small view
   // At this width the panel is a bottom sheet.
   const check = page.getByRole("dialog", { name: "Check my CV" });
   await expect(
-    check.getByRole("button", { name: /Writing findings/ }),
-  ).toHaveClass(/active/);
+    check.getByRole("tab", { name: /To fix/ }),
+  ).toHaveAttribute("aria-selected", "true");
   await check.getByRole("button", { name: "Close Check my CV" }).click();
   await editorTool(page, "Match a job");
   const dialog = page.getByRole("dialog", { name: "Job Tailoring Engine" });

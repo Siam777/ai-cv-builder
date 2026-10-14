@@ -28,6 +28,8 @@ export interface SectionEditorProps {
   onDeleteSection?: (sectionId: string) => void;
   onDeleteResume: () => void;
   onOpenPhotoDesigns?: () => void;
+  /** Finding ids the person dismissed; their inline hints are hidden. */
+  dismissed?: Set<string>;
   /** Every step in order, for the Back and Next buttons. */
   steps?: { id: string; label: string }[];
   onStep?: (id: string) => void;
@@ -50,6 +52,7 @@ export function SectionEditor({
   onDeleteResume,
   onWritingAction,
   onOpenPhotoDesigns,
+  dismissed,
   steps = [],
   onStep,
   onFinish,
@@ -551,6 +554,8 @@ export function SectionEditor({
                   {activeSection.type !== "summary" && (
                     <BulletList
                       bullets={entry.bullets}
+                      sectionType={activeSection.type}
+                      dismissed={dismissed}
                       disabled={busy}
                       activeBulletId={focusTarget?.bulletId}
                       onWritingAction={onWritingAction}

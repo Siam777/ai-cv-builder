@@ -182,7 +182,7 @@ test("side panels dock beside the form, keep it usable and close with Escape", a
   // Jumping to a finding keeps the Check panel open.
   await page.getByRole("button", { name: /^Check/ }).click();
   const check = page.getByRole("complementary", { name: "Check my CV" });
-  await check.getByRole("button", { name: "Review in editor" }).first().click();
+  await check.getByRole("button", { name: /^Fix:/ }).first().click();
   await expect(check).toBeVisible();
   await expect
     .poll(() =>

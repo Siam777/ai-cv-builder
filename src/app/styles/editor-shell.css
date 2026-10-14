@@ -426,10 +426,6 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
-.side-panel .ats-content {
-  padding: 0;
-  overflow: visible;
-}
 
 @media (max-width: 900px) {
   .editor-toolbar {

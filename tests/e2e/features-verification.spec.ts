@@ -35,12 +35,12 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(atsModal).toBeVisible();
 
     await atsModal
-      .getByRole("button", { name: "Role checklist", exact: true })
+      .getByRole("tab", { name: "Compare with a role" })
       .click();
     // Role comparisons remain an explicit choice after content findings.
     await expect(
-      atsModal.getByRole("button", { name: /Role checklist/i }),
-    ).toHaveClass(/active/);
+      atsModal.getByRole("tab", { name: "Compare with a role" }),
+    ).toHaveAttribute("aria-selected", "true");
 
     // Switch to Solutions Architect
     await page
