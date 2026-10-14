@@ -14,7 +14,7 @@ Break the monolithic studio component into focused, single-responsibility subcom
 - `EditorSidebar`: Sticky navigation rail providing continuous document overview, section reordering, section visibility toggles, and instant jump navigation.
 - `SectionEditor`: Polymorphic container for section-specific forms (contact, summary, experience, education, skills, projects, certifications, custom sections).
 - `BulletList`: Streamlined, keyboard-centric list editing engine for accomplishment bullets.
-- `InlineAiMagicBar`: Floating contextual popover directly on active bullets for instant rewrites.
+- `FieldAi`: The sparkle (AI) menu on a field (bullet, summary, skills) and the inline accept or reject view it opens. `AIPanel` is the single AI Assistant side panel (Help me finish, Match a job, Cover letter).
 
 Ensure all child components communicate through explicit callbacks or a lightweight context. Do not pass uncontrolled setters that trigger global re-renders on every keystroke; debounce autosave and separate fast local typing state from document persistence.
 
@@ -33,16 +33,16 @@ Create a seamless feedback loop between the editor inputs and the live rendered 
 2. Attach preview click listeners: Clicking any text element in the preview identifies its block ID, scrolls the editor canvas to the corresponding input, and highlights it with a temporary focus ring (`ring-2 ring-primary/60`).
 3. Reverse synchronization: Focusing an input in the editor scrolls the preview stage to ensure the corresponding page and block are visible.
 
-## Inline contextual magic bar
+## Inline sparkle menu (FieldAi)
 
-Replace multi-step modal dialogs for bullet rewrites with an inline contextual assistant:
+Replace multi-step modal dialogs for rewrites with an inline contextual assistant on each field. Offer each action only where it works, and show unavailable AI actions with the reason (needs an account, not configured) instead of hiding them:
 1. When a user focuses or hovers on a bullet, show a floating action bar with quick chips:
    - `✨ Improve`: Strengthens phrasing and clarity while preserving verified facts.
    - `📊 Add Metric`: Prompts for quantifiable outcome using Google XYZ structure.
    - `🎯 Match Job`: Highlights relevant skills and keywords matching the target job description.
    - `📏 Make Concise`: Trims wordiness to fit page budget.
 2. Render an inline before/after diff directly beneath the active bullet (red strikethrough for removals, green highlight for additions).
-3. Provide single-keystroke confirmation: `Tab` to accept changes, `Esc` to dismiss.
+3. Provide keyboard confirmation without trapping focus: focus moves to the Accept button when the diff appears (`Enter` accepts) and `Esc` keeps the original wording. Do not override `Tab`, so the Try again and Keep mine buttons stay reachable.
 4. Maintain strict anti-hallucination verification: The inline assistant must pass proposed diffs through the verification contract ([ai-proposals.ts](file:///D:/utility-projects/ai-cv-builder/src/lib/ai-proposals.ts)) before showing the diff to the user.
 
 ## Verification and testing

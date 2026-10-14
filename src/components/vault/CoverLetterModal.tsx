@@ -15,6 +15,8 @@ export interface CoverLetterModalProps {
   doc: ResumeDocument;
   busy: boolean;
   onClose: () => void;
+  /** Render inside the AI Assistant panel instead of as a dialog. */
+  embedded?: boolean;
   onExport: (
     format: "txt" | "md" | "copy" | "print",
     text: string,
@@ -26,10 +28,11 @@ export function CoverLetterModal({
   doc,
   busy,
   onClose,
+  embedded = false,
   onExport,
 }: CoverLetterModalProps) {
-  useBodyScrollLock(true);
-  const dialogRef = useModalFocus(onClose);
+  useBodyScrollLock(!embedded);
+  const dialogRef = useModalFocus(onClose, !embedded);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [recipientName, setRecipientName] = useState("");
@@ -62,40 +65,8 @@ export function CoverLetterModal({
     day: "numeric",
   });
 
-  return (
-    <div
-      className="modal-backdrop no-print"
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Tailored Cover Letter Generator"
-    >
-      <div
-        className="modal-card tailor-modal"
-        style={{
-          maxWidth: letter ? "1100px" : "760px",
-          width: "95vw",
-          transition: "max-width 0.2s",
-        }}
-      >
-        <header className="modal-header">
-          <div>
-            <p className="eyebrow">
-              CAREER VAULT · EVIDENCE-GROUNDED COVER LETTER
-            </p>
-            <h2>Tailored Cover Letter Generator</h2>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
-            <X size={18} aria-hidden />
-          </button>
-        </header>
-
+  const content = (
+    <>
         <div className="tailor-content">
           {!letter ? (
             <div className="tailor-input-stage">
@@ -239,9 +210,11 @@ export function CoverLetterModal({
               >
                 Generate Grounded Cover Letter <span>↗</span>
               </button>
-              <button type="button" onClick={onClose} disabled={busy}>
-                Cancel
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={busy}>
+                  Cancel
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -282,12 +255,61 @@ export function CoverLetterModal({
               >
                 Adjust Inputs
               </button>
-              <button type="button" onClick={onClose} disabled={busy}>
-                Done
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={busy}>
+                  Done
+                </button>
+              )}
             </>
           )}
         </div>
+    </>
+  );
+
+  if (embedded)
+    return (
+      <section
+        className="embedded-tool tailor-modal cover-letter-embedded"
+        aria-label="Cover letter"
+      >
+        <h3 className="embedded-tool-title">Cover letter</h3>
+        {content}
+      </section>
+    );
+  return (
+    <div
+      className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tailored Cover Letter Generator"
+    >
+      <div
+        className="modal-card tailor-modal"
+        style={{
+          maxWidth: letter ? "1100px" : "760px",
+          width: "95vw",
+          transition: "max-width 0.2s",
+        }}
+      >
+        <header className="modal-header">
+          <div>
+            <p className="eyebrow">
+              CAREER VAULT · EVIDENCE-GROUNDED COVER LETTER
+            </p>
+            <h2>Tailored Cover Letter Generator</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            <X size={18} aria-hidden />
+          </button>
+        </header>
+        {content}
       </div>
     </div>
   );

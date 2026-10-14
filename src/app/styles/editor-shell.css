@@ -51,6 +51,7 @@
 .menu-item {
   display: flex;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: var(--space-3);
   width: 100%;
   padding: var(--space-2) var(--space-3);
@@ -407,19 +408,6 @@
   margin-top: var(--space-5);
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-}
-.side-panel .ai-panel {
-  display: block;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  overflow: visible;
-}
-/* The side panel scrolls; inner bodies must not trap the wheel. */
-.side-panel .ai-panel-body {
-  padding: 0;
-  overflow: visible;
-  overscroll-behavior: auto;
 }
 .panel-intro {
   margin: 0 0 var(--space-4);

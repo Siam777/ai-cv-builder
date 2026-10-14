@@ -110,7 +110,12 @@ const CV_MENU = [
   "Demo examples",
   "Create practice example",
 ];
-const AI_MENU = ["Writing help", "Match a job", "Cover letter"];
+// The AI Assistant is one panel with three tabs.
+const AI_TABS: Record<string, string> = {
+  "Writing help": "Help me finish",
+  "Match a job": "Match a job",
+  "Cover letter": "Cover letter",
+};
 
 // Run an editor toolbar action, opening its menu first when it lives in one.
 export async function editorTool(page: Page, name: string) {
@@ -118,11 +123,19 @@ export async function editorTool(page: Page, name: string) {
     await page.getByRole("button", { name: /^Check/ }).click();
     return;
   }
-  const menu = CV_MENU.includes(name)
-    ? "CV options"
-    : AI_MENU.includes(name)
-      ? "AI Assistant"
-      : null;
+  if (name in AI_TABS) {
+    const toggle = page.getByRole("button", {
+      name: "AI Assistant",
+      exact: true,
+    });
+    if ((await toggle.getAttribute("aria-pressed")) !== "true")
+      await toggle.click();
+    await page
+      .getByRole("tab", { name: AI_TABS[name], exact: true })
+      .click();
+    return;
+  }
+  const menu = CV_MENU.includes(name) ? "CV options" : null;
   if (!menu) {
     await page.getByRole("button", { name, exact: true }).click();
     return;
@@ -148,4 +161,16 @@ export async function openAccount(page: Page) {
   await page
     .getByRole("menuitem", { name: /^(Account settings|Sign in)/ })
     .click();
+}
+
+// Show the free plan's locked states by default, and a paid plan on request.
+export async function grantPaidPlan(page: Page) {
+  await page.route("**/api/billing/subscription", (route) =>
+    route.fulfill({
+      json: {
+        subscription: { planId: "job_hunter_monthly", status: "active" },
+        user: null,
+      },
+    }),
+  );
 }

@@ -132,8 +132,6 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
   const dialogs: [string, string | null, string][] = [
     ["Account menu", "Keyboard shortcuts", "Keyboard Navigation & Actions"],
     ["Upgrade", null, "Subscription Pricing"],
-    ["AI Assistant", "Match a job", "Job Tailoring Engine"],
-    ["AI Assistant", "Cover letter", "Tailored Cover Letter Generator"],
     ["CV options", "History", "Resume Version History"],
     ["CV options", "Create practice example", "Create fictional practice CV"],
     ["CV options", "Demo examples", "Demo Resume Gallery"],

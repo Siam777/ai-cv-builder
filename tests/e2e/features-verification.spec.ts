@@ -23,7 +23,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(page.getByRole("button", { name: /^Check/ })).toBeVisible();
     await page.getByRole("button", { name: "AI Assistant", exact: true }).click();
     await expect(
-      page.getByRole("menuitem", { name: /^Cover letter/ }),
+      page.getByRole("tab", { name: "Cover letter", exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
 
@@ -95,9 +95,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
 
     // 4. Open Tailored Cover Letter Studio
     await editorTool(page, "Cover letter");
-    const clModal = page.getByRole("dialog", {
-      name: "Tailored Cover Letter Generator",
-    });
+    const clModal = page.getByRole("region", { name: "Cover letter" });
     await expect(clModal).toBeVisible();
     await clModal
       .getByRole("button", { name: /Generate Grounded Cover Letter/i })
@@ -112,8 +110,8 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     ).toBeVisible();
 
     // Close Cover Letter Studio
-    await clModal.getByRole("button", { name: "Done" }).click();
-    await expect(clModal).not.toBeVisible();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
+    await expect(clModal).toHaveCount(0);
 
     // 5. Open Design & Templates Modal (Confirm No Squished Live Preview & 8 Templates)
     await page.getByRole("button", { name: "Design", exact: true }).click();

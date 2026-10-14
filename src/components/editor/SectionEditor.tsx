@@ -15,6 +15,7 @@ import { BulletList } from "./BulletList";
 import { PhotoUploader } from "./PhotoUploader";
 import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
+import { FieldAi } from "./FieldAi";
 import type { FocusTarget } from "./types";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Save, Trash2, X } from "lucide-react";
 
@@ -35,10 +36,6 @@ export interface SectionEditorProps {
   onStep?: (id: string) => void;
   /** Called by Next on the last step. */
   onFinish?: () => void;
-  onWritingAction?: (
-    bulletId: string | undefined,
-    action: "improve" | "concise" | "metric" | "summary",
-  ) => void;
 }
 
 export function SectionEditor({
@@ -50,7 +47,6 @@ export function SectionEditor({
   onUpdateDocument,
   onDeleteSection,
   onDeleteResume,
-  onWritingAction,
   onOpenPhotoDesigns,
   dismissed,
   steps = [],
@@ -536,6 +532,11 @@ export function SectionEditor({
                     />
                   ) : (
                     <Field
+                      id={
+                        activeSection.type === "summary"
+                          ? `field-summary-${entry.id}`
+                          : undefined
+                      }
                       label={
                         activeSection.type === "summary"
                           ? "Professional summary"
@@ -551,6 +552,29 @@ export function SectionEditor({
                       onChange={(v) => editEntry(entry.id, { description: v })}
                     />
                   )}
+                  {activeSection.type === "skills" && (
+                    <FieldAi
+                      kind="skills"
+                      label="Skills"
+                      text={entry.description}
+                      disabled={busy}
+                      onApply={(description) =>
+                        editEntry(entry.id, { description })
+                      }
+                    />
+                  )}
+                  {activeSection.type === "summary" && (
+                    <FieldAi
+                      kind="summary"
+                      label="Professional summary"
+                      text={entry.description}
+                      focusId={`field-summary-${entry.id}`}
+                      disabled={busy}
+                      onApply={(description) =>
+                        editEntry(entry.id, { description })
+                      }
+                    />
+                  )}
                   {activeSection.type !== "summary" && (
                     <BulletList
                       bullets={entry.bullets}
@@ -558,7 +582,6 @@ export function SectionEditor({
                       dismissed={dismissed}
                       disabled={busy}
                       activeBulletId={focusTarget?.bulletId}
-                      onWritingAction={onWritingAction}
                       onChange={(bullets) => editEntry(entry.id, { bullets })}
                     />
                   )}

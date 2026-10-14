@@ -49,9 +49,6 @@ export interface EditorToolbarProps {
   onUndo: () => void;
   onRedo: () => void;
   onTogglePanel: (panel: SidePanelId) => void;
-  onWritingHelp: () => void;
-  onMatchJob: () => void;
-  onCoverLetter: () => void;
   onPrint: () => void;
   onExport: (format: ExportFormat) => void;
 }
@@ -121,24 +118,6 @@ export function EditorToolbar(props: EditorToolbarProps) {
       hint: "A fictional CV for practice",
       icon: <Wand2 size={16} aria-hidden />,
       onSelect: props.onOpenAiGenerator,
-    },
-  ];
-
-  const aiItems: MenuItem[] = [
-    {
-      label: "Writing help",
-      hint: "Bullets, summary, results and skills",
-      onSelect: props.onWritingHelp,
-    },
-    {
-      label: "Match a job",
-      hint: "Compare your CV with a job posting",
-      onSelect: props.onMatchJob,
-    },
-    {
-      label: "Cover letter",
-      hint: "Draft a letter from your CV",
-      onSelect: props.onCoverLetter,
     },
   ];
 
@@ -240,20 +219,18 @@ export function EditorToolbar(props: EditorToolbarProps) {
             {props.strength}%<span className="sr-only"> complete</span>
           </span>
         </button>
-        <Menu
-          ariaLabel="AI Assistant"
-          label={
-            <>
-              <Sparkles size={16} aria-hidden />
-              <span className="toolbar-label">AI Assistant</span>
-              <ChevronDown size={14} aria-hidden />
-            </>
-          }
-          items={aiItems}
+        <button
+          type="button"
+          className="ai-button"
+          aria-pressed={activePanel === "ai"}
+          aria-controls="side-panel"
           disabled={busy}
-          className="ai-menu"
-          align="end"
-        />
+          onClick={() => props.onTogglePanel("ai")}
+          title="Help finishing your CV, matching a job and writing a cover letter"
+        >
+          <Sparkles size={16} aria-hidden />
+          <span className="toolbar-label">AI Assistant</span>
+        </button>
         <details
           className="export-menu"
           ref={exportMenu}

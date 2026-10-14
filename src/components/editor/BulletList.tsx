@@ -5,7 +5,7 @@ import type { Bullet, SectionType } from "@/lib/document";
 import { lintBullet } from "@/lib/linter/ats-linter";
 import { describeFinding } from "@/lib/check-findings";
 import { uid } from "@/lib/document";
-import { InlineAiMagicBar } from "./InlineAiMagicBar";
+import { FieldAi } from "./FieldAi";
 import { Lightbulb, TriangleAlert, X } from "lucide-react";
 
 export interface BulletListProps {
@@ -16,10 +16,6 @@ export interface BulletListProps {
   onChange: (bullets: Bullet[]) => void;
   disabled?: boolean;
   activeBulletId?: string | null;
-  onWritingAction?: (
-    bulletId: string,
-    action: "improve" | "concise" | "metric",
-  ) => void;
 }
 
 export function BulletList({
@@ -29,7 +25,6 @@ export function BulletList({
   onChange,
   disabled = false,
   activeBulletId,
-  onWritingAction,
 }: BulletListProps) {
   const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(
     new Map(),
@@ -217,18 +212,14 @@ export function BulletList({
                 <X size={14} aria-hidden />
               </button>
             </div>
-            <InlineAiMagicBar
-              bulletText={bullet.text}
+            <FieldAi
+              kind="bullet"
+              label={`Bullet ${bi + 1}`}
+              text={bullet.text}
+              bulletId={bullet.id}
+              focusId={`field-bullet-${bullet.id}`}
               disabled={disabled}
-              onApplyEdit={(newText) => updateBulletText(bullet.id, newText)}
-              onTriggerAction={
-                onWritingAction
-                  ? (action) => {
-                      if (action !== "match")
-                        onWritingAction(bullet.id, action);
-                    }
-                  : undefined
-              }
+              onApply={(newText) => updateBulletText(bullet.id, newText)}
             />
             {/* Below the AI bar, so hints appearing on blur never move a button being clicked. */}
             {hints.length > 0 && (

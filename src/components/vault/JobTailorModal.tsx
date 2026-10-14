@@ -16,7 +16,8 @@ import {
   type JobEvidenceReview,
   type Priority,
 } from "@/lib/vault/job-evidence";
-import { X } from "lucide-react";
+import { Lock, X } from "lucide-react";
+import { lockedCopy } from "@/lib/ai-access";
 
 export interface JobTailorModalProps {
   doc: ResumeDocument;
@@ -29,6 +30,11 @@ export interface JobTailorModalProps {
     sourceSnapshot: string,
   ) => Promise<boolean>;
   onClose: () => void;
+  /** Render inside the AI Assistant panel instead of as a dialog. */
+  embedded?: boolean;
+  /** False on plans without tailored copies; the comparison stays available. */
+  canCreateCopy?: boolean;
+  onSeePlans?: () => void;
 }
 const statusLabels = {
   direct: "Direct text support",
@@ -44,9 +50,12 @@ export function JobTailorModal({
   acceptCoaching,
   onApplyTailoredVariant,
   onClose,
+  embedded = false,
+  canCreateCopy = true,
+  onSeePlans,
 }: JobTailorModalProps) {
-  useBodyScrollLock(true);
-  const dialogRef = useModalFocus(onClose);
+  useBodyScrollLock(!embedded);
+  const dialogRef = useModalFocus(onClose, !embedded);
   const [jobTitle, setJobTitle] = useState(""),
     [company, setCompany] = useState(""),
     [jobDescription, setJobDescription] = useState("");
@@ -169,29 +178,8 @@ export function JobTailorModal({
     );
     setEvidenceConfirmed(false);
   }
-  return (
-    <div
-      className="modal-backdrop no-print"
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Job Tailoring Engine"
-    >
-      <div className="modal-card tailor-modal job-evidence-modal">
-        <header className="modal-header">
-          <div>
-            <h2>Compare your CV with a job</h2>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
-            <X size={18} aria-hidden />
-          </button>
-        </header>
+  const content = (
+    <>
         <div className="tailor-content">
           {error && (
             <p role="alert" className="alert">
@@ -648,22 +636,37 @@ export function JobTailorModal({
               >
                 {analyzing ? "Reviewing…" : "Analyze & Match Evidence"}
               </button>
-              <button type="button" onClick={onClose} disabled={locked}>
-                Cancel
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={locked}>
+                  Cancel
+                </button>
+              )}
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="primary"
-                disabled={
-                  locked || stale || !evidenceConfirmed || !accepted.length
-                }
-                onClick={create}
-              >
-                {creating ? "Saving variant…" : "Create reviewed variant"}
-              </button>
+              {canCreateCopy ? (
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={
+                    locked || stale || !evidenceConfirmed || !accepted.length
+                  }
+                  onClick={create}
+                >
+                  {creating ? "Saving variant…" : "Create reviewed variant"}
+                </button>
+              ) : (
+                <div className="locked-feature" role="group" aria-label="Locked: tailored CV copies">
+                  <Lock size={18} aria-hidden />
+                  <div>
+                    <strong>{lockedCopy("tailored-copy").title}</strong>
+                    <p>{lockedCopy("tailored-copy").reason}</p>
+                  </div>
+                  <button type="button" className="primary" onClick={onSeePlans}>
+                    See plans
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 disabled={locked}
@@ -676,12 +679,51 @@ export function JobTailorModal({
               >
                 Edit Job Description
               </button>
-              <button type="button" onClick={onClose} disabled={locked}>
-                Done
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={locked}>
+                  Done
+                </button>
+              )}
             </>
           )}
         </div>
+    </>
+  );
+
+  if (embedded)
+    return (
+      <section
+        className="embedded-tool tailor-modal job-evidence-modal"
+        aria-label="Job Tailoring Engine"
+      >
+        <h3 className="embedded-tool-title">Compare your CV with a job</h3>
+        {content}
+      </section>
+    );
+  return (
+    <div
+      className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Job Tailoring Engine"
+    >
+      <div className="modal-card tailor-modal job-evidence-modal">
+        <header className="modal-header">
+          <div>
+            <h2>Compare your CV with a job</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            <X size={18} aria-hidden />
+          </button>
+        </header>
+        {content}
       </div>
     </div>
   );

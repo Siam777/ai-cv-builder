@@ -211,7 +211,7 @@ for (const width of [360, 768, 1440]) {
       .click();
     await expect(page.getByRole("region", {name:"Requirement coverage"})).toBeVisible();
     await capture("tailor-results");
-    await closeDialog();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
     await editorTool(page, "Cover letter");
     await capture("letter-input");
     await page
@@ -221,7 +221,7 @@ for (const width of [360, 768, 1440]) {
       page.getByRole("button", { name: "Adjust Inputs" }),
     ).toBeVisible();
     await capture("letter-review");
-    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
     await editorTool(page, "Writing help");
     await capture("ai-signin-gate", true);
     await page.getByRole("button", { name: "Close AI Assistant" }).click();

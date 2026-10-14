@@ -1,4 +1,4 @@
-import { editorTool, cvCount } from "./helpers";
+import { editorTool, cvCount, grantPaidPlan } from "./helpers";
 import { getDemoResume } from "../../src/lib/demo-resumes";
 import {
   startSampleResume,
@@ -144,7 +144,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
       .click();
     if (name === "Profile")
       await page
-        .getByLabel("Professional summary")
+        .getByLabel("Professional summary", { exact: true })
         .fill("A careful introduction.");
     else {
       await page
@@ -219,6 +219,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
 test("reviewed job evidence creates an isolated fact-preserving variant and supports undo", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
@@ -515,12 +516,10 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
   // Click Cover Letter button in toolbar
   await editorTool(page, "Cover letter");
 
-  // Dialog should open
-  const modal = page.getByRole("dialog", {
-    name: "Tailored Cover Letter Generator",
-  });
+  // The cover letter tool opens in the AI Assistant panel.
+  const modal = page.getByRole("region", { name: "Cover letter" });
   await expect(modal).toBeVisible();
-  await expect(modal).toContainText("Tailored Cover Letter Generator");
+  await expect(modal).toContainText("Draft a cover letter");
 
   // Fill in target role and company
   await modal
@@ -551,9 +550,9 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
   const txtDownload = await txtDownloadPromise;
   expect(txtDownload.suggestedFilename()).toMatch(/\.txt$/i);
 
-  // Close modal
-  await modal.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Close the panel
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
+  await expect(modal).toHaveCount(0);
 });
 
 test("Preview zoom controls adjust scale and support fit to width", async ({
@@ -793,78 +792,6 @@ test("Skills taxonomy: autocomplete search, tag chips, category filters, and liv
   await expect(
     page.getByRole("article", { name: "Resume preview" }),
   ).not.toContainText("PostgreSQL");
-});
-
-test("Contextual AI Assistant: summary drafting, impact interview, and skill discovery", async ({
-  page,
-}) => {
-  await page.goto("/builder");
-  await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
-
-  // Open AI assistant
-  await editorTool(page, "Writing help");
-  await expect(
-    page.getByRole("region", { name: "AI bullet assistant" }),
-  ).toBeVisible();
-
-  // Switch to Summary Drafter tab
-  await page.getByRole("tab", { name: "Write a summary" }).click();
-  await expect(page.locator(".ai-summary-drafter")).toBeVisible();
-  await expect(page.locator(".ai-summary-card")).toHaveCount(3);
-  await expect(page.locator(".ai-summary-card").first()).toContainText(
-    "Results from your CV",
-  );
-
-  // Click Review this draft on the first card
-  await page
-    .locator(".ai-summary-card")
-    .first()
-    .getByRole("button", { name: "Review this draft" })
-    .click();
-  await page
-    .getByLabel("I checked this summary against my own experience.")
-    .check();
-  await page.getByRole("button", { name: "Use this summary" }).click();
-  await expect(page.locator(".account-message")).toContainText(
-    "Summary added to Profile",
-  );
-
-  // Switch to Impact Interview tab
-  await page.getByRole("tab", { name: "Add a real result" }).click();
-  await expect(page.locator(".ai-interview-container")).toBeVisible();
-
-  // If there are interview questions, test answering one
-  const questionCards = page.locator(".ai-interview-card");
-  if ((await questionCards.count()) > 0) {
-    const firstQ = questionCards.first();
-    await firstQ
-      .getByLabel("Your documented result")
-      .fill("The team reused the report for its weekly review.");
-    await firstQ
-      .getByRole("button", { name: "Preview updated bullet" })
-      .click();
-    await expect(firstQ.locator(".ai-interview-diff")).toBeVisible();
-    await firstQ
-      .getByLabel("This result is accurate and belongs to this work.")
-      .check();
-    await firstQ.getByRole("button", { name: "Use this bullet" }).click();
-  }
-
-  // Switch to Skill Discovery tab
-  await page.getByRole("tab", { name: "Find skills" }).click();
-  await expect(page.locator(".ai-skills-discovery")).toBeVisible();
-
-  // Close AI assistant modal
-  await page.getByRole("button", { name: "Close AI Assistant" }).click();
-  await expect(
-    page.getByRole("region", { name: "AI bullet assistant" }),
-  ).toHaveCount(0);
-
-  // Resume preview should reflect the applied summary
-  await expect(
-    page.getByRole("article", { name: "Resume preview" }),
-  ).toContainText("Experience:");
 });
 
 test("Studio Accessibility: global keyboard shortcuts (?, Esc, Ctrl+Z) and shortcuts cheat sheet", async ({

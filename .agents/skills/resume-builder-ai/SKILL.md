@@ -7,7 +7,7 @@ description: Implement an evidence-grounded chatbot and AI editing features insi
 
 Inspect the app's canonical document, revision model, and provider integration. Keep AI proposals separate from saved resume content. Read [chat-contract.md](references/chat-contract.md) when implementing prompts, tools, structured output, or evaluations.
 
-Make chat and AI assistants support concrete resume actions: gather missing facts, draft summaries, improve bullets via inline contextual magic bars, reorganize content, suggest supported skills, tailor to a pasted job description, and run the Google XYZ Impact Coach. Ask for missing impact evidence instead of inventing numbers. Preserve the distinction between an aspiration and a demonstrated skill.
+Make chat and AI assistants support concrete resume actions: gather missing facts, draft summaries, improve bullets via the per-field sparkle menu (inline accept or reject view), reorganize content, suggest supported skills, tailor to a pasted job description, and run the Google XYZ Impact Coach. Ask for missing impact evidence instead of inventing numbers. Preserve the distinction between an aspiration and a demonstrated skill.
 
 Use only candidate-provided facts for employers, dates, degrees, credentials, achievements, seniority, and skills. Every new factual assertion needs traceable support. A citation alone is insufficient: its source must actually support the claim. Suggestions requiring confirmation remain outside the resume until the user supplies the fact.
 
