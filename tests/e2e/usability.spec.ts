@@ -8,7 +8,7 @@ test("guided start creates only supplied facts and retains them after reload", a
 }) => {
   await page.goto("/builder");
   await page
-    .getByRole("button", { name: "Help me start", exact: true })
+    .getByRole("button", { name: "Start from my job title", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Start a CV with guidance" });
   await dialog
@@ -81,8 +81,8 @@ test("photo errors are recoverable and uploading enables preview on a supported 
     .click();
   const designs = page.getByRole("complementary", { name: "Design" });
   await expect(
-    designs.getByRole("tab", { name: "Supports photo" }),
-  ).toHaveAttribute("aria-selected", "true");
+    designs.getByRole("button", { name: /^Supports photo/ }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
     designs.getByRole("button", { name: "Classic template" }),
   ).toHaveCount(0);
@@ -253,12 +253,12 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await expect(page.locator("body")).not.toHaveClass(/modal-open/);
 });
 
-test("a photo on Brand shows the design warning and keeping the design hides it", async ({
+test("a photo on Tech Startup shows the design warning and keeping the design hides it", async ({
   page,
 }) => {
   await page.goto("/builder");
   const fixture = createDocument(true);
-  fixture.presentation.template = "bold";
+  fixture.presentation.template = "tech";
   await startSampleResume(page, fixture);
   await page.getByLabel("Choose resume photo").setInputFiles({
     name: "pixel.png",
@@ -270,7 +270,7 @@ test("a photo on Brand shows the design warning and keeping the design hides it"
   });
   const warning = page.locator(".photo-design-warning");
   await expect(warning).toContainText(
-    "Your current design (Brand) doesn't show photos.",
+    "Your current design (Tech Startup) doesn't show photos.",
   );
   await expect(page.getByText("Photo added", { exact: false })).toHaveCount(0);
   await warning

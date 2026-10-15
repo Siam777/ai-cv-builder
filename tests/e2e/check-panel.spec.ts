@@ -23,7 +23,10 @@ test("findings are grouped, fixable in place, and the panel stays open", async (
   );
   // No raw counters; completeness and a short checklist instead.
   await expect(panel).not.toContainText("0/0");
-  await expect(panel.getByRole("meter", { name: "CV strength" })).toBeVisible();
+  // On wide screens the meter lives in the steps rail; the panel keeps the checklist.
+  await expect(panel.locator(".check-checklist")).toContainText("Contact details");
+  await expect(page.getByRole("meter", { name: "CV strength" })).toHaveCount(1);
+  await expect(panel.getByRole("meter", { name: "CV strength" })).toHaveCount(0);
   await expect(
     panel.getByRole("region", { name: "Personal details" }),
   ).toContainText("Add your city or region");

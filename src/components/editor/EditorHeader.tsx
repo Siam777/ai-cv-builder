@@ -18,6 +18,8 @@ import type { SaveState } from "./types";
 
 export interface EditorHeaderProps {
   libraryMode?: boolean;
+  /** Title of the page heading shown in library mode. */
+  heading?: string;
   cloudUser: AccountUser | null;
   sessionUser: AccountUser | null;
   status: SaveState;
@@ -36,6 +38,7 @@ export interface EditorHeaderProps {
 
 export function EditorHeader({
   libraryMode = false,
+  heading = "My CVs",
   cloudUser,
   sessionUser,
   status,
@@ -153,11 +156,11 @@ export function EditorHeader({
       {libraryMode && (
         <div className="workspace-heading no-print" style={{ display: showAccount ? "none" : undefined }}>
           <div>
-            <h1>My CVs</h1>
+            <h1>{heading}</h1>
             <p>
               {cloudUser?.email
                 ? `Saved to your account · ${cloudUser.email}`
-                : "Saved in this browser. Demo examples have their own gallery."}
+                : "Saved in this browser."}
             </p>
           </div>
           <div className="save-indicator">

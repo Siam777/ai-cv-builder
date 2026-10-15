@@ -170,13 +170,15 @@
   display: flex;
 }
 .template-classic .block-photo,
-.template-executive .block-photo {
+.template-executive .block-photo,
+.template-elegant .block-photo {
   justify-content: center;
 }
 .template-modern .block-photo,
 .template-creative .block-photo,
 .template-timeline .block-photo,
-.template-minimalist .block-photo {
+.template-minimalist .block-photo,
+.template-bold .block-photo {
   justify-content: flex-start;
 }
 .resume-avatar-img {

@@ -31,6 +31,7 @@ export type RewriteStatus =
   | "checking"
   | "unreachable"
   | "account-needed"
+  | "browser-cv"
   | "session-expired"
   | "not-configured"
   | "ready";
@@ -42,8 +43,10 @@ export type RewriteStatus =
 export function rewriteStatus(
   owner: string | null,
   availability: { configured: boolean; signedIn: boolean } | "unreachable" | null,
+  /** Signed in, even if the open CV is still the copy saved in this browser. */
+  signedIn = false,
 ): RewriteStatus {
-  if (!owner) return "account-needed";
+  if (!owner) return signedIn ? "browser-cv" : "account-needed";
   if (!availability) return "checking";
   if (availability === "unreachable") return "unreachable";
   if (!availability.configured) return "not-configured";
@@ -57,6 +60,8 @@ export const REWRITE_STATUS_TEXT: Record<RewriteStatus, string> = {
     "Could not check whether AI rewriting is available. Check your connection and reopen this menu.",
   "account-needed":
     "AI rewriting works on CVs saved to your account. Sign in to use it. The other options work without it.",
+  "browser-cv":
+    "You are signed in, but this CV is still saved only in this browser. Copy it to your account to use AI rewriting. The other options work without it.",
   "session-expired":
     "Your sign-in has expired. Sign in again to use AI rewriting.",
   "not-configured":

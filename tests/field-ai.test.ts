@@ -196,6 +196,8 @@ test("tailored CV copies are locked on the free plan and open on paid plans", ()
 test("rewriteStatus explains why an AI rewrite is not available", () => {
   const live = { configured: true, signedIn: true };
   assert.equal(rewriteStatus(null, live), "account-needed");
+  // Signed in, but the open CV is still the copy saved in this browser.
+  assert.equal(rewriteStatus(null, null, true), "browser-cv");
   assert.equal(rewriteStatus("user-1", null), "checking");
   assert.equal(rewriteStatus("user-1", "unreachable"), "unreachable");
   assert.equal(

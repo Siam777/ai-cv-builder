@@ -70,7 +70,7 @@ test("without an email service, a signed-in unverified user can download a PDF",
   expect(account.user.canExport).toBe(true);
   page.on("dialog", (dialog) => dialog.accept());
   const download = page.waitForEvent("download");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page.getByRole("button", { name: "PDF Document (.pdf)" }).click();
   expect((await download).suggestedFilename()).toMatch(/\.pdf$/);
   await expect(page.locator(".account-panel")).toHaveCount(0);

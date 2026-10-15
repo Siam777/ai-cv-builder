@@ -109,6 +109,7 @@ const CV_MENU = [
   "Mark as my CV",
   "Demo examples",
   "Create practice example",
+  "Delete this CV",
 ];
 // The AI Assistant is one panel with three tabs.
 const AI_TABS: Record<string, string> = {
@@ -160,6 +161,17 @@ export async function openAccount(page: Page) {
   await page.getByRole("button", { name: "Account menu" }).click();
   await page
     .getByRole("menuitem", { name: /^(Account settings|Sign in)/ })
+    .click();
+}
+
+// Switch the account settings panel to one of its tabs.
+export async function accountTab(
+  page: Page,
+  name: "Profile" | "Sign-in & security" | "Data & privacy" | "Billing",
+) {
+  await page
+    .getByRole("tablist", { name: "Account sections" })
+    .getByRole("tab", { name, exact: true })
     .click();
 }
 

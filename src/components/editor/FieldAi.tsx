@@ -52,6 +52,7 @@ const SHORT_STATUS: Partial<Record<RewriteStatus, string>> = {
   checking: "Checking…",
   unreachable: "Could not check",
   "account-needed": "Needs your account",
+  "browser-cv": "Copy CV to your account",
   "session-expired": "Sign in again",
   "not-configured": "Not set up here",
 };
@@ -175,7 +176,8 @@ export function FieldAi({
   }, [pending]);
 
   const status = useMemo(
-    () => (ai ? rewriteStatus(ai.owner, ai.availability) : "account-needed"),
+    () =>
+      ai ? rewriteStatus(ai.owner, ai.availability, ai.signedIn) : "account-needed",
     [ai],
   );
   if (!ai) return null;
@@ -507,6 +509,11 @@ export function FieldAi({
                 session.status === "session-expired") && (
                 <button type="button" onClick={services.onOpenAccount}>
                   Sign in
+                </button>
+              )}
+              {session.status === "browser-cv" && (
+                <button type="button" className="primary" onClick={services.onCopyToAccount}>
+                  Copy to my account
                 </button>
               )}
             </div>

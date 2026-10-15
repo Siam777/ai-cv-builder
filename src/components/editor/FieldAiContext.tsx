@@ -26,6 +26,10 @@ export interface FieldAiServices {
   /** Signed-in account that owns the open CV; null for CVs on this device. */
   owner: string | null;
   availability: RewriteAvailability | "unreachable" | null;
+  /** Signed in, even when the open CV is the copy saved in this browser. */
+  signedIn: boolean;
+  /** Copies the open browser CV to the signed-in account and opens it there. */
+  onCopyToAccount: () => void;
   prepare: () => Promise<ResumeDocument>;
   accept: (proposal: Proposal) => Promise<void>;
   onOpenAccount: () => void;

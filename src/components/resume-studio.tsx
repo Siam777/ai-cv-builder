@@ -30,6 +30,7 @@ import {
   accountRequest,
   createCloudRepository,
   transferLocalResumes,
+  importReceipts,
   CloudRequestError,
 } from "@/lib/cloud-repository";
 import { userCanExport, type AccountUser } from "@/lib/cloud-contract";
@@ -45,7 +46,8 @@ import { lintResumeDocument } from "@/lib/linter/ats-linter";
 import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
 import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
-import { ColdStartImporter } from "./editor/ColdStartImporter";
+import { StartScreen } from "./editor/StartScreen";
+import { BrowserCvsBanner } from "./editor/BrowserCvsBanner";
 import {
   ImportReviewModal,
   type StagedImportData,
@@ -62,6 +64,7 @@ import { VersionHistoryModal } from "./editor/VersionHistoryModal";
 import { AddSectionModal } from "./editor/AddSectionModal";
 import { CheckPanel } from "./editor/CheckPanel";
 import { loadDismissed, saveDismissed } from "@/lib/dismissed-findings";
+import { issuesToFix } from "@/lib/check-findings";
 import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
@@ -85,7 +88,6 @@ import {
 } from "@/lib/session-events";
 import { GuidedStartModal } from "./editor/GuidedStartModal";
 import { PanelDialog } from "./editor/PanelDialog";
-import { Palette, Sparkles } from "lucide-react";
 
 function download(
   content: string | Uint8Array | BlobPart,
@@ -160,6 +162,7 @@ export function ResumeStudio({
   const pendingFieldId = useRef(0);
   const [showAiGen, setShowAiGen] = useState(false);
   const [showGuidedStart, setShowGuidedStart] = useState(false);
+  const [showStart, setShowStart] = useState(false);
   const [showDemoGallery, setShowDemoGallery] = useState(false);
   const [reviewedVariantUndo, setReviewedVariantUndo] = useState<{
     variantId: string;
@@ -173,6 +176,14 @@ export function ResumeStudio({
   const [isSubscriber, setIsSubscriber] = useState(false);
   const [currentPlanId, setCurrentPlanId] = useState<PlanId>("free");
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
+  // Browser CVs never copied to the signed-in account (one-time banner).
+  // CVs saved in this browser while signed in: all of them, and the ones that
+  // can still be copied (own CVs never copied before).
+  const [browserCvs, setBrowserCvs] = useState<{
+    total: number;
+    pending: ResumeDocument[];
+  } | null>(null);
+  const [browserCvsCheck, setBrowserCvsCheck] = useState(0);
   const rewriteAvailability = useRewriteAvailability(cloudUser?.id ?? null);
   const [sessionPaused, setSessionPaused] = useState(false);
   const paused = useRef(false);
@@ -214,8 +225,36 @@ export function ResumeStudio({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // The start screen replaces an empty library and opens from New CV.
+  const startVisible =
+    showStart || (!doc && (!showLibrary || !documents.length));
+  const cloudUserId = cloudUser?.id;
+  useEffect(() => {
+    setBrowserCvs(null);
+    if (!cloudUserId) return;
+    let active = true;
+    void Promise.all([createRepository().list(), importReceipts(cloudUserId)])
+      .then(([local, receipts]) => {
+        const copied = new Set(receipts.map((receipt) => receipt.source_id));
+        const pending = local.filter(
+          (item) =>
+            !copied.has(item.id) && item.provenance.purpose !== "practice",
+        );
+        if (active)
+          setBrowserCvs(local.length ? { total: local.length, pending } : null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [cloudUserId, browserCvsCheck]);
+
   function select(next: ResumeDocument) {
+    // Coming from the start screen or library, begin at the top of the form
+    // rather than wherever that page was scrolled.
+    if (current.current?.id !== next.id) window.scrollTo({ top: 0 });
     setShowLibrary(false);
+    setShowStart(false);
     setShowAI(false);
     clearTimeout(timer.current);
     current.current = next;
@@ -674,6 +713,45 @@ export function ResumeStudio({
       }
       await addDocument(next);
       if (selectedStart) clearStartingDesign();
+    });
+  }
+
+  /**
+   * Signed in while the open CV is still the copy saved in this browser (for
+   * example after signing in mid-edit): copy it to the account and open the
+   * account copy. The browser copy is kept.
+   */
+  function copyCurrentToAccount() {
+    const user = sessionUser;
+    const source = current.current;
+    if (!user || !source || cloudUser || sessionPaused) return;
+    void action(async () => {
+      await flush();
+      const latest =
+        (await repository.current!.list()).find((d) => d.id === source.id) ??
+        source;
+      let [result] = await transferLocalResumes(user.id, [latest]);
+      // Copied before: send the current version as a new copy so the latest
+      // edits reach the account.
+      if (result.status === "already_imported")
+        [result] = await transferLocalResumes(user.id, [
+          duplicateDocument(latest, latest.name),
+        ]);
+      await switchWorkspace(user, false);
+      const copy = (await repository.current!.list()).find(
+        (d) => d.id === result.resumeId,
+      );
+      if (copy) select(copy);
+      setNotice(
+        "This CV is now saved to your account, so AI rewriting is available. The copy in this browser was kept.",
+      );
+    });
+  }
+
+  /** Opens the start screen; the open CV stays as it is underneath. */
+  function openStart() {
+    void action(async () => {
+      setShowStart(true);
     });
   }
 
@@ -1232,7 +1310,9 @@ export function ResumeStudio({
         </a>
       )}
       <EditorHeader
-        libraryMode={showLibrary}
+        libraryMode={showLibrary || startVisible}
+        // "New CV" only when asked for; an empty My CVs keeps its name.
+        heading={showStart ? "New CV" : "My CVs"}
         cloudUser={cloudUser}
         sessionUser={sessionUser}
         status={status}
@@ -1251,6 +1331,7 @@ export function ResumeStudio({
         }
         onOpenLibrary={() => {
           void action(async () => {
+            setShowStart(false);
             setShowLibrary(true);
           });
         }}
@@ -1277,7 +1358,6 @@ export function ResumeStudio({
             beforeChange={
               pendingExport || sessionPaused ? async () => {} : flush
             }
-            beforeNavigate={flush}
             pendingAction={pendingExport ? "Continue export" : undefined}
             onAuthenticated={async (user) => {
               setSessionUser(user);
@@ -1292,8 +1372,11 @@ export function ResumeStudio({
                 await performExport(pendingExport, user);
               }
             }}
-            onLocal={() => switchWorkspace(null)}
             onCloud={(user) => switchWorkspace(user)}
+            onOpenPricing={() => {
+              setShowAccount(false);
+              setShowPricing(true);
+            }}
             onSignedOut={handleSignedOut}
             onClose={() => {
               setShowAccount(false);
@@ -1308,6 +1391,7 @@ export function ResumeStudio({
               const result = await transferLocalResumes(owner, docs);
               if (cloudUser?.id === owner)
                 await switchWorkspace(cloudUser, false);
+              setBrowserCvsCheck((count) => count + 1);
               return `${result.filter((r) => r.status === "imported").length} resumes copied. Local originals were kept.`;
             }}
             onExport={async (owner) => {
@@ -1458,7 +1542,7 @@ export function ResumeStudio({
       {staged && (
         <ImportReviewModal
           staged={staged}
-          hasActiveDoc={!!doc}
+          hasActiveDoc={!!doc && !showStart}
           busy={busy}
           onRestoreAsNew={() => {
             void action(async () => {
@@ -1469,7 +1553,7 @@ export function ResumeStudio({
             });
           }}
           onReplaceActive={
-            doc
+            doc && !showStart
               ? () => {
                   void action(async () => {
                     const imported = structuredClone(staged.document);
@@ -1561,7 +1645,52 @@ export function ResumeStudio({
             e.target.value = "";
           }}
         />
-        {showLibrary ? (
+        {cloudUser && browserCvs && !(doc && !showLibrary && !showStart) && (
+          <BrowserCvsBanner
+            key={`${cloudUser.id}:${browserCvsCheck}`}
+            userId={cloudUser.id}
+            email={cloudUser.email}
+            total={browserCvs.total}
+            documents={browserCvs.pending}
+            busy={busy || !ready}
+            onShow={() => void action(() => switchWorkspace(null))}
+            onDone={() => setBrowserCvsCheck((count) => count + 1)}
+            onCopy={async (selected) => {
+              await flush();
+              const result = await transferLocalResumes(
+                cloudUser.id,
+                selected,
+              );
+              await switchWorkspace(cloudUser, false);
+              setNotice(
+                `${result.filter((r) => r.status === "imported").length} CVs copied to your account. The copies in this browser were kept.`,
+              );
+            }}
+          />
+        )}
+        {startVisible ? (
+          <StartScreen
+            disabled={!ready || busy || status === "Save failed"}
+            signedIn={!!cloudUser}
+            startingDesign={selectedStart?.label}
+            onClearStartingDesign={clearStartingDesign}
+            onStaged={(data) => setStaged(data)}
+            onError={setError}
+            onScratch={createSelectedResume}
+            onGuided={() => setShowGuidedStart(true)}
+            onExamples={() => setShowDemoGallery(true)}
+            onPractice={() => setShowAiGen(true)}
+            onRestoreBackup={() => fileInput.current?.click()}
+            onBack={
+              documents.length
+                ? () => {
+                    setShowStart(false);
+                    if (!doc) setShowLibrary(true);
+                  }
+                : undefined
+            }
+          />
+        ) : showLibrary || !doc ? (
           <>
             {selectedStart && (
               <section
@@ -1571,8 +1700,8 @@ export function ResumeStudio({
                 <div>
                   <strong>Start with {selectedStart.label}</strong>
                   <p>
-                    Create my resume will use this design with empty personal
-                    details. Existing CVs stay unchanged.
+                    New CV will use this design with empty personal details.
+                    Existing CVs stay unchanged.
                   </p>
                 </div>
                 <button disabled={busy || !ready} onClick={clearStartingDesign}>
@@ -1594,75 +1723,9 @@ export function ResumeStudio({
               onClassify={(next, purpose) => {
                 void classifyDocument(next, purpose);
               }}
-              onNew={createSelectedResume}
-              onImport={() => {
-                setShowLibrary(false);
-                current.current = null;
-                setDoc(null);
-              }}
-              onExamples={() => setShowDemoGallery(true)}
-              onAccount={() => setShowAccount(true)}
-              onGuidedStart={() => setShowGuidedStart(true)}
+              onNew={openStart}
             />
           </>
-        ) : !doc ? (
-          <main id="workspace-main" tabIndex={-1} className="welcome no-print">
-            <Sparkles className="welcome-symbol" size={40} aria-hidden />
-            <p className="eyebrow">A fresh start</p>
-            <h2>
-              Your experience deserves
-              <br />a thoughtful introduction.
-            </h2>
-            <p>
-              Start with a blank page, upload your current resume, or explore a
-              fictional example.
-              <br />
-              {cloudUser
-                ? "Your resumes are saved in your account."
-                : "Your resumes stay in this browser, on this device."}
-            </p>
-            <div className="button-row">
-              <button
-                className="primary"
-                disabled={!ready || busy || status === "Save failed"}
-                onClick={() => {
-                  void action(() => addDocument(createDocument()));
-                }}
-              >
-                Create my resume <span>↗</span>
-              </button>
-              <button
-                disabled={!ready || busy || status === "Save failed"}
-                onClick={() => {
-                  setShowDemoGallery(true);
-                }}
-              >
-                Explore an example
-              </button>
-              <button
-                disabled={!ready || busy}
-                onClick={() => fileInput.current?.click()}
-              >
-                Restore a backup
-              </button>
-            </div>
-
-            <ColdStartImporter
-              disabled={!ready || busy}
-              onStaged={(data) => setStaged(data)}
-              onError={(err) => setError(err)}
-              onOpenAiGenerator={() => setShowAiGen(true)}
-              onOpenDemoGallery={() => setShowDemoGallery(true)}
-            />
-
-            <p className="privacy-note">
-              Edit on this device without an account. Sign in to download or
-              export.
-              <br />
-              Clearing browser data removes local resumes. Server export
-              processing requires your confirmation.
-            </p>
-          </main>
         ) : (
           <>
             <EditorToolbar
@@ -1683,18 +1746,15 @@ export function ResumeStudio({
                     ? sessionPaused
                       ? undefined
                       : {
-                          label: "Open my account CVs",
-                          onClick: () => {
-                            const user = sessionUser;
-                            void action(() => switchWorkspace(user));
-                          },
+                          label: "Copy to my account",
+                          onClick: copyCurrentToAccount,
                         }
                     : {
                         label: "Sign in to back up",
                         onClick: () => setShowAccount(true),
                       }
               }
-              strength={strength.percent}
+              issueCount={issuesToFix(allIssues, dismissed).length}
               activePanel={activePanel}
               onRename={(name) =>
                 update((d) => {
@@ -1714,9 +1774,8 @@ export function ResumeStudio({
                   select(next);
                 });
               }}
-              onNew={() => {
-                void action(() => addDocument(createDocument()));
-              }}
+              onNew={openStart}
+              onDelete={() => deleteSavedDocument(doc)}
               onDuplicate={() => {
                 void action(() =>
                   addDocument(duplicateDocument(current.current!)),
@@ -1760,7 +1819,7 @@ export function ResumeStudio({
             <main
               id="workspace-main"
               tabIndex={-1}
-              className={`editor-layout show-${mobileTab}${activePanel && !sheetLayout ? " has-panel" : ""}`}
+              className={`editor-layout show-${mobileTab}${activePanel && !sheetLayout ? " has-panel" : ""}${activePanel === "design" && !sheetLayout ? " has-design" : ""}`}
             >
               <EditorSidebar
                 doc={doc}
@@ -1782,6 +1841,8 @@ export function ResumeStudio({
                   doc,
                   owner: cloudUser?.id ?? null,
                   availability: rewriteAvailability,
+                  signedIn: !!sessionUser,
+                  onCopyToAccount: copyCurrentToAccount,
                   prepare: prepareAI,
                   accept: acceptAI,
                   onOpenAccount: () => {
@@ -1814,7 +1875,6 @@ export function ResumeStudio({
                     });
                     setSectionId("contact");
                   }}
-                  onDeleteResume={() => deleteSavedDocument(doc)}
                   steps={steps}
                   onStep={goToStep}
                   onFinish={() => setShowAts(true)}
@@ -1873,6 +1933,8 @@ export function ResumeStudio({
                       doc={doc}
                       owner={cloudUser?.id ?? null}
                       availability={rewriteAvailability}
+                      signedIn={!!sessionUser}
+                      onCopyToAccount={copyCurrentToAccount}
                       onStartAction={startFieldAction}
                       onOpenAccount={() => {
                         setShowAI(false);
@@ -1931,7 +1993,8 @@ export function ResumeStudio({
                 id="resume-preview-panel"
                 className="preview-panel"
                 aria-label="Live preview"
-                hidden={!!activePanel && !sheetLayout}
+                // Design sits in the form's column so the preview stays visible.
+                hidden={!!activePanel && activePanel !== "design" && !sheetLayout}
               >
                 <div className="preview-toolbar no-print">
                   <div className="preview-toolbar-left">
@@ -1944,14 +2007,6 @@ export function ResumeStudio({
                         )!.name
                       }
                     </span>
-                    <button
-                      type="button"
-                      className="preview-change-style-btn"
-                      onClick={() => setShowDesign(true)}
-                      title="Change template, colors, and typography"
-                    >
-                      <Palette size={16} aria-hidden /> Change style
-                    </button>
                   </div>
                   {!showDesign && (
                   <label>

@@ -1,4 +1,8 @@
-import type { ResumeDocument, SectionType } from "../document";
+import {
+  isAchievementSection,
+  type ResumeDocument,
+  type SectionType,
+} from "../document";
 
 export interface AtsLintIssue {
   id: string;
@@ -89,7 +93,10 @@ export function lintBullet(
   if (!text)
     return { counted: false, weakOpening: false, hasMetric: false, issues };
   const words = wordCount(text);
-  const weakOpening = isWeakOpening(text);
+  // List items such as a skill or a language may be one word; only
+  // achievement sentences get the verb and length checks.
+  const sentence = isAchievementSection(sectionType);
+  const weakOpening = sentence && isWeakOpening(text);
   if (weakOpening) {
     issues.push({
       id: `weak-verb-${ref.bulletId}`,
@@ -113,7 +120,9 @@ export function lintBullet(
         "Describe a real outcome. Include a number only if you can support it; qualitative outcomes can also be useful.",
     });
   }
-  if (words < 5) {
+  if (!sentence) {
+    // No length checks for list items.
+  } else if (words < 5) {
     issues.push({
       id: `short-${ref.bulletId}`,
       ruleId: "bullet_length",
@@ -131,7 +140,8 @@ export function lintBullet(
       ...ref,
     });
   }
-  return { counted: true, weakOpening, hasMetric, issues };
+  // Only achievement sentences count toward the bullet and result totals.
+  return { counted: sentence, weakOpening, hasMetric, issues };
 }
 
 /**
@@ -174,7 +184,8 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
     issues.push({
       id: "contact-location",
       ruleId: "contact_missing",
-      severity: "warning",
+      // Optional advice, so it is a suggestion rather than a warning.
+      severity: "suggestion",
       message:
         "Location is missing. Consider including it if relevant to your application.",
       sectionId: "contact",

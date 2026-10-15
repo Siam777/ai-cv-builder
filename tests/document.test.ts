@@ -168,8 +168,14 @@ test("layout shows the photo only on photo designs that have it switched on", ()
   const hasPhoto = () => layoutBlocks(doc).some((block) => block.kind === "photo");
   doc.presentation.template = "modern";
   assert.equal(hasPhoto(), true);
-  doc.presentation.template = "bold";
-  assert.equal(hasPhoto(), false);
+  for (const template of ["bold", "executive", "elegant"] as const) {
+    doc.presentation.template = template;
+    assert.equal(hasPhoto(), true, template);
+  }
+  for (const template of ["classic", "compact", "academic", "tech"] as const) {
+    doc.presentation.template = template;
+    assert.equal(hasPhoto(), false, template);
+  }
   doc.presentation.template = "modern";
   doc.presentation.showPhoto = false;
   assert.equal(hasPhoto(), false);

@@ -169,12 +169,19 @@ test("side panels dock beside the form, keep it usable and close with Escape", a
   await expect(design).toHaveAttribute("aria-pressed", "true");
   const panel = page.getByRole("complementary", { name: "Design" });
   await expect(panel).toBeVisible();
+  // Design takes the form's column, so the CV stays visible while choosing.
+  await expect(preview).toBeVisible();
+  await expect(page.getByLabel("Full name", { exact: true })).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(preview).toBeVisible();
+
+  // Check and AI dock beside the form, which stays editable.
+  await page.getByRole("button", { name: /^AI Assistant/ }).click();
   await expect(preview).toBeHidden();
-  // The form stays editable while a panel is open.
   await page.getByLabel("Full name", { exact: true }).fill("Docked edit");
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("Docked edit");
   await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
   await expect(preview).toBeVisible();
 
   // Jumping to a finding keeps the Check panel open.

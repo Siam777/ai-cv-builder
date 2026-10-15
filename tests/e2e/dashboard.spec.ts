@@ -110,18 +110,19 @@ for (const width of [360, 768, 1440]) {
     );
     await capture("empty");
     await page
-      .getByRole("button", { name: "Create my resume", exact: true })
+      .getByRole("button", { name: "Start from scratch", exact: true })
       .click();
     await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
       "Untitled resume",
     );
-    await expect(page.getByRole("button", { name: /^Check/ })).toContainText(
-      "0%",
+    // The badge counts findings to fix, not sections not started yet.
+    await expect(page.getByRole("button", { name: /^Check/ })).toHaveAccessibleName(
+      /^Check \d+ to fix$/,
     );
     await capture("start");
     if (width > 520) {
       // The strength card points to the first missing item.
-      await page.getByRole("button", { name: /^Next: Add your name/ }).click();
+      await page.getByRole("button", { name: /^Suggested: Add your name/ }).click();
       await expect(page.getByLabel("Full name", { exact: true })).toBeFocused();
     }
     await page
@@ -299,10 +300,10 @@ test("account dashboard duplicate/delete affect account CVs and preserve indepen
   const deviceBefore = await deviceDocuments(page);
   const user = await authenticateForExport(page);
   await openAccount(page);
-  await page.getByRole("button", { name: "Open account workspace" }).click();
+  await page.getByRole("button", { name: "Open my account CVs" }).click();
   await page.getByRole("button", { name: "Close account settings" }).click();
   await page
-    .getByRole("button", { name: "Create my resume", exact: true })
+    .getByRole("button", { name: "Start from scratch", exact: true })
     .click();
   await page.getByLabel("CV name").fill("Account original");
   await library(page);

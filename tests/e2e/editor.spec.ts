@@ -43,12 +43,13 @@ test("creation, save/reload, independent variants, undo, imports and exports", a
     .getByRole("complementary", { name: "Resume sections" })
     .getByRole("button", { name: /^Experience/ })
     .click();
+  await page.locator(".section-settings > summary").click();
   await page.getByLabel("Show in resume").uncheck();
   await expect(page.getByRole("article")).not.toContainText("Northstar");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("article")).toContainText("Northstar");
   await page.getByLabel("Page size").selectOption("Letter");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const backupDownload = page.waitForEvent("download");
   await page
@@ -124,7 +125,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
 }) => {
   test.setTimeout(60000);
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Create my resume" }).click();
+  await page.getByRole("button", { name: "Start from scratch", exact: true }).click();
   await page.getByLabel("Full name", { exact: true }).fill("Zoë Example");
   for (const name of [
     "Profile",
@@ -140,7 +141,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
       .getByRole("button", { name: new RegExp(name) })
       .click();
     await page
-      .getByRole("button", { name: /^\+ Add (entry|experience)$/ })
+      .getByRole("button", { name: /^Add your first / })
       .click();
     if (name === "Profile")
       await page
@@ -162,6 +163,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
         .fill(`Details for ${name}.`);
     }
   }
+  await page.locator(".section-settings > summary").click();
   await page.getByLabel("Section heading").fill("Spoken languages");
   await page
     .getByRole("button", { name: "Move section up", exact: true })
@@ -175,7 +177,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
   );
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("article")).toContainText("Languages evidence");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const textDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
@@ -393,13 +395,13 @@ test("Pricing modal displays commercial tiers, entitlement benefits, and initiat
     .click();
   await expect(dialog).toHaveCount(0);
   await expect(
-    page.getByRole("region", { name: "Account and storage" }),
+    page.getByRole("region", { name: "Account settings" }),
   ).toBeVisible();
 
   // Close account modal
   await page.getByRole("button", { name: "Close account settings" }).click();
   await expect(
-    page.getByRole("region", { name: "Account and storage" }),
+    page.getByRole("region", { name: "Account settings" }),
   ).toHaveCount(0);
 });
 
@@ -463,7 +465,7 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
 
   await authenticateForExport(page);
   // Test Direct PDF download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const pdfDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "PDF Document (.pdf)" }).click();
   const pdfDownload = await pdfDownloadPromise;
@@ -471,35 +473,35 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
   expect(pdfDownload.suggestedFilename()).not.toMatch(/^[0-9a-f-]{36}$/i); // Must not be raw UUID without extension
 
   // Test HTML download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const htmlDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Standalone HTML (.html)" }).click();
   const htmlDownload = await htmlDownloadPromise;
   expect(htmlDownload.suggestedFilename()).toMatch(/\.html$/i);
 
   // Test DOCX download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const docxDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Word Document (.docx)" }).click();
   const docxDownload = await docxDownloadPromise;
   expect(docxDownload.suggestedFilename()).toMatch(/\.docx$/i);
 
   // Test Markdown download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const mdDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Markdown (.md)" }).click();
   const mdDownload = await mdDownloadPromise;
   expect(mdDownload.suggestedFilename()).toMatch(/\.md$/i);
 
   // Test Plain Text download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const txtDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
   const txtDownload = await txtDownloadPromise;
   expect(txtDownload.suggestedFilename()).toMatch(/\.txt$/i);
 
   // Test Backup JSON download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const jsonDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Backup (.json)" }).click();
   const jsonDownload = await jsonDownloadPromise;
@@ -625,11 +627,10 @@ test("Version history modal creates checkpoints and forks variants", async ({
   );
 });
 
-test("Cold-start dropzone ingests and parses LinkedIn Positions.csv", async ({
+test("start screen upload ingests and parses LinkedIn Positions.csv", async ({
   page,
 }) => {
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Import my CV" }).click();
   const linkedInPositionsCsv = `Company Name,Title,Location,Started On,Finished On,Description\n"Vercel, Inc.","Principal Engineer","Remote","Jan 2022",,"• Architected Next.js performance optimizations\n• Shipped edge runtime features"`;
 
   await page.getByLabel("Upload existing resume").setInputFiles({
@@ -684,7 +685,8 @@ test("Custom sections: add preset section, edit entry, save to library, preview,
   // Starter example should be populated
   await expect(page.locator("input[value*='Keynote Speaker']")).toBeVisible();
 
-  // Click Save to Library
+  // Click Save to Library (in the collapsed section settings)
+  await page.locator(".section-settings > summary").click();
   const saveLibraryBtn = page.getByRole("button", {
     name: "Save section to library",
   });

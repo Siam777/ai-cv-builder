@@ -16,7 +16,7 @@ test("render failure preserves the draft without falling back to print", async (
   await page.route("**/api/exports", route => route.fulfill({ status: 503, json: { error: "RENDER_FAILED", message: "Renderer unavailable. Retry export." } }));
   let downloads = 0;
   page.on("download", () => downloads++);
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page.getByRole("button", { name: "PDF Document (.pdf)" }).click();
   await expect(page.locator(".alert")).toContainText("Renderer unavailable");
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("Alex Morgan");
@@ -46,7 +46,7 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   page,
 }) => {
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Browse demo examples" }).click();
+  await page.getByRole("button", { name: "Browse example CVs" }).click();
   await page.locator(".demo-profile-card").first().getByRole("button").click();
   await expect(page.getByRole("dialog")).toContainText("Read-only example");
   await page.getByRole("button", { name: "Close demo gallery" }).click();
@@ -54,7 +54,7 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   await page.reload();
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(page.locator(".library-card")).toHaveCount(0);
-  await page.getByRole("button", { name: "Browse demo examples" }).click();
+  await page.getByRole("button", { name: "Browse example CVs" }).click();
   await page.locator(".demo-profile-card").first().getByRole("button").click();
   await page.getByRole("button", { name: "Use this design" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
@@ -146,7 +146,7 @@ test("signed-out export preserves edits and resumes chosen format after sign-in"
   await page
     .getByLabel("Full name", { exact: true })
     .fill("Draft kept through sign-in");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page
     .getByRole("button", { name: "Backup (.json)", exact: true })
     .click();
@@ -178,7 +178,7 @@ test("signed-out export preserves edits and resumes chosen format after sign-in"
     headers: { origin: (process.env.E2E_ORIGIN || "http://localhost:3100") },
     data: { action: "signout" },
   });
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
   await expect(page.locator(".account-panel")).toBeVisible();
 });

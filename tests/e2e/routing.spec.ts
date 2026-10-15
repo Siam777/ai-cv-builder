@@ -7,14 +7,11 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
   }) => {
     await page.goto("/profile");
 
-    // Profile heading must be visible
+    // Signed out, the account page offers sign-in
     await expect(
-      page.getByRole("heading", { name: "Your Profile & Account Settings" }),
+      page.getByRole("heading", { level: 1, name: "Sign in" }),
     ).toBeVisible();
-
-    // Storage options must be visible
-    await expect(page.getByText("On this device", { exact: true })).toBeVisible();
-    await expect(page.getByText("In your account", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Account settings" })).toBeVisible();
 
     // The CV editor components must NOT be present
     await expect(page.locator(".editor-layout")).toHaveCount(0);
@@ -23,7 +20,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await expect(page.locator(".cv-title")).toHaveCount(0);
 
     // Header back link to studio
-    const backBtn = page.getByRole("link", { name: "← Back to Resume Studio" });
+    const backBtn = page.getByRole("link", { name: "Back to My CVs" });
     await expect(backBtn).toBeVisible();
     await backBtn.click();
     await expect(page).toHaveURL("/builder");
@@ -33,7 +30,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await page.goto("/account");
     await expect(page).toHaveURL(/.*\/profile/);
     await expect(
-      page.getByRole("heading", { name: "Your Profile & Account Settings" }),
+      page.getByRole("heading", { level: 1, name: "Sign in" }),
     ).toBeVisible();
   });
 
@@ -90,14 +87,14 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // Open Account settings
     await openAccount(page);
-    await expect(page.getByRole("region", { name: "Account and storage" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Account settings" })).toBeVisible();
 
     // While account settings are active, workspace-body CV editor must be hidden (display: none)
     await expect(page.locator(".workspace-body")).toBeHidden();
 
     // Close account settings
     await page.getByRole("button", { name: "Close account settings" }).click();
-    await expect(page.getByRole("region", { name: "Account and storage" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Account settings" })).toHaveCount(0);
 
     // Workspace-body CV editor must be visible again
     await expect(page.locator(".workspace-body")).toBeVisible();

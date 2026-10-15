@@ -44,3 +44,17 @@ test("results count when at least half of the experience bullets have a number",
     for (const bullet of entry.bullets) bullet.text = "Cut costs by 20%.";
   assert.equal(cvStrength(doc).items.find((i) => i.id === "results")!.done, true);
 });
+
+test("contact guidance names only what is still missing", () => {
+  const doc = createDocument();
+  const reach = () => cvStrength(doc).items.find((i) => i.id === "reach")!;
+  assert.equal(reach().action, "Add an email and a phone or location");
+  doc.contact.email = "sam@example.com";
+  assert.equal(reach().action, "Add a phone number or your city");
+  assert.equal(reach().detail, "(add phone or city)");
+  doc.contact.email = "";
+  doc.contact.phone = "+44 20 0000 0000";
+  assert.equal(reach().action, "Add your email address");
+  doc.contact.email = "sam@example.com";
+  assert.equal(reach().done, true);
+});

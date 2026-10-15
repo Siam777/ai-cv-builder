@@ -112,7 +112,7 @@ export function EditorSidebar({
             onClick={() => onNextStep?.(next.stepId)}
           >
             <span>
-              Next: {next.action}
+              Suggested: {next.action}
               <small>+{Math.round((next.weight / strength.items.reduce((s, i) => s + i.weight, 0)) * 100)}%</small>
             </span>
             <ArrowRight size={16} aria-hidden />

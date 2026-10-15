@@ -1,4 +1,4 @@
-import { startSampleResume, openFirstCv, authenticateForExport, verifyTestEmail, openAccount } from "./helpers";
+import { startSampleResume, openFirstCv, authenticateForExport, verifyTestEmail, openAccount, accountTab } from "./helpers";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
@@ -286,13 +286,14 @@ test("account UI explicitly copies local resumes and returns to local after dele
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Open account workspace" }),
+    page.getByRole("button", { name: "Open my account CVs" }),
   ).toBeVisible();
   await verifyTestEmail(page.request, email);
-  await page.getByRole("button", { name: "Open account workspace" }).click();
+  await page.getByRole("button", { name: "Open my account CVs" }).click();
   await expect(page.locator(".cv-title")).toHaveCount(0);
+  await accountTab(page, "Data & privacy");
   await page
-    .getByRole("button", { name: "Review local resumes for import" })
+    .getByRole("button", { name: "Choose CVs to copy" })
     .click();
   const copy = page.getByRole("button", { name: "Copy 0 selected to account" });
   await expect(copy).toBeDisabled();
@@ -339,6 +340,7 @@ test("account UI explicitly copies local resumes and returns to local after dele
     "Account copy",
   );
   await openAccount(page);
+  await accountTab(page, "Data & privacy");
   await page
     .getByRole("button", { name: "Delete account and cloud resumes" })
     .click();

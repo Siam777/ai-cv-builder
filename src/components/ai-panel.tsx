@@ -25,6 +25,9 @@ export interface AIPanelProps {
   /** Jump to the field an item is about and open its sparkle action. */
   onStartAction: (item: HelpItem) => void;
   onOpenAccount: () => void;
+  /** Signed in while the open CV is still saved only in this browser. */
+  signedIn?: boolean;
+  onCopyToAccount?: () => void;
   onOpenCheck: () => void;
   /** The "Match a job" and "Cover letter" tools, built by the studio. */
   jobTab: ReactNode;
@@ -42,6 +45,8 @@ export function AIPanel({
   initialTab = "help",
   onStartAction,
   onOpenAccount,
+  signedIn = false,
+  onCopyToAccount,
   onOpenCheck,
   jobTab,
   letterTab,
@@ -50,7 +55,7 @@ export function AIPanel({
   // Tools keep what was typed in them while another tab is open.
   const [visited, setVisited] = useState<Set<AiTab>>(new Set([initialTab]));
   const items = useMemo(() => helpMeFinish(doc), [doc]);
-  const status = rewriteStatus(owner, availability);
+  const status = rewriteStatus(owner, availability, signedIn);
 
   function select(next: AiTab) {
     setTab(next);
@@ -121,6 +126,11 @@ export function AIPanel({
           {(status === "account-needed" || status === "session-expired") && (
             <button type="button" onClick={onOpenAccount}>
               Sign in
+            </button>
+          )}
+          {status === "browser-cv" && onCopyToAccount && (
+            <button type="button" className="primary" onClick={onCopyToAccount}>
+              Copy to my account
             </button>
           )}
         </div>

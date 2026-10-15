@@ -10,7 +10,10 @@ test("AI controls keep local data private and require account storage", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await page.getByRole("button", { name: /Experience/ }).click();
+  await page
+    .locator(".section-nav")
+    .getByRole("button", { name: /^Experience/ })
+    .click();
   await page
     .getByRole("button", { name: "AI help for Bullet 1", exact: true })
     .first()

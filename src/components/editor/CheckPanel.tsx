@@ -17,7 +17,12 @@ import type { ResumeDocument } from "@/lib/document";
 import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { auditAtsExtraction } from "@/lib/linter/ats-plain-text";
 import type { CvStrength } from "@/lib/cv-strength";
-import { describeFinding, groupFindings } from "@/lib/check-findings";
+import {
+  describeFinding,
+  groupFindings,
+  isNotStarted,
+  issuesToFix,
+} from "@/lib/check-findings";
 import { FileDiagnostics } from "./FileDiagnostics";
 import { RoleComparison } from "./RoleComparison";
 
@@ -115,16 +120,19 @@ export function CheckPanel({
   const [advancedView, setAdvancedView] = useState<"text" | "file">("text");
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const open = useMemo(
-    () => issues.filter((issue) => !dismissed.has(issue.id)),
+  // Sections not started yet are to-dos, listed apart and not counted.
+  const fixable = useMemo(() => issues.filter((issue) => !isNotStarted(issue)), [issues]);
+  const open = useMemo(() => issuesToFix(issues, dismissed), [issues, dismissed]);
+  const notStarted = useMemo(
+    () => issues.filter((issue) => isNotStarted(issue) && !dismissed.has(issue.id)),
     [issues, dismissed],
   );
-  const hidden = issues.length - open.length;
+  const hidden = fixable.length - open.length;
   // With nothing dismissed there is nothing to show or hide.
   const listDismissed = showDismissed && hidden > 0;
   const groups = useMemo(
-    () => groupFindings(doc, listDismissed ? issues : open),
-    [doc, issues, open, listDismissed],
+    () => groupFindings(doc, listDismissed ? fixable : open),
+    [doc, fixable, open, listDismissed],
   );
   const ordered = useMemo(
     () =>
@@ -265,8 +273,10 @@ export function CheckPanel({
           </div>
           {open.length === 0 && (
             <p className="findings-empty">
-              <CircleCheck size={20} aria-hidden /> The current checks found
-              nothing. Read your CV once more before you send it.
+              <CircleCheck size={20} aria-hidden />{" "}
+              {notStarted.length
+                ? "Nothing to fix in what you have written so far."
+                : "The current checks found nothing. Read your CV once more before you send it."}
             </p>
           )}
           {groups.map((group) => (
@@ -295,6 +305,31 @@ export function CheckPanel({
               </ul>
             </section>
           ))}
+          {notStarted.length > 0 && (
+            <section className="not-started" aria-labelledby="not-started-heading">
+              <h3 id="not-started-heading">
+                Not started yet <span className="count">{notStarted.length}</span>
+              </h3>
+              <p>Add an entry when you are ready, or hide a section you do not need.</p>
+              <ul>
+                {notStarted.map((issue) => {
+                  const section = doc.sections.find((s) => s.id === issue.sectionId);
+                  return (
+                    <li key={issue.id}>
+                      <span>{section?.label || "Section"}</span>
+                      <button
+                        type="button"
+                        onClick={() => onOpenStep(issue.sectionId!)}
+                        aria-label={`Open ${section?.label || "section"}`}
+                      >
+                        Open
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {hidden > 0 && (
             <button
               type="button"

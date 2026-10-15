@@ -105,7 +105,7 @@ for (const width of [360, 768, 1440]) {
       "Saved in this browser",
     );
     await capture("library-empty", true);
-    await page.getByRole("button", { name: "Browse demo examples" }).click();
+    await page.getByRole("button", { name: "Browse example CVs" }).click();
     await capture("demo-gallery");
     await page
       .locator(".demo-profile-card")
@@ -229,7 +229,7 @@ for (const width of [360, 768, 1440]) {
     await capture("export-menu");
     await page.getByRole("button", { name: "Plain text (.txt)" }).click();
     await expect(
-      page.getByRole("region", { name: "Account and storage" }),
+      page.getByRole("region", { name: "Account settings" }),
     ).toBeVisible();
     await capture("export-signin", true);
     await page.getByRole("button", { name: "Close account settings" }).click();

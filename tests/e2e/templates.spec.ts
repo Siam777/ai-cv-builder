@@ -129,7 +129,7 @@ test("print uses the authenticated server-rendered document", async ({
   await page
     .getByLabel("Full name", { exact: true })
     .fill("Current print revision");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const response = page.waitForResponse(
     (r) => r.url().endsWith("/api/exports") && r.request().method() === "POST",
   );
@@ -279,7 +279,7 @@ test("design switching persists without changing facts; hidden mobile editor pag
   await expect(page.getByLabel("Resume font")).toHaveValue("humanist");
   await expect(page.getByLabel("Accent color")).toHaveValue("rust");
   await page.getByRole("button", { name: "Close Design" }).click();
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const downloading = page.waitForEvent("download");
   await page

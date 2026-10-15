@@ -85,10 +85,18 @@ export function cvStrength(
     {
       id: "reach",
       label: "Contact details",
-      action: "Add an email and a phone or location",
+      // Name only what is still missing.
+      action: !hasText(c.email)
+        ? hasText(c.phone) || hasText(c.location)
+          ? "Add your email address"
+          : "Add an email and a phone or location"
+        : "Add a phone number or your city",
       weight: 10,
       done: hasText(c.email) && (hasText(c.phone) || hasText(c.location)),
       stepId: "contact",
+      detail: hasText(c.email) && !hasText(c.phone) && !hasText(c.location)
+        ? "(add phone or city)"
+        : undefined,
     },
     {
       id: "headline",

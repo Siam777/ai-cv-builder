@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  isAchievementSection,
   labels,
   newEntry,
   type Entry,
   type ResumeDocument,
   type Section,
+  type SectionType,
 } from "@/lib/document";
 import { saveCustomSectionToLibrary } from "@/lib/custom-sections";
 import type { AccountUser } from "@/lib/cloud-contract";
@@ -17,7 +19,7 @@ import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import { FieldAi } from "./FieldAi";
 import type { FocusTarget } from "./types";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Save, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Plus, Save, Settings2, Trash2, X } from "lucide-react";
 
 export interface SectionEditorProps {
   doc: ResumeDocument;
@@ -27,7 +29,6 @@ export interface SectionEditorProps {
   focusTarget?: FocusTarget | null;
   onUpdateDocument: (mutator: (draft: ResumeDocument) => void) => void;
   onDeleteSection?: (sectionId: string) => void;
-  onDeleteResume: () => void;
   onOpenPhotoDesigns?: () => void;
   /** Finding ids the person dismissed; their inline hints are hidden. */
   dismissed?: Set<string>;
@@ -38,6 +39,29 @@ export interface SectionEditorProps {
   onFinish?: () => void;
 }
 
+/** What one entry is called in the add buttons, by section type. */
+const ENTRY_NOUN: Record<SectionType, string> = {
+  summary: "summary",
+  experience: "job",
+  education: "school or course",
+  skills: "skill group",
+  projects: "project",
+  certifications: "certificate",
+  languages: "language",
+  custom: "item",
+};
+
+const EMPTY_HELP: Record<SectionType, string> = {
+  summary: "Two or three sentences about the work you do best.",
+  experience: "Start with your most recent job, internship or volunteer role.",
+  education: "Add your degree, diploma or training. Most recent first.",
+  skills: "Group related skills, for example Tools or Languages.",
+  projects: "Add a project you can talk about in an interview.",
+  certifications: "Add a certificate or licence, with the year you earned it.",
+  languages: "Add a language and how well you speak it.",
+  custom: "Add the first item for this section.",
+};
+
 export function SectionEditor({
   doc,
   sectionId,
@@ -46,7 +70,6 @@ export function SectionEditor({
   focusTarget,
   onUpdateDocument,
   onDeleteSection,
-  onDeleteResume,
   onOpenPhotoDesigns,
   dismissed,
   steps = [],
@@ -164,6 +187,13 @@ export function SectionEditor({
     });
   }
 
+  function addEntry() {
+    onUpdateDocument((d) => {
+      const s = d.sections.find((sec) => sec.id === sectionId);
+      if (s && s.entries.length < 100) s.entries.push(newEntry());
+    });
+  }
+
   return (
     <section
       ref={containerRef}
@@ -176,30 +206,9 @@ export function SectionEditor({
         {sectionId === "contact" ? (
           <>
             <div className="panel-heading">
-              <p className="eyebrow">The introduction</p>
               <h2>Personal details</h2>
               <p>Make it easy for your next team to find you.</p>
             </div>
-            <PhotoUploader
-              value={doc.contact.photoUrl || ""}
-              disabled={busy}
-              templateName={activeTemplate?.name ?? "this design"}
-              photoSupported={Boolean(activeTemplate?.photoSupported)}
-              photoHidden={doc.presentation.showPhoto === false}
-              onChange={(value) =>
-                onUpdateDocument((d) => {
-                  d.contact.photoUrl = value;
-                  d.presentation.showPhoto = Boolean(value);
-                })
-              }
-              onSwitchDesign={onOpenPhotoDesigns}
-              onKeepDesign={() =>
-                onUpdateDocument((d) => {
-                  d.presentation.showPhoto = false;
-                })
-              }
-            />
-            <div className="form-divider" />
 
             <Field
               label="Full name"
@@ -276,25 +285,30 @@ export function SectionEditor({
                 details you want to share.
               </p>
             </div>
-            <button
-              type="button"
-              className="danger-link"
-              onClick={onDeleteResume}
-            >
-              Delete this resume
-            </button>
+            <PhotoUploader
+              value={doc.contact.photoUrl || ""}
+              disabled={busy}
+              templateName={activeTemplate?.name ?? "this design"}
+              photoSupported={Boolean(activeTemplate?.photoSupported)}
+              photoHidden={doc.presentation.showPhoto === false}
+              onChange={(value) =>
+                onUpdateDocument((d) => {
+                  d.contact.photoUrl = value;
+                  d.presentation.showPhoto = Boolean(value);
+                })
+              }
+              onSwitchDesign={onOpenPhotoDesigns}
+              onKeepDesign={() =>
+                onUpdateDocument((d) => {
+                  d.presentation.showPhoto = false;
+                })
+              }
+            />
           </>
         ) : (
           activeSection && (
             <>
               <div className="panel-heading">
-                <p className="eyebrow">
-                  {activeSection.type === "custom"
-                    ? "Custom section"
-                    : activeSection.type === "summary"
-                      ? "The introduction"
-                      : "Your experience"}
-                </p>
                 <h2>{activeSection.label || labels[activeSection.type]}</h2>
                 <p>
                   {activeSection.type === "summary"
@@ -304,102 +318,32 @@ export function SectionEditor({
                       : "Add the details that tell your story."}
                 </p>
               </div>
-              <Field
-                label="Section heading"
-                value={activeSection.label}
-                onChange={(v) =>
-                  onUpdateDocument((d) => {
-                    const s = d.sections.find((sec) => sec.id === sectionId);
-                    if (s) s.label = v;
-                  })
-                }
-              />
-              <div className="section-controls">
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={activeSection.visible}
-                    onChange={(e) =>
+              {!activeSection.visible && (
+                <div className="section-hidden-note" role="status">
+                  <p>This section is hidden on your CV.</p>
+                  <button
+                    type="button"
+                    onClick={() =>
                       onUpdateDocument((d) => {
-                        const s = d.sections.find(
-                          (sec) => sec.id === sectionId,
-                        );
-                        if (s) s.visible = e.target.checked;
+                        const s = d.sections.find((sec) => sec.id === sectionId);
+                        if (s) s.visible = true;
                       })
                     }
-                  />
-                  Show in resume
-                </label>
-                <div className="button-row">
-                  {([-1, 1] as const).map((delta) => (
-                    <button
-                      key={delta}
-                      type="button"
-                      aria-label={
-                        delta === -1 ? "Move section up" : "Move section down"
-                      }
-                      disabled={
-                        doc.sections.indexOf(activeSection) + delta < 0 ||
-                        doc.sections.indexOf(activeSection) + delta >=
-                          doc.sections.length
-                      }
-                      onClick={() => moveSection(delta)}
-                    >
-                      {delta === -1 ? (
-                        <ArrowUp size={16} aria-hidden />
-                      ) : (
-                        <ArrowDown size={16} aria-hidden />
-                      )}
-                    </button>
-                  ))}
-                  {activeSection.type === "custom" && (
-                    <button
-                      key="save-library"
-                      type="button"
-                      className="section-tool-btn"
-                      aria-label={
-                        librarySaved
-                          ? "Saved to library"
-                          : "Save section to library"
-                      }
-                      title="Save section to reusable library"
-                      onClick={() => {
-                        saveCustomSectionToLibrary(activeSection);
-                        setLibrarySaved(true);
-                        setTimeout(() => setLibrarySaved(false), 2000);
-                      }}
-                    >
-                      {librarySaved ? <Check size={16} aria-hidden /> : <Save size={16} aria-hidden />}
-                      {librarySaved ? "Saved" : "Save"}
-                    </button>
-                  )}
-                  {activeSection.type === "custom" && onDeleteSection && (
-                    <button
-                      key="delete-section"
-                      type="button"
-                      className="section-tool-btn section-delete-btn"
-                      aria-label="Remove section"
-                      title="Remove section"
-                      onClick={() => {
-                        if (
-                          activeSection.entries.length === 0 ||
-                          window.confirm(
-                            `Remove section “${activeSection.label}”? You can undo this change.`,
-                          )
-                        ) {
-                          onDeleteSection(activeSection.id);
-                        }
-                      }}
-                    >
-                      <Trash2 size={16} aria-hidden />
-                    </button>
-                  )}
+                  >
+                    Show it
+                  </button>
                 </div>
-              </div>
+              )}
               {!activeSection.entries.length && (
                 <div className="empty-section">
-                  <span>+</span>
-                  <p>No entries yet. Start with one detail.</p>
+                  <p>{EMPTY_HELP[activeSection.type]}</p>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={addEntry}
+                  >
+                    <Plus size={16} aria-hidden /> Add your first {ENTRY_NOUN[activeSection.type]}
+                  </button>
                 </div>
               )}
               {activeSection.entries.map((entry, index) => (
@@ -547,7 +491,9 @@ export function SectionEditor({
                       placeholder={
                         activeSection.type === "summary"
                           ? "Write a high-impact overview of your expertise, core domains, and key achievements..."
-                          : "High-level overview (optional — use accomplishment bullets below)..."
+                          : isAchievementSection(activeSection.type)
+                            ? "High-level overview (optional — use accomplishment bullets below)..."
+                            : "Optional details"
                       }
                       onChange={(v) => editEntry(entry.id, { description: v })}
                     />
@@ -587,24 +533,118 @@ export function SectionEditor({
                   )}
                 </div>
               ))}
-              <button
-                type="button"
-                className="add-entry"
-                disabled={activeSection.entries.length >= 100}
-                onClick={() =>
-                  onUpdateDocument((d) => {
-                    const s = d.sections.find((sec) => sec.id === sectionId);
-                    if (s) s.entries.push(newEntry());
-                  })
-                }
-              >
-                + Add{" "}
-                {activeSection.type === "experience"
-                  ? "experience"
-                  : activeSection.type === "custom"
-                    ? "item"
-                    : "entry"}
-              </button>
+              {activeSection.entries.length > 0 && (
+                <button
+                  type="button"
+                  className="add-entry"
+                  disabled={activeSection.entries.length >= 100}
+                  onClick={addEntry}
+                >
+                  <Plus size={16} aria-hidden /> Add another {ENTRY_NOUN[activeSection.type]}
+                </button>
+              )}
+              <details className="section-settings">
+                <summary>
+                  <Settings2 size={16} aria-hidden /> Section settings
+                  <span className="section-settings-hint">
+                    Heading, show or hide, order
+                  </span>
+                </summary>
+                <div className="section-settings-body">
+                  <Field
+                    label="Section heading"
+                    value={activeSection.label}
+                    onChange={(v) =>
+                      onUpdateDocument((d) => {
+                        const s = d.sections.find((sec) => sec.id === sectionId);
+                        if (s) s.label = v;
+                      })
+                    }
+                  />
+                  <div className="section-controls">
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={activeSection.visible}
+                        onChange={(e) =>
+                          onUpdateDocument((d) => {
+                            const s = d.sections.find(
+                              (sec) => sec.id === sectionId,
+                            );
+                            if (s) s.visible = e.target.checked;
+                          })
+                        }
+                      />
+                      Show in resume
+                    </label>
+                    <div className="button-row">
+                      {([-1, 1] as const).map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          aria-label={
+                            delta === -1 ? "Move section up" : "Move section down"
+                          }
+                          disabled={
+                            doc.sections.indexOf(activeSection) + delta < 0 ||
+                            doc.sections.indexOf(activeSection) + delta >=
+                              doc.sections.length
+                          }
+                          onClick={() => moveSection(delta)}
+                        >
+                          {delta === -1 ? (
+                            <ArrowUp size={16} aria-hidden />
+                          ) : (
+                            <ArrowDown size={16} aria-hidden />
+                          )}
+                        </button>
+                      ))}
+                      {activeSection.type === "custom" && (
+                        <button
+                          key="save-library"
+                          type="button"
+                          className="section-tool-btn"
+                          aria-label={
+                            librarySaved
+                              ? "Saved to library"
+                              : "Save section to library"
+                          }
+                          title="Save section to reusable library"
+                          onClick={() => {
+                            saveCustomSectionToLibrary(activeSection);
+                            setLibrarySaved(true);
+                            setTimeout(() => setLibrarySaved(false), 2000);
+                          }}
+                        >
+                          {librarySaved ? <Check size={16} aria-hidden /> : <Save size={16} aria-hidden />}
+                          {librarySaved ? "Saved" : "Save"}
+                        </button>
+                      )}
+                      {activeSection.type === "custom" && onDeleteSection && (
+                        <button
+                          key="delete-section"
+                          type="button"
+                          className="section-tool-btn section-delete-btn"
+                          aria-label="Remove section"
+                          title="Remove section"
+                          onClick={() => {
+                            if (
+                              activeSection.entries.length === 0 ||
+                              window.confirm(
+                                `Remove section “${activeSection.label}”? You can undo this change.`,
+                              )
+                            ) {
+                              onDeleteSection(activeSection.id);
+                            }
+                          }}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </details>
             </>
           )
         )}

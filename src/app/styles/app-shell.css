@@ -379,7 +379,7 @@
 @media (max-width: 900px) {
   .studio .mobile-tabs {
     position: sticky;
-    top: 0;
+    top: var(--editor-toolbar-height, 0px);
     z-index: 990;
     display: grid;
     grid-template-columns: repeat(3, 1fr);

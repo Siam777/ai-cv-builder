@@ -200,8 +200,12 @@ test("the landing route preserves existing IndexedDB drafts; explicit design sta
       ),
     ).toBeLessThanOrEqual(1);
   }
+  await page.getByRole("button", { name: "New CV" }).click();
+  await expect(
+    page.getByRole("region", { name: "Selected starting design" }),
+  ).toBeVisible();
   await page
-    .getByRole("button", { name: "Create my resume", exact: true })
+    .getByRole("button", { name: "Start from scratch", exact: true })
     .click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
   await expect(page.getByLabel("Email", { exact: true })).toHaveValue("");
@@ -249,7 +253,7 @@ test("design links are bounded; selection and cancellation never mutate existing
   await page.getByRole("button", { name: "Clear design choice" }).click();
   await expect(page).toHaveURL("/builder");
   await page
-    .getByRole("button", { name: "Create my resume", exact: true })
+    .getByRole("button", { name: "Start from scratch", exact: true })
     .click();
   await expect(page.locator(".paginated-resume")).toHaveClass(
     /template-classic/,

@@ -1,99 +1,92 @@
-.welcome {
-  text-align: center;
-  background: var(--green-50);
-  border: 1px solid var(--line);
+.start-screen {
+  /* Lines up with the page heading, which sits in a 1700px column. */
+  margin: 10px max(var(--page-gutter), calc((100% - 1700px) / 2 + var(--page-gutter))) 40px;
+  display: grid;
+  gap: var(--space-5);
+}
+.start-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.start-heading h2 {
+  font: normal var(--text-xl)/1.2 var(--serif);
+  margin: 0 0 var(--space-2);
+}
+.start-heading p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.start-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+.start-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  margin: 10px var(--page-gutter) 40px;
-  padding: 70px 20px;
 }
-.welcome-symbol {
-  display: block;
-  font-size: var(--text-2xl);
-  color: var(--green-400);
-  margin-bottom: 25px;
+.start-choice h3 {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-lg);
 }
-.welcome h2 {
-  font: normal 43px/1.2 var(--serif);
-  letter-spacing: -1px;
-  margin: 18px 0;
+.start-choice p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
-.welcome p {
-  line-height: 1.8;
-  color: var(--muted);
+.start-choice button {
+  margin-top: auto;
+  min-height: 44px;
 }
-.welcome .button-row {
-  justify-content: center;
-  margin: 30px 0;
-}
-.welcome .primary span {
-  margin-left: 15px;
-}
-.welcome .privacy-note {
+.start-choice .start-choice-note {
   font-size: var(--text-xs);
-  line-height: 1.9;
-  margin-top: 38px;
+}
+.start-choice-icon {
+  color: var(--color-brand);
+}
+.start-upload {
+  border: 2px dashed var(--color-border-strong);
+  background: var(--color-brand-soft);
+}
+.start-upload.dragging {
+  border-color: var(--color-brand);
+}
+.start-examples {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+.start-examples h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+}
+.start-examples p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+}
+.start-examples button {
+  min-height: 44px;
+}
+.start-screen .starting-design {
+  margin: 0;
 }
 @media (max-width: 520px) {
-  .welcome {
-    padding: 45px 18px;
+  .start-screen {
+    margin-inline: 12px;
   }
-  .welcome h2 {
-    font-size: var(--text-xl);
-  }
-  .welcome .button-row {
+  .start-examples .button-row {
     flex-direction: column;
+    align-items: stretch;
   }
-}
-/* Cold-Start Onboarding Dropzone */
-.cold-start-dropzone {
-  border: 2px dashed var(--gray-300);
-  border-radius: var(--radius-md);
-  background: var(--gray-0);
-  padding: 24px;
-  margin: 20px 0;
-  transition: all 0.2s ease;
-}
-.cold-start-dropzone.dragging {
-  border-color: var(--green);
-  background: var(--green-50);
-  transform: scale(1.01);
-}
-.dropzone-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.dropzone-icon {
-  font-size: var(--text-2xl);
-  flex-shrink: 0;
-}
-.dropzone-text {
-  flex: 1;
-  min-width: 200px;
-}
-.dropzone-text strong {
-  display: block;
-  font-size: var(--text-md);
-  color: var(--ink);
-  margin-bottom: 4px;
-}
-.dropzone-text p {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--text-xs);
-}
-.dropzone-browse-button {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-300);
-  border-radius: var(--radius-sm);
-  padding: 8px 16px;
-  font-weight: 500;
-  color: var(--green);
-}
-.dropzone-browse-button:hover {
-  background: var(--green-25);
-  border-color: var(--green);
 }
 .example-label {
   font-size: var(--text-xs);
@@ -311,14 +304,32 @@
   display: flex;
   flex-direction: column;
 }
+/* Same side padding as the dialog's header and footer. */
 .demo-category-tabs {
   flex-shrink: 0;
+  margin: 0;
+  padding: var(--space-4) 24px var(--space-3);
 }
 .demo-profiles-grid {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding: var(--space-1) 24px var(--space-5);
+}
+.demo-gallery-modal .example-preview {
+  padding: var(--space-4) 24px 0;
+}
+@media (max-width: 520px) {
+  .demo-category-tabs {
+    padding-inline: var(--space-4);
+  }
+  .demo-profiles-grid {
+    padding-inline: var(--space-4);
+  }
+  .demo-gallery-modal .example-preview {
+    padding-inline: var(--space-4);
+  }
 }
 .document-library {
   max-width: 1180px;
@@ -330,15 +341,10 @@
 }
 .library-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
-}
-.library-heading h2 {
-  margin: 0 0 8px;
-  font-size: var(--text-xl);
-  letter-spacing: -0.025em;
 }
 .library-heading p,
 .library-explanation {
@@ -506,11 +512,8 @@
   border-radius: var(--radius-sm);
   gap: 24px;
 }
-.studio .library-heading h2 {
-  font-size: var(--text-xl);
-}
 .studio .library-heading p {
-  margin: 8px 0 0;
+  margin: 0;
 }
 .studio .library-heading .button-row {
   max-width: 470px;

@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDocument } from "../src/lib/document";
-import { describeFinding, excerpt, groupFindings } from "../src/lib/check-findings";
+import {
+  describeFinding,
+  excerpt,
+  groupFindings,
+  isNotStarted,
+  issuesToFix,
+} from "../src/lib/check-findings";
 import { lintBullet, lintResumeDocument } from "../src/lib/linter/ats-linter";
 
 test("every rule has a short plain-language title", () => {
@@ -70,4 +76,32 @@ test("inline hints and the full report use the same bullet checks", () => {
       }
   assert.equal(lintBullet("   ", "experience", { bulletId: "x" }).counted, false);
   assert.equal(lintBullet("Cut wait times by 30% across clinics.", "experience", { bulletId: "x" }).issues.length, 0);
+});
+
+test("a new CV lists sections not started apart from findings to fix", () => {
+  const doc = createDocument();
+  doc.contact.name = "Sam Rivera";
+  doc.contact.email = "sam@example.com";
+  const issues = lintResumeDocument(doc).issues;
+  const notStarted = issues.filter(isNotStarted);
+  assert.ok(notStarted.length >= 3, "empty sections are to-dos");
+  const toFix = issuesToFix(issues, new Set());
+  assert.ok(toFix.every((issue) => issue.ruleId !== "empty_section"));
+  // A missing city is optional advice, never a warning.
+  const city = issues.find((issue) => issue.id === "contact-location")!;
+  assert.equal(city.severity, "suggestion");
+  assert.equal(issuesToFix(issues, new Set([city.id])).length, toFix.length - 1);
+});
+
+test("one-word skills, languages and details are fine; achievements keep their checks", () => {
+  for (const type of ["skills", "languages", "certifications", "education", "custom"] as const) {
+    const result = lintBullet("Python", type, { bulletId: `b-${type}` });
+    assert.deepEqual(result.issues, [], type);
+    assert.equal(result.counted, false, type);
+  }
+  const job = lintBullet("Python", "experience", { bulletId: "b-job" });
+  assert.ok(job.issues.some((issue) => issue.ruleId === "bullet_length"));
+  assert.ok(job.issues.some((issue) => issue.ruleId === "missing_metric"));
+  const project = lintBullet("Responsible for things", "projects", { bulletId: "b-p" });
+  assert.ok(project.issues.some((issue) => issue.ruleId === "weak_verb"));
 });

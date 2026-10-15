@@ -121,15 +121,14 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(page.locator(".design-modal-body")).toBeVisible();
     // Modal should NOT contain the redundant live document preview
     await expect(page.locator(".modal-live-preview")).not.toBeVisible();
-    // Check template filter tabs
-    await expect(page.getByRole("tab", { name: "ATS Classic" })).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: "Modern & Tech" }),
-    ).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Executive" })).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: "Creative & Visual" }),
-    ).toBeVisible();
+    // Check design filters
+    const filters = page.getByRole("group", { name: "Filter designs" });
+    for (const name of [/^All \(12\)/, /^Supports photo/, /^ATS-friendly/, /^One column/, /^Two columns/])
+      await expect(filters.getByRole("button", { name })).toBeVisible();
+    await filters.getByRole("button", { name: /^Two columns/ }).click();
+    await expect(page.getByRole("button", { name: "Creative template" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Classic template" })).toHaveCount(0);
+    await filters.getByRole("button", { name: /^All/ }).click();
 
     // Click Tech Startup template
     await page.getByRole("button", { name: /Tech Startup/i }).click();

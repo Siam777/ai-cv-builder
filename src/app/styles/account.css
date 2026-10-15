@@ -4,24 +4,6 @@
   margin: 0;
   min-width: 0;
 }
-.account-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.account-navigation a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 8px 14px;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-}
 .account-signin-options {
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
@@ -47,23 +29,94 @@
   gap: 20px;
   align-items: flex-start;
 }
-.account-heading h2 {
-  margin: 8px 0;
+.account-heading :is(h1, h2) {
+  margin: 0 0 var(--space-1);
 }
-.storage-options {
+.account-heading p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.account-next-step {
+  margin: var(--space-4) 0 0;
+}
+.account-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-5) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.account-tabs [role="tab"] {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.account-tabs [role="tab"][aria-selected="true"] {
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand);
+}
+.account-tab-panel {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin: 24px 0;
+  gap: var(--space-4);
 }
-.storage-card {
-  padding: 20px;
-  border: 1px solid var(--gray-250);
+.account-card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 }
-.storage-card.active {
-  border-color: var(--green-600);
-  background: var(--green-25);
+.account-card h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+}
+.account-card > p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+.account-card button {
+  min-height: 44px;
+}
+.account-card .account-form {
+  margin-bottom: 0;
+}
+.account-signin-options.account-card {
+  border-bottom: 1px solid var(--color-border);
+}
+.account-danger-zone {
+  border-color: var(--red-300);
+  background: var(--color-danger-soft);
+}
+.account-danger-zone h3 {
+  color: var(--color-danger);
+}
+.browser-cvs-banner {
+  /* Lines up with the page heading, which sits in a 1700px column. */
+  margin: 0 max(var(--page-gutter), calc((100% - 1700px) / 2 + var(--page-gutter))) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-info-soft);
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius-md);
+}
+.browser-cvs-banner > p {
+  margin: 0 0 var(--space-3);
+  line-height: 1.5;
+}
+.browser-cvs-banner button {
+  min-height: 44px;
+}
+.browser-cvs-banner .transfer-review {
+  margin: 0;
+}
+.profile-main-content .account-panel {
+  max-width: 820px;
 }
 .account-email {
   display: block;
@@ -85,16 +138,6 @@
   border: 1px solid var(--gray-300);
   padding: 12px;
   border-radius: var(--radius-sm);
-}
-.account-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.account-deletion {
-  border-top: 1px solid var(--gray-250);
-  padding-top: 20px;
-  margin-top: 28px;
 }
 .account-error {
   color: var(--red-800);
@@ -128,9 +171,6 @@
     margin: 12px;
     padding: 18px;
   }
-  .storage-options {
-    grid-template-columns: 1fr;
-  }
 }
 /* Standalone Profile & Upgrade Layouts */
 .profile-page-container,
@@ -148,13 +188,11 @@
   margin: 0 auto;
   padding: 40px var(--page-gutter) 80px;
 }
-.profile-hero,
 .upgrade-hero {
   text-align: center;
   max-width: 760px;
   margin: 0 auto 40px;
 }
-.profile-badge,
 .upgrade-badge {
   display: inline-block;
   font-size: var(--text-xs);
@@ -165,7 +203,6 @@
   border-radius: var(--radius-md);
   margin-bottom: 14px;
 }
-.profile-hero h1,
 .upgrade-hero h1 {
   font-family: var(--serif);
   font-size: var(--text-2xl);
@@ -174,82 +211,11 @@
   margin: 0 0 12px;
   color: var(--ink);
 }
-.profile-hero .hero-lead,
 .upgrade-hero .hero-lead {
   font-size: var(--text-md);
   line-height: 1.6;
   color: var(--muted);
   margin: 0;
-}
-.profile-dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
-  gap: 32px;
-  align-items: flex-start;
-}
-.profile-panel-column .account-panel {
-  margin: 0;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-2);
-}
-.profile-sidebar-column {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.profile-info-card {
-  background: var(--gray-0);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  box-shadow: var(--shadow-2);
-}
-.info-card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.info-card-header h3 {
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--ink);
-}
-.workspace-stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--gray-100);
-  font-size: var(--text-xs);
-}
-.stat-label {
-  color: var(--muted);
-}
-.stat-value {
-  font-weight: 600;
-  color: var(--ink);
-}
-.user-email-val {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card-action-row,
-.plan-badge-row {
-  margin-top: 16px;
-}
-.privacy-feature-list {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--text-xs);
-  color: var(--gray-500);
 }
 .profile-footer,
 .upgrade-footer {
@@ -259,11 +225,6 @@
   color: var(--muted);
   border-top: 1px solid var(--line);
 }
-@media (max-width: 900px) {
-  .profile-dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
 .account-dialog-body .account-panel {
   margin: 0;
   padding: 0;
@@ -271,4 +232,23 @@
 }
 .account-dialog-body {
   overscroll-behavior: contain;
+}
+.browser-cvs-banner.compact {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+.browser-cvs-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.browser-cvs-line p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.browser-cvs-banner.compact .transfer-review {
+  margin-top: var(--space-3);
 }

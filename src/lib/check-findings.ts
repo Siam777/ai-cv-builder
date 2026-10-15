@@ -94,6 +94,19 @@ export function describeFinding(
   }
 }
 
+/**
+ * A section the person has not started yet. It is a to-do, not a problem, so
+ * it is listed apart from findings and not counted as one.
+ */
+export function isNotStarted(issue: AtsLintIssue) {
+  return issue.ruleId === "empty_section";
+}
+
+/** Findings worth fixing: open (not dismissed) and not just "not started". */
+export function issuesToFix(issues: AtsLintIssue[], dismissed: Set<string>) {
+  return issues.filter((issue) => !dismissed.has(issue.id) && !isNotStarted(issue));
+}
+
 export interface FindingGroup {
   stepId: string;
   label: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ClipboardCheck,
@@ -10,6 +10,7 @@ import {
   FolderOpen,
   History,
   Palette,
+  Trash2,
   PenLine,
   Redo2,
   Sparkles,
@@ -35,11 +36,14 @@ export interface EditorToolbarProps {
   savedToAccount: boolean;
   /** Shown next to the save status when the CV only lives in this browser. */
   saveAction?: { label: string; onClick: () => void };
-  strength: number;
+  /** Findings to fix (not dismissed, not just sections not started yet). */
+  issueCount: number;
   activePanel: SidePanelId | null;
   onRename: (name: string) => void;
   onSelectDocument: (id: string) => void;
   onNew: () => void;
+  /** Deletes the open CV after confirmation. */
+  onDelete: () => void;
   onDuplicate: () => void;
   onImportClick: () => void;
   onOpenHistory: () => void;
@@ -56,6 +60,43 @@ export interface EditorToolbarProps {
 export function EditorToolbar(props: EditorToolbarProps) {
   const { doc, busy, activePanel } = props;
   const exportMenu = useRef<HTMLDetailsElement>(null);
+
+  // The toolbar is sticky; panels below it offset by its live height.
+  const toolbar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = toolbar.current;
+    if (!node) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() =>
+      root.style.setProperty("--editor-toolbar-height", `${node.offsetHeight}px`),
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--editor-toolbar-height");
+    };
+  }, []);
+
+  // Once the page scrolls past the toolbar's resting place it is "stuck";
+  // on phones the stuck toolbar keeps only its action row.
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node) return;
+    // Collapsing shortens the page. On a page that barely scrolls that would
+    // pull the scroll back and expand it again, so only collapse with room.
+    const observer = new IntersectionObserver((entries) => {
+      // Several changes can arrive together; the last one is current.
+      const entry = entries[entries.length - 1];
+      setStuck(
+        !entry.isIntersecting &&
+          document.documentElement.scrollHeight - window.innerHeight > 240,
+      );
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   function closeExport(restoreFocus = false) {
     if (!exportMenu.current) return;
@@ -74,7 +115,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
     })),
     {
       label: "New",
-      hint: "Blank CV",
+      hint: "Upload, import or blank",
       icon: <FilePlus2 size={16} aria-hidden />,
       onSelect: props.onNew,
       separated: others.length > 0,
@@ -119,6 +160,13 @@ export function EditorToolbar(props: EditorToolbarProps) {
       icon: <Wand2 size={16} aria-hidden />,
       onSelect: props.onOpenAiGenerator,
     },
+    {
+      label: "Delete this CV",
+      icon: <Trash2 size={16} aria-hidden />,
+      onSelect: props.onDelete,
+      separated: true,
+      className: "menu-danger",
+    },
   ];
 
   const status =
@@ -127,7 +175,9 @@ export function EditorToolbar(props: EditorToolbarProps) {
       : props.status;
 
   return (
-    <div className="editor-toolbar no-print" aria-label="CV actions" role="toolbar">
+    <>
+    <div ref={sentinel} className="toolbar-sentinel" aria-hidden />
+    <div ref={toolbar} className={`editor-toolbar no-print${stuck ? " is-stuck" : ""}`} aria-label="CV actions" role="toolbar">
       <div className="toolbar-document">
         <label className="cv-title">
           <PenLine size={16} aria-hidden />
@@ -211,13 +261,16 @@ export function EditorToolbar(props: EditorToolbarProps) {
           aria-controls="side-panel"
           disabled={busy}
           onClick={() => props.onTogglePanel("check")}
-          title="CV strength: how complete your CV is. Not a hiring score."
+          title="Check my CV: things to fix and what is still missing."
         >
           <ClipboardCheck size={16} aria-hidden />
           <span className="toolbar-label check-label">Check</span>
-          <span className="strength-badge">
-            {props.strength}%<span className="sr-only"> complete</span>
-          </span>
+          {props.issueCount > 0 && (
+            <span className="strength-badge">
+              {props.issueCount}
+              <span className="sr-only"> to fix</span>
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -288,5 +341,6 @@ export function EditorToolbar(props: EditorToolbarProps) {
         </details>
       </div>
     </div>
+    </>
   );
 }

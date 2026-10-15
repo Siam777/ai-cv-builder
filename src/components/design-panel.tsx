@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ResumeDocument } from "@/lib/document";
+import { createDocument, type ResumeDocument } from "@/lib/document";
 import { layoutBlocks, type LayoutBlock } from "@/lib/layout";
 import {
   accents,
@@ -25,7 +25,28 @@ export interface DesignPanelProps {
   initialFilter?: TemplateFilter;
 }
 
-export type TemplateFilter = "all" | "photo" | "ats" | "modern" | "executive" | "creative";
+export type TemplateFilter = "all" | "photo" | "ats" | "one-column" | "two-column";
+
+type Template = (typeof templates)[number];
+
+/** Feature tags on a design card, e.g. "Photo · Two columns". */
+function templateTags(t: Template) {
+  return [
+    t.photoSupported && "Photo",
+    t.category === "ats" && "ATS-friendly",
+    t.columns === 2 && "Two columns",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+const FILTERS: { id: TemplateFilter; label: string; matches: (t: Template) => boolean }[] = [
+  { id: "all", label: "All", matches: () => true },
+  { id: "photo", label: "Supports photo", matches: (t) => t.photoSupported },
+  { id: "ats", label: "ATS-friendly", matches: (t) => t.category === "ats" },
+  { id: "one-column", label: "One column", matches: (t) => t.columns === 1 },
+  { id: "two-column", label: "Two columns", matches: (t) => t.columns === 2 },
+];
 
 const ACCENT_PALETTE: { id: Presentation["accent"]; name: string; hex: string }[] = [
   { id: "forest", name: "Forest", hex: "#285641" },
@@ -105,16 +126,21 @@ export function DesignPanel({
   disabled = false,
   initialFilter = "all",
 }: DesignPanelProps) {
-  const thumbnailBlocks = useMemo(() => layoutBlocks(doc).slice(0, 18), [doc]);
+  // A new CV would give near-blank thumbnails, so show sample content until
+  // the CV has at least one entry.
+  const sample = doc.sections.every((section) => !section.entries.length);
+  const thumbnailBlocks = useMemo(
+    () => layoutBlocks(sample ? { ...createDocument(true), presentation: doc.presentation } : doc).slice(0, 18),
+    [doc, sample],
+  );
   const p = doc.presentation;
   const [categoryFilter, setCategoryFilter] = useState<TemplateFilter>(initialFilter);
 
   const activeTemplateObj = templates.find((t) => t.id === p.template) || templates[0];
 
   const filteredTemplates = useMemo(() => {
-    if (categoryFilter === "all") return templates;
-    if (categoryFilter === "photo") return templates.filter((t) => t.photoSupported);
-    return templates.filter((t) => t.category === categoryFilter);
+    const filter = FILTERS.find((f) => f.id === categoryFilter) ?? FILTERS[0];
+    return templates.filter(filter.matches);
   }, [categoryFilter]);
 
   return (
@@ -129,66 +155,24 @@ export function DesignPanel({
               <section className="design-section">
                 <div className="design-section-header">
                   <div>
-                    <h3>Choose Template Family</h3>
+                    <h3>Choose a design</h3>
                     <p className="design-section-sub">
-                      Changing the design preserves your career details. Review the exported file for reading order and layout.
+                      Changing the design keeps everything you wrote.
+                      {sample && " Thumbnails show sample content until you add your experience."}
                     </p>
                   </div>
-                  <div className="template-category-tabs" role="tablist" aria-label="Template categories">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "all"}
-                      className={`cat-tab-btn ${categoryFilter === "all" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("all")}
-                    >
-                      All ({templates.length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "photo"}
-                      className={`cat-tab-btn ${categoryFilter === "photo" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("photo")}
-                    >
-                      Supports photo
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "ats"}
-                      className={`cat-tab-btn ${categoryFilter === "ats" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("ats")}
-                    >
-                      ATS Classic
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "modern"}
-                      className={`cat-tab-btn ${categoryFilter === "modern" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("modern")}
-                    >
-                      Modern & Tech
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "executive"}
-                      className={`cat-tab-btn ${categoryFilter === "executive" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("executive")}
-                    >
-                      Executive
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "creative"}
-                      className={`cat-tab-btn ${categoryFilter === "creative" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("creative")}
-                    >
-                      Creative & Visual
-                    </button>
+                  <div className="template-category-tabs" role="group" aria-label="Filter designs">
+                    {FILTERS.map((filter) => (
+                      <button
+                        type="button"
+                        key={filter.id}
+                        aria-pressed={categoryFilter === filter.id}
+                        className={`cat-tab-btn ${categoryFilter === filter.id ? "active" : ""}`}
+                        onClick={() => setCategoryFilter(filter.id)}
+                      >
+                        {filter.label} ({templates.filter(filter.matches).length})
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -223,8 +207,8 @@ export function DesignPanel({
                             </span>
                           </div>
                           <span className="template-style-pill">{template.badge}</span>
-                          {template.photoSupported && (
-                            <span className="template-style-pill template-photo-pill">Photo</span>
+                          {templateTags(template) && (
+                            <span className="template-tags">{templateTags(template)}</span>
                           )}
                         </div>
                         <p className="template-desc">{template.description}</p>

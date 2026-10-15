@@ -809,3 +809,45 @@
 .field-hints .suggestion {
   color: var(--color-text-muted);
 }
+
+/* Sections not started yet: a to-do list, not findings. */
+.not-started {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+.not-started h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+.not-started > p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.not-started ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.not-started li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.not-started li button {
+  min-height: 44px;
+}
+/* The steps rail shows the same meter on wider screens. */
+@media (min-width: 421px) {
+  .check-summary .strength-meter {
+    display: none;
+  }
+}
