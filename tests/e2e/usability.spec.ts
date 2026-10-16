@@ -209,8 +209,7 @@ test("a pending AI suggestion can be closed without applying or locking the page
       .click();
     await page.getByRole("menuitem", { name: /^Improve wording/ }).click();
     const card = page.getByRole("group", { name: "AI help for Bullet 1" });
-    await card.getByLabel("Send this to OpenAI").check();
-    await card.getByRole("button", { name: "Suggest a rewrite" }).click();
+    await card.getByRole("button", { name: "Turn on AI writing help" }).click();
     await expect.poll(() => calls).toBe(1);
     await expect(card).toContainText("Nothing changes until you accept");
     await card.getByRole("button", { name: "Cancel" }).click();

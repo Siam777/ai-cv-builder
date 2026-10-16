@@ -26,7 +26,7 @@ export default function Help() {
         <h2>Get help with your wording</h2>
         <p>
           <strong>Writing help</strong> offers four actions. Rewrite a bullet
-          uses OpenAI for an account CV after your consent. The summary, result
+          uses OpenAI for an account CV once you turn on AI writing help. The summary, result
           and skill helpers run locally. You preview changes before using them,
           and Undo can restore earlier wording.
         </p>

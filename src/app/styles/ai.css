@@ -643,3 +643,138 @@ label.field-ai-check {
 .locked-feature button {
   min-height: 44px;
 }
+
+/* Write with AI and examples on a job or project entry */
+.entry-ai {
+  display: grid;
+  gap: var(--space-2);
+}
+.entry-ai-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.entry-ai-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.entry-ai-card textarea,
+.starter-review textarea,
+.field-ai-form textarea,
+.field-ai-form select {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 400;
+}
+.entry-ai-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 !important;
+  list-style: none;
+}
+.entry-ai-list li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+}
+.entry-ai-source {
+  margin: 0 !important;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.entry-ai-review fieldset,
+.starter-review fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.entry-ai-review legend,
+.starter-review legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+.entry-ai-withheld,
+.entry-ai-questions,
+.entry-ai-prompts {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--amber-50);
+}
+.entry-ai-questions,
+.entry-ai-prompts {
+  background: var(--color-surface-muted);
+}
+.starter-label {
+  justify-self: start;
+  margin: 0 !important;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--amber-100);
+  color: var(--gray-800);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.starter-blanks {
+  color: var(--red-800) !important;
+}
+
+/* Group headings in the sparkle menu: AI writing help and Quick (no AI) */
+.menu-group {
+  padding: var(--space-2) var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Suggest skills with AI: the proposed groups */
+.skills-ai-groups {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* The AI interview takes the place of the step form */
+.ai-interview {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+.ai-interview .library-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.ai-interview h2:focus {
+  outline: none;
+}
+.ai-interview .field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+.ai-interview input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 400;
+}

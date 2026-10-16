@@ -11,7 +11,10 @@ export type FieldActionId =
   | "shorten"
   | "grammar"
   | "draft"
-  | "skills";
+  | "ai-draft"
+  | "skills"
+  | "examples"
+  | "ai-skills";
 
 export interface FieldActionDef {
   id: FieldActionId;
@@ -30,8 +33,8 @@ const ACTIONS: Record<FieldActionId, FieldActionDef> = {
   },
   result: {
     id: "result",
-    label: "Add a result",
-    hint: "Work in a real outcome (Google XYZ)",
+    label: "Add a result (you type it)",
+    hint: "Built-in: adds the result you type",
     source: "local",
   },
   shorten: {
@@ -46,10 +49,16 @@ const ACTIONS: Record<FieldActionId, FieldActionDef> = {
     hint: "Spacing, capitals and repeated words",
     source: "local",
   },
+  "ai-draft": {
+    id: "ai-draft",
+    label: "Write with AI",
+    hint: "AI drafts it from your CV; you review it",
+    source: "ai",
+  },
   draft: {
     id: "draft",
-    label: "Draft from my CV",
-    hint: "Built from details already in your CV",
+    label: "Quick draft",
+    hint: "Built-in template from your CV details",
     source: "local",
   },
   skills: {
@@ -58,16 +67,28 @@ const ACTIONS: Record<FieldActionId, FieldActionDef> = {
     hint: "Skills your bullets already show",
     source: "local",
   },
+  "ai-skills": {
+    id: "ai-skills",
+    label: "Suggest skills with AI",
+    hint: "Skills your CV shows, and common ones for your role",
+    source: "ai",
+  },
+  examples: {
+    id: "examples",
+    label: "Show examples",
+    hint: "AI examples for your job title, with blanks to fill",
+    source: "ai",
+  },
 };
 
 /** The sparkle menu for each kind of field, in the order shown. */
 export function fieldActions(kind: FieldKind): FieldActionDef[] {
   const ids: FieldActionId[] =
     kind === "bullet"
-      ? ["improve", "result", "shorten", "grammar"]
+      ? ["improve", "shorten", "result", "grammar"]
       : kind === "summary"
-        ? ["draft", "grammar"]
-        : ["skills"];
+        ? ["ai-draft", "examples", "draft", "grammar"]
+        : ["ai-skills", "examples", "skills"];
   return ids.map((id) => ACTIONS[id]);
 }
 

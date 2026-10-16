@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
-import { verifyTestEmail } from "./helpers";
+import { grantPaidPlan, verifyTestEmail } from "./helpers";
 
 // A current-state baseline, not a pixel snapshot or accessibility certification.
 // Only synthetic data and the isolated local test server are used.
@@ -12,6 +12,8 @@ for (const width of [360, 768, 1440]) {
     page,
   }) => {
     test.setTimeout(180_000);
+    // Paid plan, so the cover letter and coaching states are captured.
+    await grantPaidPlan(page);
     await page.setViewportSize({ width, height: 1000 });
     page.setDefaultTimeout(10_000);
     const directory = `test-results/visual-baseline/${width}`;
@@ -178,7 +180,7 @@ for (const width of [360, 768, 1440]) {
     await page.getByRole("button", { name: "Document text view" }).click();
     await capture("analyzer-text");
     await page.getByRole("button", { name: "Close Check my CV" }).click();
-    await editorTool(page, "Create practice example");
+    await editorTool(page, "Practice CV (fictional)");
     await expect(page.getByRole("dialog")).toBeVisible();
     await capture("practice-generator");
     await closeDialog();
@@ -280,7 +282,7 @@ for (const width of [360, 768, 1440]) {
     await page.goto("/upgrade");
     await capture("pricing", true);
     await page
-      .getByRole("button", { name: "Upgrade to Job Hunter Pass ↗" })
+      .getByRole("button", { name: "Choose Go" })
       .click();
     await expect(page.locator(".upgrade-alert")).toContainText(
       /configured|unavailable/i,

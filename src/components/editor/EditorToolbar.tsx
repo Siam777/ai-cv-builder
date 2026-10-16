@@ -16,7 +16,7 @@ import {
   Sparkles,
   Undo2,
   UserCheck,
-  Wand2,
+  FlaskConical,
 } from "lucide-react";
 import type { ResumeDocument } from "@/lib/document";
 import { Menu, type MenuItem } from "./Menu";
@@ -155,9 +155,9 @@ export function EditorToolbar(props: EditorToolbarProps) {
       separated: true,
     },
     {
-      label: "Create practice example",
-      hint: "A fictional CV for practice",
-      icon: <Wand2 size={16} aria-hidden />,
+      label: "Practice CV (fictional)",
+      hint: "Built-in fictional CV, not AI",
+      icon: <FlaskConical size={16} aria-hidden />,
       onSelect: props.onOpenAiGenerator,
     },
     {

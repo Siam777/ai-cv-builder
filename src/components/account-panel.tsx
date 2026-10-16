@@ -9,7 +9,7 @@ import {
   type AccountUser,
 } from "@/lib/cloud-contract";
 import type { ResumeDocument } from "@/lib/document";
-import { PLANS, type PlanId } from "@/lib/billing-plans";
+import { PLANS, normalizePlanId, type PlanId } from "@/lib/billing-plans";
 import { notifySessionChange, watchSessionChanges } from "@/lib/session-events";
 import { GoogleSignIn } from "./GoogleSignIn";
 import { TriangleAlert, X } from "lucide-react";
@@ -22,6 +22,7 @@ const sessionSchema = z.object({
   googleConfigured: z.boolean().default(false),
   googleLinked: z.boolean().default(false),
   hasPassword: z.boolean().default(true),
+  aiWritingHelp: z.boolean().default(false),
 });
 type Session = z.infer<typeof sessionSchema>;
 
@@ -45,6 +46,7 @@ export function AccountPanel({
   onAuthenticated,
   onOpenPricing,
   pendingAction,
+  onAiWritingHelp,
   initialTab = "profile",
   headingLevel = 2,
 }: {
@@ -62,6 +64,8 @@ export function AccountPanel({
   /** Defaults to the /pricing page. */
   onOpenPricing?: () => void;
   pendingAction?: string;
+  /** Called when the AI writing help switch changes. */
+  onAiWritingHelp?: (enabled: boolean) => void;
   initialTab?: AccountTab;
   /** 1 on the standalone /profile page, 2 inside the editor dialog. */
   headingLevel?: 1 | 2;
@@ -69,6 +73,8 @@ export function AccountPanel({
   const [session, setSession] = useState<Session | null>(null);
   const [tab, setTab] = useState<AccountTab>(initialTab);
   const [planId, setPlanId] = useState<PlanId | null>(null);
+  // Unix seconds when the beta's free Go period ends, if that is the plan.
+  const [betaEnds, setBetaEnds] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [action, setAction] = useState<"signin" | "signup" | "reset">("signin");
@@ -135,7 +141,11 @@ export function AccountPanel({
     void fetch("/api/billing/subscription")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (active) setPlanId((data?.subscription?.planId as PlanId) || "free");
+        if (!active) return;
+        setPlanId(normalizePlanId(data?.subscription?.planId));
+        setBetaEnds(
+          data?.subscription?.beta ? Number(data.subscription.currentPeriodEnd) : null,
+        );
       })
       .catch(() => {
         if (active) setPlanId("free");
@@ -545,10 +555,45 @@ export function AccountPanel({
                   )}
                 </div>
                 <div className="account-card">
+                  <h3>AI writing help</h3>
+                  <p>
+                    When this is on, AI features send the CV text and notes
+                    they need to OpenAI. Contact details are never sent. Each AI
+                    view says what it sends, and nothing is added to your CV
+                    until you accept it.
+                  </p>
+                  <label className="checkbox account-switch">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      aria-checked={session.aiWritingHelp}
+                      checked={session.aiWritingHelp}
+                      disabled={working}
+                      onChange={(event) => {
+                        const enabled = event.target.checked;
+                        void run(async () => {
+                          const result = (await accountRequest("/api/account", {
+                            method: "PATCH",
+                            body: JSON.stringify({ aiWritingHelp: enabled }),
+                          }, user.id)) as { aiWritingHelp: boolean };
+                          setSession({ ...session, aiWritingHelp: result.aiWritingHelp });
+                          onAiWritingHelp?.(result.aiWritingHelp);
+                          setMessage(
+                            result.aiWritingHelp
+                              ? "AI writing help is on."
+                              : "AI writing help is off. AI features will ask again before sending anything.",
+                          );
+                        });
+                      }}
+                    />
+                    Use AI writing help
+                  </label>
+                </div>
+                <div className="account-card">
                   <h3>Your data</h3>
                   <p>
                     Download everything stored in your account as a JSON file.
-                    AI requests are only sent with your consent.{" "}
+                    AI requests are only sent while AI writing help is on.{" "}
                     <a href="/privacy">Read the privacy notice</a>.
                   </p>
                   <button
@@ -653,9 +698,21 @@ export function AccountPanel({
                 <h3>Your plan</h3>
                 <p>
                   {planId
-                    ? `Current plan: ${PLANS[planId]?.name ?? PLANS.free.name}`
+                    ? `Current plan: ${PLANS[planId].name}${betaEnds ? " (free during the beta)" : ""}`
                     : "Checking your plan…"}
                 </p>
+                {betaEnds && (
+                  <p>
+                    Your free Go period ends on{" "}
+                    {new Date(betaEnds * 1000).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                    . After that your account moves to Free unless you choose a
+                    plan.
+                  </p>
+                )}
                 <button
                   className="primary"
                   disabled={working}

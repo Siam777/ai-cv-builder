@@ -20,7 +20,8 @@
 }
 .start-choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* 260px keeps four choices per row at 1440px, under the full-width AI choice. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-4);
 }
 .start-choice {
@@ -717,4 +718,33 @@
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   font: inherit;
+}
+
+/* Sign in to use AI, on the start screen for guests */
+.start-ai-signin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius-md);
+  background: var(--green-50);
+}
+.start-ai-signin > svg {
+  color: var(--color-brand);
+}
+.start-ai-signin p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.start-ai-signin button {
+  min-height: 44px;
+}
+
+/* Build my CV with AI: listed first, across the whole row */
+.start-ai {
+  grid-column: 1 / -1;
+  border-color: var(--green-200);
+  background: var(--green-50);
 }

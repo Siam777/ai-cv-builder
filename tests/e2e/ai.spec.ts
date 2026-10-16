@@ -116,6 +116,21 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
     });
   });
   try {
+    // Rewrites need AI writing help on the account; nothing is sent before that.
+    const rewrite = {
+      requestId: randomUUID(),
+      documentId: doc.id,
+      revision: 0,
+      bulletId: source.id,
+      instruction: "Rewrite",
+      consent: true,
+    };
+    const withoutConsent = await page.request.post("/api/ai", { headers, data: rewrite });
+    expect(withoutConsent.status()).toBe(403);
+    expect((await withoutConsent.json()).error).toBe("AI_CONSENT_REQUIRED");
+    expect(
+      (await page.request.patch("/api/account", { headers, data: { aiWritingHelp: true } })).status(),
+    ).toBe(200);
     // Real endpoints still enforce account ownership before checking provider configuration.
     expect(
       (
@@ -157,13 +172,19 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
       await page.getByRole("menuitem", { name: /^Improve wording/ }).click();
     };
     const card = field.getByRole("group", { name: /^AI help for Bullet/ });
+    // Turn the account setting off again, so the editor asks once, then remembers.
+    await page.request.patch("/api/account", { headers, data: { aiWritingHelp: false } });
     await openImprove();
-    const generate = card.getByRole("button", { name: "Suggest a rewrite" });
-    await expect(generate).toBeDisabled();
+    // AI consent is asked once and kept on the account, not per request.
+    const turnOn = card.getByRole("button", { name: "Turn on AI writing help" });
+    await expect(turnOn).toBeVisible();
+    await expect(card).toContainText("contact details are not");
     expect(providerRequests).toBe(0);
-    await card.getByLabel("Send this to OpenAI").check();
-    await generate.click();
+    await turnOn.click();
     await expect(card).toContainText("Controlled test suggestion");
+    expect(
+      (await (await page.request.get("/api/account")).json()).aiWritingHelp,
+    ).toBe(true);
     // The inline view shows the change: removed words struck, added words marked.
     await expect(card.locator(".field-ai-text ins").first()).toBeVisible();
     const accept = card.getByRole("button", { name: "Accept" });
@@ -181,9 +202,9 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
         ).json()
       ).revision,
     ).toBe(0);
+    // Consent is already on: the request starts straight away.
     await openImprove();
-    await card.getByLabel("Send this to OpenAI").check();
-    await card.getByRole("button", { name: "Suggest a rewrite" }).click();
+    await expect(card).toContainText("Controlled test suggestion");
     await card
       .getByLabel(
         "I checked the wording and it accurately describes my experience.",

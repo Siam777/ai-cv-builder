@@ -5,6 +5,7 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { JobReviewHistory } from "./JobReviewHistory";
 import { JobCriterionCoach } from "./JobCriterionCoach";
+import { LockedFeature } from "../billing/LockedFeature";
 import { type Proposal } from "@/lib/ai-proposals";
 import {
   reviewJobEvidence,
@@ -34,6 +35,8 @@ export interface JobTailorModalProps {
   embedded?: boolean;
   /** False on plans without tailored copies; the comparison stays available. */
   canCreateCopy?: boolean;
+  /** AI coaching per requirement (Pro). */
+  canCoach?: boolean;
   onSeePlans?: () => void;
 }
 const statusLabels = {
@@ -52,6 +55,7 @@ export function JobTailorModal({
   onClose,
   embedded = false,
   canCreateCopy = true,
+  canCoach = true,
   onSeePlans,
 }: JobTailorModalProps) {
   useBodyScrollLock(!embedded);
@@ -569,7 +573,10 @@ export function JobTailorModal({
               </section>
             </div>
           )}
-          {review && coachCriterionId && (
+          {review && coachCriterionId && !canCoach && (
+            <LockedFeature feature="job-coaching" onSeePlans={onSeePlans} />
+          )}
+          {review && coachCriterionId && canCoach && (
             <JobCriterionCoach
               key={`${review.sourceHash}:${coachCriterionId}`}
               doc={doc}

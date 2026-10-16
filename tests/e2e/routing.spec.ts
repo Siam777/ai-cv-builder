@@ -41,18 +41,18 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
 
     // Upgrade heading must be visible
     await expect(
-      page.getByRole("heading", { name: "Invest In Your Next Career Chapter" }),
+      page.getByRole("heading", { name: "Plans for every stage of your job search" }),
     ).toBeVisible();
 
-    // Commercial pricing cards must be rendered
-    await expect(page.getByRole("heading", { name: "Free / Local" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Monthly Pass" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Power Pass" })).toBeVisible();
+    // Three monthly plans with their prices
+    for (const [name, price] of [["Free", "$0"], ["Go", "$9.99"], ["Pro", "$29.99"]]) {
+      const card = page.getByRole("group", { name: `${name} plan` });
+      await expect(card.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(card).toContainText(price);
+    }
 
-    // Feature matrix must be present
-    await expect(
-      page.getByRole("heading", { name: "Detailed Feature Comparison" }),
-    ).toBeVisible();
+    // Feature comparison must be present
+    await expect(page.getByRole("heading", { name: "Compare plans" })).toBeVisible();
 
     // The CV editor components must NOT be present
     await expect(page.locator(".editor-layout")).toHaveCount(0);
@@ -71,7 +71,7 @@ test.describe("Dedicated Route Verification (Profile & Upgrade)", () => {
     await page.goto("/pricing");
     await expect(page).toHaveURL(/.*\/upgrade/);
     await expect(
-      page.getByRole("heading", { name: "Invest In Your Next Career Chapter" }),
+      page.getByRole("heading", { name: "Plans for every stage of your job search" }),
     ).toBeVisible();
   });
 

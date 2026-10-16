@@ -136,9 +136,27 @@ Setup references: [Next.js installation](https://nextjs.org/docs/app/getting-sta
 
 Database/auth references: [Better Auth Drizzle adapter](https://better-auth.com/docs/adapters/drizzle), [Better Auth user accounts](https://better-auth.com/docs/concepts/users-accounts), [Drizzle and Turso](https://orm.drizzle.team/docs/sqlite/connect-turso).
 
+## Plans and billing
+
+Three monthly plans, defined in `src/lib/billing-plans.ts`:
+
+| | Free | Go ($9.99/month) | Pro ($29.99/month) |
+|---|---|---|---|
+| Editor, all 12 designs, Check my CV, built-in helpers | Yes | Yes | Yes |
+| AI rewrites a day | 5 | 50 | 200 |
+| AI summary drafts | — | Yes | Yes |
+| Watermark-free downloads | — | Yes | Yes |
+| Tailored CV copies a month | — | 20 | Unlimited |
+| Cover letters | — | Yes | Yes |
+| AI job coaching | — | — | Yes |
+
+Beta: every signed-in account gets Go free for its first 30 days, with no card. Set `BETA_GO_TRIAL_DAYS` (0 turns it off). The server enforces the daily AI limit, AI summary drafts and job coaching; the watermark is applied on server exports. `AI_DAILY_USER_LIMIT`, when set, caps every plan.
+
+Stripe checkout needs `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_GO` and `STRIPE_PRICE_PRO` (monthly prices). Until they are set, checkout says payments are not configured. To try a paid plan without Stripe, give an existing account a plan: `npm run plan:grant -- --email you@example.com --plan pro` (`--plan free` removes it).
+
 ## OpenAI bullet assistant
 
-Use a bullet’s ✨ **AI** menu → **Improve wording** or **Shorten** for the account AI rewrite. The suggestion appears inline next to your wording and nothing changes until you choose **Accept**. It requires an account workspace, a nonempty bullet, and explicit consent to send the selected entry's bullets and writing instruction. It does not upload local resumes or send contact fields or other entries. Instructions express writing preferences; add new candidate facts to the original entry before asking for another rewrite.
+Use a bullet’s ✨ **AI** menu → **Improve wording** or **Shorten**, or the summary’s **Write with AI** (Go and Pro), for the account AI rewrite. The suggestion appears inline next to your wording and nothing changes until you choose **Accept**. It requires an account workspace, a nonempty bullet, and explicit consent to send the selected entry's bullets and writing instruction. It does not upload local resumes or send contact fields or other entries. Instructions express writing preferences; add new candidate facts to the original entry before asking for another rewrite.
 
 Add `OPENAI_API_KEY` privately to `.env.local` (or the deployment's secret settings), then restart the app. Do not put keys in chat or any `NEXT_PUBLIC_` variable. `OPENAI_MODEL` defaults to `gpt-4.1-mini-2025-04-14`; model access and actual output quality still require testing with your OpenAI project. Run `npm run db:setup` for the proposal/usage migration.
 

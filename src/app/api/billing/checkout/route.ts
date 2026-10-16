@@ -6,7 +6,7 @@ import { createBillingCheckoutSession } from "@/lib/server/stripe";
 export const dynamic = "force-dynamic";
 
 const checkoutSchema = z.strictObject({
-  planId: z.enum(["job_hunter_monthly", "job_hunter_weekly", "lifetime"]),
+  planId: z.enum(["go", "pro"]),
 });
 
 export async function POST(request: Request) {

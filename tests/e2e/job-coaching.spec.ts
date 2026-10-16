@@ -6,7 +6,7 @@ import { bulletEvidence, proposalSchema } from "../../src/lib/ai-proposals";
 import { generateSchema } from "../../src/lib/ai-contract";
 import { createCoachingProposal } from "../../src/lib/job-coach";
 import { jobCoachContext } from "../../src/lib/server/job-coach-context";
-import { authenticateForExport, openFirstCv, editorTool } from "./helpers";
+import { authenticateForExport, openFirstCv, editorTool, grantProAccount } from "./helpers";
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 const consent =
   "Send this criterion, target context, entry bullets and instruction to OpenAI.";
@@ -15,6 +15,8 @@ const rewrite = "Conducted customer interviews about onboarding friction.";
 async function setup(page: Page) {
   await page.goto("/builder");
   const owner = await authenticateForExport(page);
+  // AI job coaching is a Pro feature.
+  await grantProAccount(owner.id);
   const fixture = createDocument(true);
   fixture.provenance = { purpose: "personal", origin: "import" };
   fixture.sections

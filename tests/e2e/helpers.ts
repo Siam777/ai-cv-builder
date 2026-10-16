@@ -108,7 +108,7 @@ const CV_MENU = [
   "History",
   "Mark as my CV",
   "Demo examples",
-  "Create practice example",
+  "Practice CV (fictional)",
   "Delete this CV",
 ];
 // The AI Assistant is one panel with three tabs.
@@ -143,7 +143,9 @@ export async function editorTool(page: Page, name: string) {
   }
   await page.getByRole("button", { name: menu, exact: true }).click();
   await page
-    .getByRole("menuitem", { name: new RegExp(`^${name}`) })
+    .getByRole("menuitem", {
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    })
     .first()
     .click();
 }
@@ -175,12 +177,27 @@ export async function accountTab(
     .click();
 }
 
+// Give a real test account Pro in the isolated e2e database, so server-side
+// plan checks (such as AI job coaching) pass.
+export async function grantProAccount(userId: string) {
+  const { createClient } = await import("@libsql/client");
+  const client = createClient({ url: "file:./data/e2e.db" });
+  const now = new Date().toISOString();
+  await client.execute({
+    sql: `INSERT INTO subscriptions (id, user_id, stripe_customer_id, stripe_subscription_id, plan_id, status, current_period_end, cancel_at_period_end, created_at, updated_at)
+          VALUES (?, ?, ?, NULL, 'pro', 'active', NULL, 0, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET plan_id = 'pro', status = 'active'`,
+    args: [`sub_${randomUUID()}`, userId, `cus_e2e_${userId}`, now, now],
+  });
+  client.close();
+}
+
 // Show the free plan's locked states by default, and a paid plan on request.
 export async function grantPaidPlan(page: Page) {
   await page.route("**/api/billing/subscription", (route) =>
     route.fulfill({
       json: {
-        subscription: { planId: "job_hunter_monthly", status: "active" },
+        subscription: { planId: "pro", status: "active" },
         user: null,
       },
     }),

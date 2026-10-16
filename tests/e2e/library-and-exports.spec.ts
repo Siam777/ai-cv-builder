@@ -4,6 +4,7 @@ import { createDocument } from "../../src/lib/document";
 import { readFile } from "node:fs/promises";
 import {
   authenticateForExport,
+  grantPaidPlan,
   openFirstCv,
   startSampleResume,
   verifyTestEmail,
@@ -25,6 +26,7 @@ test("render failure preserves the draft without falling back to print", async (
 });
 
 test("cover letter copy requires sign-in and Markdown uses reviewed edits", async ({ page }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   await editorTool(page, "Cover letter");
@@ -123,7 +125,7 @@ test("legacy records retain content and require explicit classification; practic
   await expect(
     page.getByRole("article", { name: "Resume preview" }),
   ).toContainText("Northstar");
-  await editorTool(page, "Create practice example");
+  await editorTool(page, "Practice CV (fictional)");
   await page
     .getByRole("button", { name: "Create fictional practice CV" })
     .click();
@@ -226,7 +228,10 @@ test("all export formats enforce sessions, ownership, consent and current revisi
     const otherUser = (await (await other.get("/api/account")).json()).user;
     await verifyTestEmail(other, otherUser.email);
     expect((await anon.get(`/api/billing/mock-success?user_id=${user.id}&plan_id=lifetime`)).status()).toBe(410);
-    expect((await (await page.request.get("/api/billing/subscription")).json()).subscription.entitlements.watermark_free_export).toBe(false);
+    // The legacy simulation URL grants nothing: this new account keeps only the beta's Go period.
+    const { subscription } = await (await page.request.get("/api/billing/subscription")).json();
+    expect(subscription.planId).not.toBe("pro");
+    expect(subscription.stripeSubscriptionId).toBeNull();
     for (const data of requests) {
       expect((await other.post("/api/exports", { headers: { ...headers, "X-Workspace-User": otherUser.id }, data })).status()).toBe(404);
       expect(

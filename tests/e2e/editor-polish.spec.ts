@@ -133,7 +133,7 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
     ["Account menu", "Keyboard shortcuts", "Keyboard Navigation & Actions"],
     ["Upgrade", null, "Subscription Pricing"],
     ["CV options", "History", "Resume Version History"],
-    ["CV options", "Create practice example", "Create fictional practice CV"],
+    ["CV options", "Practice CV (fictional)", "Create fictional practice CV"],
     ["CV options", "Demo examples", "Demo Resume Gallery"],
     ["Add section", null, "Add Section to Resume"],
   ];
@@ -142,7 +142,9 @@ test("editor dialogs trap focus, close with Escape and restore their launching c
     await launcher.focus();
     await page.keyboard.press("Enter");
     if (item) {
-      const option = page.getByRole("menuitem", { name: new RegExp(`^${item}`) });
+      const option = page.getByRole("menuitem", {
+        name: new RegExp(`^${item.replace(/[()]/g, "\\$&")}`),
+      });
       await option.focus();
       await page.keyboard.press("Enter");
     }

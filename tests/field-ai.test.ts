@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createDocument } from "../src/lib/document";
 import {
   diffWords,
+  fieldAction,
   fieldActions,
   fixGrammar,
   skillsProposal,
@@ -18,20 +19,26 @@ import { synthesizeVerifiedXyzBullet } from "../src/lib/vault/impact-coach";
 test("each field kind has its own sparkle actions, and only rewrites use AI", () => {
   assert.deepEqual(
     fieldActions("bullet").map((a) => a.id),
-    ["improve", "result", "shorten", "grammar"],
+    ["improve", "shorten", "result", "grammar"],
   );
   assert.deepEqual(
     fieldActions("summary").map((a) => a.id),
-    ["draft", "grammar"],
+    ["ai-draft", "examples", "draft", "grammar"],
   );
   assert.deepEqual(
     fieldActions("skills").map((a) => a.id),
-    ["skills"],
+    ["ai-skills", "examples", "skills"],
   );
   const ai = fieldActions("bullet")
     .filter((a) => a.source === "ai")
     .map((a) => a.id);
   assert.deepEqual(ai, ["improve", "shorten"]);
+  assert.equal(fieldAction("ai-draft").source, "ai");
+  assert.equal(fieldAction("draft").source, "local");
+  // Built-in helpers are never labelled as AI.
+  assert.equal(fieldAction("result").source, "local");
+  assert.match(fieldAction("result").label, /you type it/);
+  assert.equal(fieldAction("examples").source, "ai");
 });
 
 test("diffWords marks removed and added words and keeps the rest", () => {
@@ -188,9 +195,14 @@ test("an empty CV has nothing to draft or finish", () => {
 
 test("tailored CV copies are locked on the free plan and open on paid plans", () => {
   assert.equal(planAllows("free", "tailored-copy"), false);
-  assert.equal(planAllows("job_hunter_weekly", "tailored-copy"), true);
-  assert.equal(planAllows("job_hunter_monthly", "tailored-copy"), true);
-  assert.equal(planAllows("lifetime", "tailored-copy"), true);
+  assert.equal(planAllows("go", "tailored-copy"), true);
+  assert.equal(planAllows("pro", "tailored-copy"), true);
+  assert.equal(planAllows("free", "cover-letter"), false);
+  assert.equal(planAllows("go", "cover-letter"), true);
+  assert.equal(planAllows("go", "job-coaching"), false);
+  assert.equal(planAllows("pro", "job-coaching"), true);
+  assert.equal(planAllows("free", "ai-summary"), false);
+  assert.equal(planAllows("go", "ai-summary"), true);
 });
 
 test("rewriteStatus explains why an AI rewrite is not available", () => {

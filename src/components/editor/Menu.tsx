@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 export interface MenuItem {
   label: string;
@@ -10,6 +10,8 @@ export interface MenuItem {
   disabled?: boolean;
   /** Starts a new group with a divider above it. */
   separated?: boolean;
+  /** A small heading shown above this item, naming its group. */
+  group?: string;
   current?: boolean;
   /** Extra class for styling or grouping this item. */
   className?: string;
@@ -112,8 +114,13 @@ export function Menu({
         >
           {header && <div className="menu-header">{header}</div>}
           {items.map((item, index) => (
+            <Fragment key={`${index}:${item.label}`}>
+            {item.group && (
+              <div className="menu-group" role="presentation">
+                {item.group}
+              </div>
+            )}
             <button
-              key={`${index}:${item.label}`}
               type="button"
               role="menuitem"
               className={[
@@ -136,6 +143,7 @@ export function Menu({
                 {item.hint && <small>{item.hint}</small>}
               </span>
             </button>
+            </Fragment>
           ))}
         </div>
       )}

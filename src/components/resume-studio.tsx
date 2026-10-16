@@ -47,6 +47,7 @@ import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
 import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
 import { StartScreen } from "./editor/StartScreen";
+import { AiInterview } from "./editor/AiInterview";
 import { BrowserCvsBanner } from "./editor/BrowserCvsBanner";
 import {
   ImportReviewModal,
@@ -68,6 +69,7 @@ import { issuesToFix } from "@/lib/check-findings";
 import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
+import { LockedFeature } from "./billing/LockedFeature";
 import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
 import { DemoResumesModal } from "./editor/DemoResumesModal";
 import { DocumentLibrary } from "./editor/DocumentLibrary";
@@ -78,7 +80,7 @@ import {
   printArtifact,
 } from "@/lib/export-client";
 import type { ExportRequest, ExportSource } from "@/lib/export-contract";
-import type { PlanId } from "@/lib/billing-plans";
+import { normalizePlanId, type PlanId } from "@/lib/billing-plans";
 import type { StartingDesign } from "@/lib/public-catalog";
 import type { FocusTarget, SaveState } from "./editor/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -109,6 +111,14 @@ function download(
     }
     URL.revokeObjectURL(url);
   }, 2000);
+}
+
+/** The job title examples are suggested for: the headline, else the latest job. */
+function starterTitle(doc: ResumeDocument) {
+  const job = doc.sections
+    .find((section) => section.type === "experience")
+    ?.entries.find((entry) => entry.title.trim());
+  return (doc.contact.headline.trim() || job?.title.trim() || "").slice(0, 120);
 }
 
 export function ResumeStudio({
@@ -175,6 +185,12 @@ export function ResumeStudio({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
   const [currentPlanId, setCurrentPlanId] = useState<PlanId>("free");
+  // The plan comes from the beta's free Go period, and how long that lasts.
+  const [planBeta, setPlanBeta] = useState<{ active: boolean; endsAt: number | null; days: number }>({
+    active: false,
+    endsAt: null,
+    days: 0,
+  });
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
   // Browser CVs never copied to the signed-in account (one-time banner).
   // CVs saved in this browser while signed in: all of them, and the ones that
@@ -185,6 +201,19 @@ export function ResumeStudio({
   } | null>(null);
   const [browserCvsCheck, setBrowserCvsCheck] = useState(0);
   const rewriteAvailability = useRewriteAvailability(cloudUser?.id ?? null);
+  // One-time AI consent on the account; set here once the person turns it on.
+  const [aiConsentSet, setAiConsentSet] = useState<boolean | null>(null);
+  useEffect(() => setAiConsentSet(null), [cloudUser?.id]);
+  const aiConsent =
+    aiConsentSet ??
+    (typeof rewriteAvailability === "object" && rewriteAvailability
+      ? Boolean(rewriteAvailability.aiConsent)
+      : false);
+  // Sign in to use AI: after signing in, the open draft is copied to the account.
+  const aiSignIn = useRef(false);
+  // Build my CV with AI: the CV the interview is filling, and a guest's wish to start one.
+  const [interviewDocId, setInterviewDocId] = useState<string | null>(null);
+  const pendingInterview = useRef(false);
   const [sessionPaused, setSessionPaused] = useState(false);
   const paused = useRef(false);
   const preview = useRef<PreviewHandle>(null);
@@ -381,13 +410,14 @@ export function ResumeStudio({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
-        if (data?.subscription?.planId && data.subscription.planId !== "free") {
-          setIsSubscriber(true);
-          setCurrentPlanId(data.subscription.planId || "job_hunter_monthly");
-        } else {
-          setIsSubscriber(false);
-          setCurrentPlanId("free");
-        }
+        const planId = normalizePlanId(data?.subscription?.planId);
+        setIsSubscriber(planId !== "free");
+        setCurrentPlanId(planId);
+        setPlanBeta({
+          active: Boolean(data?.subscription?.beta),
+          endsAt: data?.subscription?.currentPeriodEnd ?? null,
+          days: Number(data?.betaTrialDays ?? 0),
+        });
       })
       .catch(() => {
         if (active) {
@@ -721,11 +751,11 @@ export function ResumeStudio({
    * example after signing in mid-edit): copy it to the account and open the
    * account copy. The browser copy is kept.
    */
-  function copyCurrentToAccount() {
-    const user = sessionUser;
+  function copyCurrentToAccount(signedIn?: AccountUser) {
+    const user = signedIn ?? sessionUser;
     const source = current.current;
-    if (!user || !source || cloudUser || sessionPaused) return;
-    void action(async () => {
+    if (!user || !source || cloudUser || sessionPaused) return Promise.resolve();
+    return action(async () => {
       await flush();
       const latest =
         (await repository.current!.list()).find((d) => d.id === source.id) ??
@@ -746,6 +776,72 @@ export function ResumeStudio({
         "This CV is now saved to your account, so AI rewriting is available. The copy in this browser was kept.",
       );
     });
+  }
+
+  /**
+   * Build my CV with AI: a new account CV filled by the AI interview. Guests
+   * sign in first; a CV list in this browser switches to the account.
+   */
+  function buildWithAi() {
+    if (!sessionUser) {
+      pendingInterview.current = true;
+      signInForAi();
+      return;
+    }
+    const user = sessionUser;
+    void action(async () => {
+      if (!cloudUser) await switchWorkspace(user, false);
+      await startInterviewCv();
+    });
+  }
+
+  async function startInterviewCv() {
+    const next = createDocument();
+    next.name = "My CV (AI interview)";
+    await addDocument(next);
+    setShowStart(false);
+    setShowLibrary(false);
+    setInterviewDocId(next.id);
+  }
+
+  /** Leaves the interview, optionally opening the summary or skills help. */
+  function finishInterview(next: "summary" | "skills" | null) {
+    setInterviewDocId(null);
+    if (!doc || !next) return;
+    const section = doc.sections.find((s) => s.type === next);
+    startFieldAction({
+      id: `interview-${next}`,
+      kind: next,
+      action:
+        next === "summary"
+          ? planAllows(currentPlanId, "ai-summary")
+            ? "ai-draft"
+            : "draft"
+          : planAllows(currentPlanId, "ai-skills")
+            ? "ai-skills"
+            : "skills",
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: section?.id ?? null,
+      sectionType: next,
+    });
+  }
+
+  /** Guests: sign in, then the open draft is copied to the account in one step. */
+  function signInForAi() {
+    aiSignIn.current = true;
+    setShowAI(false);
+    setShowAccount(true);
+  }
+
+  async function grantAiConsent() {
+    await accountRequest(
+      "/api/account",
+      { method: "PATCH", body: JSON.stringify({ aiWritingHelp: true }) },
+      cloudUser?.id,
+    );
+    setAiConsentSet(true);
   }
 
   /** Opens the start screen; the open CV stays as it is underneath. */
@@ -1359,6 +1455,7 @@ export function ResumeStudio({
               pendingExport || sessionPaused ? async () => {} : flush
             }
             pendingAction={pendingExport ? "Continue export" : undefined}
+            onAiWritingHelp={setAiConsentSet}
             onAuthenticated={async (user) => {
               setSessionUser(user);
               if (!cloudUser && current.current)
@@ -1370,6 +1467,17 @@ export function ResumeStudio({
               if (pendingExport) {
                 if (userCanExport(user)) setShowAccount(false);
                 await performExport(pendingExport, user);
+              } else if (aiSignIn.current && !cloudUser) {
+                aiSignIn.current = false;
+                setShowAccount(false);
+                if (pendingInterview.current) {
+                  pendingInterview.current = false;
+                  await action(async () => {
+                    await switchWorkspace(user, false);
+                    await startInterviewCv();
+                  });
+                } else if (current.current) await copyCurrentToAccount(user);
+                else await action(() => switchWorkspace(user));
               }
             }}
             onCloud={(user) => switchWorkspace(user)}
@@ -1381,6 +1489,8 @@ export function ResumeStudio({
             onClose={() => {
               setShowAccount(false);
               setPendingExport(null);
+              aiSignIn.current = false;
+              pendingInterview.current = false;
             }}
             loadLocal={async () => {
               await flush();
@@ -1496,6 +1606,8 @@ export function ResumeStudio({
         <PricingModal
           cloudUser={cloudUser}
           currentPlanId={currentPlanId}
+          beta={planBeta.active}
+          betaDays={planBeta.days}
           onOpenAccount={() => {
             setShowPricing(false);
             setShowAccount(true);
@@ -1672,6 +1784,9 @@ export function ResumeStudio({
           <StartScreen
             disabled={!ready || busy || status === "Save failed"}
             signedIn={!!cloudUser}
+            betaDays={planBeta.days}
+            onSignInForAi={sessionUser ? undefined : signInForAi}
+            onBuildWithAi={buildWithAi}
             startingDesign={selectedStart?.label}
             onClearStartingDesign={clearStartingDesign}
             onStaged={(data) => setStaged(data)}
@@ -1747,11 +1862,11 @@ export function ResumeStudio({
                       ? undefined
                       : {
                           label: "Copy to my account",
-                          onClick: copyCurrentToAccount,
+                          onClick: () => void copyCurrentToAccount(),
                         }
                     : {
-                        label: "Sign in to back up",
-                        onClick: () => setShowAccount(true),
+                        label: "Sign in to use AI",
+                        onClick: signInForAi,
                       }
               }
               issueCount={issuesToFix(allIssues, dismissed).length}
@@ -1842,18 +1957,25 @@ export function ResumeStudio({
                   owner: cloudUser?.id ?? null,
                   availability: rewriteAvailability,
                   signedIn: !!sessionUser,
-                  onCopyToAccount: copyCurrentToAccount,
+                  onCopyToAccount: () => void copyCurrentToAccount(),
+                  summaryDrafts: planAllows(currentPlanId, "ai-summary"),
+                  aiConsent,
+                  grantConsent: grantAiConsent,
+                  starterTitle: starterTitle(doc),
+                  skillsAi: planAllows(currentPlanId, "ai-skills"),
+                  updateDocument: (mutator) => update(mutator),
+                  onSeePlans: () => setShowPricing(true),
                   prepare: prepareAI,
                   accept: acceptAI,
-                  onOpenAccount: () => {
-                    setShowAI(false);
-                    setShowAccount(true);
-                  },
+                  onOpenAccount: signInForAi,
                   pending: pendingField,
                   consumePending: (id) =>
                     setPendingField((open) => (open?.id === id ? null : open)),
                 }}
               >
+                {doc.id === interviewDocId ? (
+                  <AiInterview doc={doc} onFinish={finishInterview} />
+                ) : (
                 <SectionEditor
                   doc={doc}
                   sectionId={sectionId}
@@ -1879,6 +2001,7 @@ export function ResumeStudio({
                   onStep={goToStep}
                   onFinish={() => setShowAts(true)}
                 />
+                )}
               </FieldAiProvider>
 
               {activePanel && (
@@ -1934,12 +2057,9 @@ export function ResumeStudio({
                       owner={cloudUser?.id ?? null}
                       availability={rewriteAvailability}
                       signedIn={!!sessionUser}
-                      onCopyToAccount={copyCurrentToAccount}
+                      onCopyToAccount={() => void copyCurrentToAccount()}
                       onStartAction={startFieldAction}
-                      onOpenAccount={() => {
-                        setShowAI(false);
-                        setShowAccount(true);
-                      }}
+                      onOpenAccount={signInForAi}
                       onOpenCheck={() => setActivePanel("check")}
                       jobTab={
                         <JobTailorModal
@@ -1957,6 +2077,7 @@ export function ResumeStudio({
                             currentPlanId,
                             "tailored-copy",
                           )}
+                          canCoach={planAllows(currentPlanId, "job-coaching")}
                           onSeePlans={() => {
                             if (sheetLayout) setShowAI(false);
                             setShowPricing(true);
@@ -1966,6 +2087,15 @@ export function ResumeStudio({
                         />
                       }
                       letterTab={
+                        !planAllows(currentPlanId, "cover-letter") ? (
+                          <LockedFeature
+                            feature="cover-letter"
+                            onSeePlans={() => {
+                              if (sheetLayout) setShowAI(false);
+                              setShowPricing(true);
+                            }}
+                          />
+                        ) : (
                         <CoverLetterModal
                           embedded
                           doc={doc}
@@ -1983,6 +2113,7 @@ export function ResumeStudio({
                             void performExport(pending);
                           }}
                         />
+                        )
                       }
                     />
                   )}

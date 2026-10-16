@@ -4,14 +4,24 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { accountRequest } from "@/lib/cloud-repository";
 import type { AccountUser } from "@/lib/cloud-contract";
-import { PLANS, type PlanId } from "@/lib/billing-plans";
-import { Check, TriangleAlert, X } from "lucide-react";
+import {
+  normalizePlanId,
+  type PaidPlanId,
+  type PlanId,
+} from "@/lib/billing-plans";
+import { PlanCards, PlanComparison } from "@/components/billing/PlanCards";
+import { TriangleAlert } from "lucide-react";
 
 export default function UpgradePage() {
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const [error, setError] = useState("");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [plan, setPlan] = useState<{ planId: PlanId; beta: boolean; betaDays: number }>({
+    planId: "free",
+    beta: false,
+    betaDays: 0,
+  });
 
   useEffect(() => {
     let active = true;
@@ -28,12 +38,23 @@ export default function UpgradePage() {
       }
     }
     void checkSession();
+    void fetch("/api/billing/subscription")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data)
+          setPlan({
+            planId: normalizePlanId(data.subscription?.planId),
+            beta: Boolean(data.subscription?.beta),
+            betaDays: Number(data.betaTrialDays ?? 0),
+          });
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
 
-  async function handleCheckout(planId: PlanId) {
+  async function handleCheckout(planId: PaidPlanId) {
     if (!cloudUser) {
       setError(
         "Please sign in or create an account on your Profile page to activate a subscription.",
@@ -71,22 +92,23 @@ export default function UpgradePage() {
 
   const faqs = [
     {
-      q: "Can I manage a subscription?",
-      a: "Billing settings require configured payment services. Checkout, cancellation and renewal flows still need live validation on the deployed application.",
+      q: "What do I get during the beta?",
+      a: `Every new account gets Go free for its first ${plan.betaDays || 30} days, with no card. After that it moves to Free unless you choose Go or Pro.`,
     },
     {
-      q: "Can I keep editing without a paid plan?",
-      a: "Device editing, the current designs and local writing tools are available without payment. Every app download requires sign-in; CVs, letters and recovery backups also require verified email.",
+      q: "Can I keep using the editor for free?",
+      a: "Yes. Free includes the full editor, all 12 designs, Check my CV, built-in writing helpers and 5 AI rewrites a day. Downloads need an account; Free PDFs carry a small watermark.",
     },
     {
-      q: "How does job tailoring work?",
-      a: "The local tool compares keyword and token overlap and reorders existing content into an independent variant. It does not verify qualifications or invent career facts. AI bullet suggestions use a separate consent and review flow.",
+      q: "What counts as an AI rewrite?",
+      a: "Each AI request, such as improving a bullet or drafting a summary. Nothing is changed until you accept it, and AI only uses what your CV already says.",
     },
     {
-      q: "What do the paid limits mean?",
-      a: "The cards show the current configuration, not an unlimited-use or permanent-storage promise. Some limits and paid features still need integration and live validation. Review the final product terms before subscribing.",
+      q: "How do I cancel?",
+      a: "Plans are monthly and can be cancelled at any time from Account settings, Billing. Payments are handled by Stripe once it is set up on this installation.",
     },
   ];
+
 
   return (
     <div className="upgrade-page-container">
@@ -121,13 +143,14 @@ export default function UpgradePage() {
         {/* Hero Section */}
         <section className="upgrade-hero">
           <span className="upgrade-badge">
-            Proposed plans & configured limits
+            {plan.betaDays > 0
+              ? `Beta: Go free for ${plan.betaDays} days after sign-up`
+              : "Monthly plans"}
           </span>
-          <h1>Invest In Your Next Career Chapter</h1>
+          <h1>Plans for every stage of your job search</h1>
           <p className="hero-lead">
-            Explore the current plan configuration. Payment, cancellation and
-            paid-provider services still need live validation before a public
-            release.
+            Start free. Choose Go for an active search or Pro for many
+            applications. All plans are monthly and you can cancel any time.
           </p>
 
           <div className="hero-trust-row">
@@ -154,235 +177,25 @@ export default function UpgradePage() {
           </div>
         )}
 
-        <p className="box-hint">
-          Proposed paid plan details. Prices and caps reflect the current
-          configuration; enforcement and paid features are not all integrated or
-          live-validated. Device editing currently includes twelve designs and
-          multiple drafts. All CV downloads require sign-in and verified email.
-        </p>
+        {plan.beta && (
+          <p className="box-hint">
+            You are on Go for free during the beta. Choose a plan to keep its
+            features afterwards.
+          </p>
+        )}
         {/* Pricing Cards Grid */}
         <section className="pricing-cards-section">
-          <div className="pricing-grid">
-            {/* Free Forever */}
-            <div className="pricing-card">
-              <div className="card-top">
-                <span className="plan-badge">Device editing</span>
-                <h3>Free / Local</h3>
-                <div className="plan-price">
-                  <span className="price-val">$0</span>
-                </div>
-                <p className="plan-sub">
-                  Perfect for drafting a baseline resume locally on your
-                  machine.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li><Check size={16} aria-hidden /> Multiple independent device drafts</li>
-                <li><Check size={16} aria-hidden /> Browser editing and device autosave</li>
-                <li><Check size={16} aria-hidden /> Standard PDF print export (subtle watermark)</li>
-                <li><Check size={16} aria-hidden /> Plain-text & JSON backup export</li>
-                <li><Check size={16} aria-hidden /> Explicit device or account storage</li>
-                <li className="dimmed"><Check size={16} aria-hidden /> Local rule-based job tailoring</li>
-                <li className="dimmed"><X size={16} aria-hidden /> Watermark-free PDF & DOCX exports</li>
-                <li className="dimmed">
-                  <Check size={16} aria-hidden /> Local career vault and writing tools
-                </li>
-              </ul>
-              <Link href="/builder" className="plan-button outline">
-                Continue Free in Studio
-              </Link>
-            </div>
-
-            {/* Job Hunter Monthly Pass */}
-            <div className="pricing-card featured">
-              <div className="popular-ribbon">Monthly plan</div>
-              <div className="card-top">
-                <span className="plan-badge featured-badge">
-                  JOB HUNTER PASS
-                </span>
-                <h3>Monthly Pass</h3>
-                <div className="plan-price">
-                  <span className="price-val">$19</span>
-                  <span className="price-period">/ month</span>
-                </div>
-                <p className="plan-sub">
-                  For active candidates targeting multiple job applications.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li>
-                  Configured cap:{" "}
-                  <strong>{PLANS.job_hunter_monthly.maxVariants}</strong>{" "}
-                  account variants
-                </li>
-                <li>
-                  Configured cap:{" "}
-                  <strong>
-                    {PLANS.job_hunter_monthly.maxTailoredPerMonth}
-                  </strong>{" "}
-                  tailoring uses/month
-                </li>
-                <li>
-                  <Check size={16} aria-hidden /> <strong>Clean, watermark-free</strong> PDF & DOCX export
-                </li>
-                <li>
-                  <Check size={16} aria-hidden /> <strong>All 8 designer templates</strong> (Classic, Modern,
-                  Tech, Executive, etc.)
-                </li>
-                <li>
-                  <Check size={16} aria-hidden />{" "}
-                  <strong>Master Career Vault & Google XYZ Impact Coach</strong>
-                </li>
-                <li><Check size={16} aria-hidden /> Writing findings and term observations</li>
-                <li><Check size={16} aria-hidden /> Cover Letter Studio with 1-click matching</li>
-                <li>Cancellation flow requires live validation</li>
-              </ul>
-              <button
-                type="button"
-                className="plan-button primary"
-                disabled={loadingPlan !== null}
-                onClick={() => handleCheckout("job_hunter_monthly")}
-              >
-                {loadingPlan === "job_hunter_monthly"
-                  ? "Redirecting to Stripe…"
-                  : "Upgrade to Job Hunter Pass ↗"}
-              </button>
-            </div>
-
-            {/* Lifetime Access */}
-            <div className="pricing-card">
-              <div className="card-top">
-                <span className="plan-badge">One-time plan</span>
-                <h3>Power Pass</h3>
-                <div className="plan-price">
-                  <span className="price-val">$79</span>
-                  <span className="price-period">one-time</span>
-                </div>
-                <p className="plan-sub">
-                  For senior professionals and managers maintaining lifelong
-                  career assets.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li>One-time plan configuration</li>
-                <li>
-                  Configured cap:{" "}
-                  <strong>{PLANS.lifetime.maxTailoredPerMonth}</strong>{" "}
-                  tailoring uses/month
-                </li>
-                <li>Eight current editor designs</li>
-                <li>
-                  <Check size={16} aria-hidden />{" "}
-                  <strong>
-                    Watermark-free PDF/DOCX while entitlement is active
-                  </strong>
-                </li>
-                <li>
-                  <Check size={16} aria-hidden /> Multi-format exports (PDF, DOCX, Markdown, HTML, JSON)
-                </li>
-                <li>Provider features await live validation</li>
-                <li>Future features are separately planned</li>
-              </ul>
-              <button
-                type="button"
-                className="plan-button primary dark"
-                disabled={loadingPlan !== null}
-                onClick={() => handleCheckout("lifetime")}
-              >
-                {loadingPlan === "lifetime"
-                  ? "Redirecting to Stripe…"
-                  : "Review Power Pass ↗"}
-              </button>
-            </div>
-          </div>
+          <PlanCards
+            currentPlanId={plan.planId}
+            beta={plan.beta}
+            loadingPlan={loadingPlan}
+            onChoose={(id) => void handleCheckout(id)}
+          />
         </section>
 
-        {/* Feature Comparison Matrix */}
         <section className="upgrade-matrix-section">
-          <h2>Detailed Feature Comparison</h2>
-          <div className="table-responsive">
-            <table className="comparison-table">
-              <thead>
-                <tr>
-                  <th>Features</th>
-                  <th>Free / Local</th>
-                  <th className="highlight-col">Job Hunter Pass</th>
-                  <th>One-time Power Pass</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Configured account variant cap</td>
-                  <td>1</td>
-                  <td className="highlight-col">
-                    <strong>
-                      {PLANS.job_hunter_monthly.maxVariants} configured
-                    </strong>
-                  </td>
-                  <td>
-                    <strong>{PLANS.lifetime.maxVariants} configured</strong>
-                  </td>
-                </tr>
-                <tr>
-                  <td>1-Click Job Description Tailoring</td>
-                  <td>Available locally; export requires verified email</td>
-                  <td className="highlight-col">
-                    <strong>
-                      {PLANS.job_hunter_monthly.maxTailoredPerMonth} / month
-                      configured
-                    </strong>
-                  </td>
-                  <td>
-                    <strong>
-                      {PLANS.lifetime.maxTailoredPerMonth} / month configured
-                    </strong>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Clean, Watermark-Free PDF Exports</td>
-                  <td>—</td>
-                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
-                  <td><Check size={16} aria-hidden /> Included</td>
-                </tr>
-                <tr>
-                  <td>DOCX, Markdown & HTML Exporters</td>
-                  <td>
-                    Available with verified email; PDF/DOCX use a watermark
-                  </td>
-                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
-                  <td><Check size={16} aria-hidden /> Included</td>
-                </tr>
-                <tr>
-                  <td>All 8 Designer Templates</td>
-                  <td>All 8 current designs</td>
-                  <td className="highlight-col"><Check size={16} aria-hidden /> All 8 Templates</td>
-                  <td>All 8 current designs</td>
-                </tr>
-                <tr>
-                  <td>Google XYZ Impact Bullet Coach</td>
-                  <td>Available locally; review every factual claim</td>
-                  <td className="highlight-col"><Check size={16} aria-hidden /> Included</td>
-                  <td><Check size={16} aria-hidden /> Included</td>
-                </tr>
-                <tr>
-                  <td>Master Career Vault</td>
-                  <td>Browser Local</td>
-                  <td className="highlight-col">
-                    Local vault; account CV storage is separate
-                  </td>
-                  <td>Local vault; account CV storage is separate</td>
-                </tr>
-                <tr>
-                  <td>Document content review</td>
-                  <td>Findings and term observations</td>
-                  <td className="highlight-col">
-                    Findings and term observations
-                  </td>
-                  <td>Findings and term observations</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <h2>Compare plans</h2>
+          <PlanComparison />
         </section>
 
         {/* FAQ Section */}

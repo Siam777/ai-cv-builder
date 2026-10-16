@@ -95,7 +95,7 @@ export function AiCvGeneratorModal({
         <header className="modal-header">
           <div>
             <p className="library-kind">Fictional practice content</p>
-            <h2>Create a practice CV</h2>
+            <h2>Practice CV (fictional)</h2>
           </div>
           <button
             type="button"
@@ -113,7 +113,7 @@ export function AiCvGeneratorModal({
             <div className="ai-gen-progress-stage" style={{ textAlign: "center", padding: "40px 20px" }}>
               <div className="ai-gen-spinner" />
               <h3 style={{ marginTop: "20px", fontSize: "var(--text-lg)", fontWeight: 600 }}>
-                Generating Tailored Resume…
+                Creating practice CV…
               </h3>
               <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginTop: "6px" }}>
                 {genStep}

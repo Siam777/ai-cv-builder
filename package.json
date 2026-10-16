@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "db:setup": "node scripts/setup-db.mjs",
+    "plan:grant": "node scripts/grant-plan.mjs",
     "ai:eval": "tsx scripts/eval-openai.ts",
     "ai:eval:job": "tsx scripts/eval-job-coaching.ts",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/start-flow.test.ts tests/field-ai.test.ts tests/check-findings.test.ts tests/cv-strength.test.ts tests/auth-email.test.ts tests/library.test.ts tests/document.test.ts tests/database.test.ts tests/ai-proposals.test.ts tests/openai-provider.test.ts tests/ai-service.test.ts tests/editor-components.test.ts tests/importers.test.ts tests/vault-and-tailoring.test.ts tests/ats-linter.test.ts tests/billing.test.ts tests/exporters.test.ts tests/cover-letter.test.ts tests/linkedin-importer.test.ts tests/snapshots.test.ts tests/custom-sections.test.ts tests/skills-taxonomy.test.ts tests/ai-assistant.test.ts tests/pdf-generator.test.ts tests/ai-evaluations.test.ts tests/release-readiness.test.ts tests/role-analyzer-and-ai-generator.test.ts tests/letter-layout.test.ts tests/file-diagnostics.test.ts tests/job-evidence.test.ts tests/job-review-history.test.ts tests/job-coaching.test.ts tests/job-coaching-evaluation.test.ts",
+    "test": "tsx --test tests/plan-limits.test.ts tests/ai-writing.test.ts tests/ai-interview-skills.test.ts tests/start-flow.test.ts tests/field-ai.test.ts tests/check-findings.test.ts tests/cv-strength.test.ts tests/auth-email.test.ts tests/library.test.ts tests/document.test.ts tests/database.test.ts tests/ai-proposals.test.ts tests/openai-provider.test.ts tests/ai-service.test.ts tests/editor-components.test.ts tests/importers.test.ts tests/vault-and-tailoring.test.ts tests/ats-linter.test.ts tests/billing.test.ts tests/exporters.test.ts tests/cover-letter.test.ts tests/linkedin-importer.test.ts tests/snapshots.test.ts tests/custom-sections.test.ts tests/skills-taxonomy.test.ts tests/ai-assistant.test.ts tests/pdf-generator.test.ts tests/ai-evaluations.test.ts tests/release-readiness.test.ts tests/role-analyzer-and-ai-generator.test.ts tests/letter-layout.test.ts tests/file-diagnostics.test.ts tests/job-evidence.test.ts tests/job-review-history.test.ts tests/job-coaching.test.ts tests/job-coaching-evaluation.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

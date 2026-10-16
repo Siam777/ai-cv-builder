@@ -385,14 +385,11 @@ test("Pricing modal displays commercial tiers, entitlement benefits, and initiat
   // Pricing dialog should open
   const dialog = page.getByRole("dialog", { name: "Subscription Pricing" });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Free / Local");
-  await expect(dialog).toContainText("Monthly Pass");
-  await expect(dialog).toContainText("Power Pass");
+  for (const [name, price] of [["Free", "$0"], ["Go", "$9.99"], ["Pro", "$29.99"]])
+    await expect(dialog.getByRole("group", { name: `${name} plan` })).toContainText(price);
 
-  // Clicking an upgrade button while in local mode redirects to account sign in
-  await page
-    .getByRole("button", { name: /Upgrade to Job Hunter Pass/ })
-    .click();
+  // Choosing a plan while signed out opens sign-in
+  await page.getByRole("button", { name: "Choose Go" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("region", { name: "Account settings" }),
@@ -511,6 +508,8 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
 test("Automated Cover Letter Generator creates grounded letter with 1-click export", async ({
   page,
 }) => {
+  // Cover letters are part of Go and Pro.
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");

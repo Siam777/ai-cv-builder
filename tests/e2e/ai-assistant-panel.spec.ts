@@ -29,8 +29,8 @@ test("sparkle menu is keyboard operable and Escape returns focus to it", async (
   await expect(items.nth(0)).toContainText("Improve wording");
   await page.keyboard.press("ArrowDown");
   await expect(items.nth(1)).toBeFocused();
-  await expect(items.nth(1)).toContainText("Add a result");
-  await expect(items.nth(2)).toContainText("Shorten");
+  await expect(items.nth(1)).toContainText("Shorten");
+  await expect(items.nth(2)).toContainText("Add a result (you type it)");
   await expect(items.nth(3)).toContainText("Fix grammar");
   await page.keyboard.press("Escape");
   await expect(items).toHaveCount(0);
@@ -121,8 +121,9 @@ test("summary and skills have sparkle menus built from details already in the CV
 
   await page.locator(".section-nav").getByRole("button", { name: /^Profile/ }).click();
   await sparkle(page, "Professional summary").click();
-  await expect(page.getByRole("menuitem")).toHaveCount(2);
-  await page.getByRole("menuitem", { name: /^Draft from my CV/ }).click();
+  // Write with AI, Show examples, Quick draft and Fix grammar.
+  await expect(page.getByRole("menuitem")).toHaveCount(4);
+  await page.getByRole("menuitem", { name: /^Quick draft/ }).click();
   const summaryHelp = card(page, "Professional summary");
   await expect(summaryHelp.getByRole("listitem")).toHaveCount(3);
   await summaryHelp
@@ -196,7 +197,8 @@ test("the AI Assistant is one panel with three modes and the retired entry point
   await expect(panel.getByRole("region", { name: "Job Tailoring Engine" })).toBeVisible();
   await page.keyboard.press("End");
   await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByRole("region", { name: "Cover letter" })).toBeVisible();
+  // Cover letters are a Go and Pro feature; this guest is on Free.
+  await expect(panel.getByRole("group", { name: "Locked: Cover letters" })).toBeVisible();
   await page.keyboard.press("Home");
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
 
@@ -260,7 +262,7 @@ test("free plan shows tailored copies as locked and a paid plan unlocks them", a
   const locked = tool.getByRole("group", { name: "Locked: tailored CV copies" });
   await expect(locked).toBeVisible();
   await expect(locked).toContainText("The comparison is free");
-  await expect(locked).toContainText("Job Hunter Pass");
+  await expect(locked).toContainText("part of Go and Pro");
   await expect(
     tool.getByRole("button", { name: "Create reviewed variant" }),
   ).toHaveCount(0);

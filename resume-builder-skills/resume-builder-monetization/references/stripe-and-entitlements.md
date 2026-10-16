@@ -11,7 +11,7 @@ export const subscriptions = sqliteTable('subscriptions', {
   userId: text('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   stripeCustomerId: text('stripe_customer_id').notNull().unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
-  planId: text('plan_id').notNull(), // 'free' | 'job_hunter_monthly' | 'job_hunter_weekly' | 'lifetime'
+  planId: text('plan_id').notNull(), // 'free' | 'go' | 'pro' (old IDs map through normalizePlanId)
   status: text('status').notNull(), // 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete'
   currentPeriodEnd: integer('current_period_end'),
   cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).default(false),
@@ -104,10 +104,7 @@ export async function checkEntitlement(
 
   const isActive = sub && (sub.status === 'active' || sub.status === 'trialing');
 
-  if (sub?.planId === 'lifetime') {
-    return { allowed: true };
-  }
-
+  // Pro includes every paid feature; Go excludes job coaching (see PLANS).
   switch (feature) {
     case 'watermark_free_export':
     case 'all_templates':

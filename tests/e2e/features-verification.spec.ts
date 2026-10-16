@@ -1,4 +1,4 @@
-import { editorTool } from "./helpers";
+import { editorTool, grantPaidPlan } from "./helpers";
 import {
   startSampleResume,
   openFirstCv,
@@ -11,6 +11,8 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     page,
   }) => {
     test.setTimeout(60000);
+    // The Cover Letter Studio is part of Go and Pro.
+    await grantPaidPlan(page);
     await page.goto("/builder");
 
     await startSampleResume(page);
@@ -77,7 +79,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(atsModal).not.toBeVisible();
 
     // 3. Open AI Quick-Start Generator
-    await editorTool(page, "Create practice example");
+    await editorTool(page, "Practice CV (fictional)");
     await expect(
       page.getByRole("dialog", { name: "Create fictional practice CV" }),
     ).toBeVisible();

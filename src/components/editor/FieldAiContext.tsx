@@ -18,6 +18,8 @@ export interface PendingFieldAction {
 export interface RewriteAvailability {
   configured: boolean;
   signedIn: boolean;
+  /** The account turned on AI writing help (one-time consent). */
+  aiConsent?: boolean;
 }
 
 /** What every sparkle menu needs from the studio. */
@@ -30,6 +32,19 @@ export interface FieldAiServices {
   signedIn: boolean;
   /** Copies the open browser CV to the signed-in account and opens it there. */
   onCopyToAccount: () => void;
+  /** The plan includes AI summary drafts (Go and Pro). */
+  summaryDrafts: boolean;
+  /** AI writing help is on for the account (asked once, kept on the account). */
+  aiConsent: boolean;
+  /** Turns AI writing help on for the account. */
+  grantConsent: () => Promise<void>;
+  /** The job title examples are suggested for (headline or latest job). */
+  starterTitle: string;
+  /** The plan includes Suggest skills with AI (Go and Pro). */
+  skillsAi: boolean;
+  /** Applies one change to the open CV (one Undo step). */
+  updateDocument: (mutator: (draft: ResumeDocument) => void) => void;
+  onSeePlans: () => void;
   prepare: () => Promise<ResumeDocument>;
   accept: (proposal: Proposal) => Promise<void>;
   onOpenAccount: () => void;

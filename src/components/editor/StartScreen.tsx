@@ -7,6 +7,7 @@ import {
   FileUp,
   Contact,
   ListChecks,
+  Sparkles,
 } from "lucide-react";
 import {
   readLinkedInFiles,
@@ -17,6 +18,12 @@ import {
 export interface StartScreenProps {
   disabled: boolean;
   signedIn: boolean;
+  /** Days of free Go for new accounts during the beta (0 when off). */
+  betaDays?: number;
+  /** Guests: sign in to use AI; the draft is copied to the account. */
+  onSignInForAi?: () => void;
+  /** Build my CV with AI: the interview start (guests sign in first). */
+  onBuildWithAi?: () => void;
   /** The design picked on /templates before starting, if any. */
   startingDesign?: string;
   onClearStartingDesign: () => void;
@@ -35,6 +42,9 @@ export interface StartScreenProps {
 export function StartScreen({
   disabled,
   signedIn,
+  betaDays = 0,
+  onSignInForAi,
+  onBuildWithAi,
   startingDesign,
   onClearStartingDesign,
   onStaged,
@@ -79,6 +89,22 @@ export function StartScreen({
             : "Your new CV is saved in this browser. Sign in any time to back it up."}
         </p>
       </header>
+      {onSignInForAi && (
+        <section className="start-ai-signin" aria-label="AI writing help">
+          <Sparkles size={20} aria-hidden />
+          <p>
+            <strong>Sign in to use AI.</strong>{" "}
+            {betaDays > 0
+              ? `New accounts get Go free for ${betaDays} days. `
+              : ""}
+            AI writes bullets from your notes and shows examples for your job
+            title. You review everything first.
+          </p>
+          <button type="button" className="primary" disabled={locked} onClick={onSignInForAi}>
+            Sign in to use AI
+          </button>
+        </section>
+      )}
       {startingDesign && (
         <section className="starting-design" aria-label="Selected starting design">
           <div>
@@ -91,6 +117,24 @@ export function StartScreen({
         </section>
       )}
       <div className="start-choices">
+        {onBuildWithAi && (
+          <div className="start-choice start-ai">
+            <Sparkles className="start-choice-icon" size={28} aria-hidden />
+            <h3>Build my CV with AI</h3>
+            <p>
+              Answer five short questions. AI turns your answers into a draft you
+              check step by step. Nothing is made up.
+            </p>
+            <button type="button" className="primary" disabled={locked} onClick={onBuildWithAi}>
+              Build my CV with AI
+            </button>
+            <p className="start-choice-note">
+              {signedIn
+                ? "Saved to your account. Free includes one interview; Go and Pro include more."
+                : "Needs an account: you sign in first, then the interview starts."}
+            </p>
+          </div>
+        )}
         <div
           className={`start-choice start-upload${dragging ? " dragging" : ""}`}
           onDragOver={(event) => {
@@ -191,7 +235,7 @@ export function StartScreen({
             Browse example CVs
           </button>
           <button type="button" disabled={locked} onClick={onPractice}>
-            Create a practice CV
+            Practice CV (fictional)
           </button>
           <button type="button" disabled={locked} onClick={onRestoreBackup}>
             Restore a backup (.json)

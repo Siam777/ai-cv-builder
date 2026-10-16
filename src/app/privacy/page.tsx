@@ -61,9 +61,13 @@ export default function Privacy() {
         </p>
         <h2>AI suggestions</h2>
         <p>
-          The account-only AI bullet assistant asks for consent before sending
-          the selected entry's bullets and your writing instruction to the
-          configured provider. Contact fields are excluded. Suggestions are
+          AI writing help works on account CVs and is off until you turn it on
+          (asked once, kept on your account, and switchable in Account
+          settings, Data &amp; privacy). While it is on, each AI action sends only
+          what it needs: a bullet rewrite sends the selected entry&apos;s bullets
+          and instruction; Write with AI sends your notes and that entry&apos;s
+          title, organization and bullets; examples for a job title send only
+          the job title. Contact details are removed and never sent. Suggestions are
           reviewed before acceptance. Provider retention depends on the deployed
           provider's account settings; no zero-retention guarantee is made.
         </p>

@@ -5,6 +5,7 @@ import {
   Calculator,
   Check,
   FileText,
+  Lightbulb,
   ListPlus,
   Scissors,
   Sparkles,
@@ -15,10 +16,17 @@ import {
 } from "lucide-react";
 import { Menu, type MenuItem } from "./Menu";
 import { useFieldAi } from "./FieldAiContext";
+import { AiBlocked, AiConsent } from "./AiGate";
+import {
+  findBlanks,
+  starterReady,
+  type SkillsResult,
+  type StartersResult,
+} from "@/lib/ai-contract";
+import { addSkillToText } from "@/lib/skills-taxonomy";
 import {
   REWRITE_INSTRUCTIONS,
   diffWords,
-  fieldAction,
   fieldActions,
   fixGrammar,
   skillsProposal,
@@ -45,8 +53,14 @@ const ICONS: Record<FieldActionId, LucideIcon> = {
   shorten: Scissors,
   grammar: SpellCheck,
   draft: FileText,
+  "ai-draft": Sparkles,
   skills: ListPlus,
+  examples: Lightbulb,
+  "ai-skills": Sparkles,
 };
+
+/** Actions that ask the AI provider. */
+type AiAction = "improve" | "shorten" | "ai-draft" | "examples" | "ai-skills";
 
 const SHORT_STATUS: Partial<Record<RewriteStatus, string>> = {
   checking: "Checking…",
@@ -59,14 +73,18 @@ const SHORT_STATUS: Partial<Record<RewriteStatus, string>> = {
 
 type Session =
   | { stage: "ask-result" }
-  | { stage: "consent"; action: "improve" | "shorten" }
+  | { stage: "consent"; action: AiAction }
   | { stage: "blocked"; status: RewriteStatus }
-  | { stage: "working"; action: "improve" | "shorten" }
+  | { stage: "working"; action: AiAction }
+  | { stage: "locked"; message: string }
   | { stage: "choose-draft" }
   | { stage: "note"; message: string }
   | { stage: "questions"; proposal: Proposal }
-  | { stage: "error"; message: string; retry?: "improve" | "shorten" }
+  | { stage: "error"; message: string; retry?: AiAction; plans?: boolean }
   | { stage: "done"; message: string }
+  | { stage: "examples-summary"; jobTitle: string; text: string }
+  | { stage: "examples-skills"; jobTitle: string; skills: string[]; picked: string[] }
+  | { stage: "skills-ai"; result: SkillsResult; picked: string[]; group: boolean }
   | {
       stage: "review";
       action: FieldActionId;
@@ -83,6 +101,9 @@ export interface FieldAiProps {
   label: string;
   text: string;
   bulletId?: string;
+  /** The section and entry the field is in (skills: needed to group skills). */
+  sectionId?: string;
+  entryId?: string;
   /** DOM id of the field, so focus can return to it. */
   focusId?: string;
   disabled?: boolean;
@@ -128,6 +149,8 @@ export function FieldAi({
   label,
   text,
   bulletId,
+  sectionId,
+  entryId,
   focusId,
   disabled = false,
   onApply,
@@ -135,7 +158,6 @@ export function FieldAi({
   const ai = useFieldAi();
   const [session, setSession] = useState<Session | null>(null);
   const [metric, setMetric] = useState("");
-  const [consent, setConsent] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [announce, setAnnounce] = useState("");
   const regionId = useId();
@@ -159,7 +181,8 @@ export function FieldAi({
       stage === "ask-result" ||
       stage === "consent" ||
       stage === "choose-draft" ||
-      stage === "review"
+      stage === "review" ||
+      stage === "examples-summary"
     )
       primary.current?.focus();
   }, [stage]);
@@ -234,7 +257,7 @@ export function FieldAi({
         detail: `Found in your experience: ${found.skills.join(", ")}.`,
       });
     }
-    if (!text.trim())
+    if (!text.trim() && action !== "ai-draft")
       return show(
         { stage: "note", message: "Write something first, then ask for help." },
         "Write something first.",
@@ -264,11 +287,218 @@ export function FieldAi({
       setMetric("");
       return show({ stage: "ask-result" });
     }
-    // improve or shorten: needs the AI provider.
+    // improve, shorten, ai-draft or examples: needs the AI provider.
     if (status !== "ready")
       return show({ stage: "blocked", status }, REWRITE_STATUS_TEXT[status]);
-    setConsent(false);
-    show({ stage: "consent", action });
+    if (action === "ai-draft" && !services.summaryDrafts)
+      return show(
+        {
+          stage: "locked",
+          message: "AI summary drafts are part of Go and Pro. Quick draft works on every plan.",
+        },
+        "AI summary drafts are part of Go and Pro.",
+      );
+    if (action === "ai-skills" && !services.skillsAi)
+      return show(
+        {
+          stage: "locked",
+          message:
+            "Suggesting skills with AI is part of Go and Pro. Add skills from my CV and Show examples work on every plan.",
+        },
+        "Suggest skills with AI is part of Go and Pro.",
+      );
+    if (action === "examples" && !services.starterTitle.trim())
+      return show(
+        {
+          stage: "note",
+          message:
+            "Add your job title first: the headline under Contact, or a job under Experience. Examples are suggested for that title.",
+        },
+        "Add your job title first.",
+      );
+    if (!services.aiConsent)
+      return show({ stage: "consent", action: action as AiAction });
+    void run(action as AiAction);
+  }
+
+  function run(action: AiAction) {
+    return action === "examples"
+      ? examples()
+      : action === "ai-skills"
+        ? suggestSkills()
+        : ask(action);
+  }
+
+  /** Suggest skills with AI: skills the CV shows, common ones, grouping. */
+  async function suggestSkills() {
+    generation.current?.abort();
+    const controller = new AbortController();
+    generation.current = controller;
+    show({ stage: "working", action: "ai-skills" }, "Asking the AI for skills.");
+    try {
+      const snapshot = await services.prepare();
+      if (!mounted.current || controller.signal.aborted) return;
+      const result = (await accountRequest(
+        "/api/ai/skills",
+        {
+          method: "POST",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(65000)]),
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            documentId: snapshot.id,
+            revision: snapshot.revision,
+          }),
+        },
+        services.owner ?? undefined,
+      )) as SkillsResult;
+      if (!mounted.current || controller.signal.aborted) return;
+      // Grouping rewrites one skills section, so it is offered only when there is one.
+      const groupable =
+        result.groups.length > 1 &&
+        services.doc.sections.filter((s) => s.type === "skills").length === 1;
+      const next = { ...result, groups: groupable ? result.groups : [] };
+      if (!next.demonstrated.length && !next.roleSuggestions.length && !next.groups.length)
+        return show(
+          {
+            stage: "note",
+            message:
+              next.message ||
+              (next.withheld
+                ? "The suggested skills could not be backed up by your CV, so they were withheld."
+                : "No new skills to suggest. Add more detail to your jobs first."),
+          },
+          "No skills to suggest.",
+        );
+      return show(
+        { stage: "skills-ai", result: next, picked: [], group: false },
+        "Skill suggestions are ready. Tick the ones to add.",
+      );
+    } catch (error) {
+      if (!mounted.current || controller.signal.aborted) return;
+      failed(error, "ai-skills");
+    }
+  }
+
+  /** Adds the ticked skills and, if asked, groups the section, in one change. */
+  function applySkills(current: Extract<Session, { stage: "skills-ai" }>) {
+    const added = current.picked;
+    if (current.group && sectionId) {
+      services.updateDocument((draft) => {
+        const section = draft.sections.find((s) => s.id === sectionId);
+        if (!section) return;
+        const groups = current.result.groups.map((g) => ({ ...g, skills: [...g.skills] }));
+        if (added.length) {
+          const other = groups.find((g) => g.name === "Other") ?? { name: "Other", skills: [] };
+          if (!groups.includes(other)) groups.push(other);
+          other.skills.push(...added);
+        }
+        // The first group keeps this entry's id, so this view stays open.
+        section.entries = groups.map((group, index) => ({
+          id: index === 0 && entryId ? entryId : crypto.randomUUID(),
+          title: group.name,
+          organization: "",
+          location: "",
+          start: "",
+          end: "",
+          current: false,
+          description: group.skills.join(" · "),
+          bullets: [],
+        }));
+      });
+    } else {
+      onApply(added.reduce((all, skill) => addSkillToText(all, skill), text));
+    }
+    const parts = [
+      added.length ? `Added ${added.length} skill${added.length === 1 ? "" : "s"}` : "",
+      current.group ? "grouped your skills" : "",
+    ].filter(Boolean);
+    show(
+      { stage: "done", message: `${parts.join(" and ")}. Undo restores the previous skills.` },
+      "Skills updated. Undo restores the previous skills.",
+    );
+  }
+
+  /** What each AI action sends, said in every AI view. */
+  function sendsText(action: AiAction) {
+    if (action === "ai-draft")
+      return "Sends your headline, jobs, bullets, education and skills to OpenAI. Contact details are not sent.";
+    if (action === "examples")
+      return `Sends only the job title “${services.starterTitle}” to OpenAI.`;
+    if (action === "ai-skills")
+      return "Sends your headline, jobs, bullets and listed skills to OpenAI. Contact details are not sent.";
+    return `Sends this job’s ${sources} bullet${sources === 1 ? "" : "s"} and the instruction to OpenAI. Contact details and other entries are not sent.`;
+  }
+
+  /** Shows an AI request error; a turned-off consent asks again. */
+  function failed(error: unknown, action: AiAction) {
+    if (error instanceof CloudRequestError && error.code === "AI_CONSENT_REQUIRED")
+      return show({ stage: "consent", action });
+    const message =
+      error instanceof CloudRequestError && error.code === "NETWORK_ERROR"
+        ? "The assistant could not finish in time or lost its connection. Your CV was kept."
+        : (error as Error).message;
+    show(
+      {
+        stage: "error",
+        message,
+        retry: action,
+        plans: error instanceof CloudRequestError && error.code === "AI_LIMIT",
+      },
+      message,
+    );
+  }
+
+  /** Example summary or common skills for the job title, with blanks to fill. */
+  async function examples() {
+    generation.current?.abort();
+    const controller = new AbortController();
+    generation.current = controller;
+    show({ stage: "working", action: "examples" }, "Asking the AI for examples.");
+    const jobTitle = services.starterTitle.trim();
+    try {
+      const result = (await accountRequest(
+        "/api/ai/starters",
+        {
+          method: "POST",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(65000)]),
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            jobTitle,
+            section: kind === "summary" ? "summary" : "skills",
+          }),
+        },
+        services.owner ?? undefined,
+      )) as StartersResult;
+      if (!mounted.current || controller.signal.aborted) return;
+      if (kind === "summary") {
+        if (!result.summary)
+          return show(
+            { stage: "note", message: `No example summary came back for “${jobTitle}”.` },
+            "No example summary.",
+          );
+        return show(
+          { stage: "examples-summary", jobTitle, text: result.summary },
+          "An example summary is ready. Fill its blanks before you add it.",
+        );
+      }
+      const listed = text.toLowerCase();
+      const skills = result.skills.filter((skill) => !listed.includes(skill.toLowerCase()));
+      if (!skills.length)
+        return show(
+          {
+            stage: "note",
+            message: `Your skills already include the common skills for “${jobTitle}”.`,
+          },
+          "No new example skills.",
+        );
+      return show(
+        { stage: "examples-skills", jobTitle, skills, picked: [] },
+        "Example skills are ready. Tick only the ones that are true.",
+      );
+    } catch (error) {
+      if (!mounted.current || controller.signal.aborted) return;
+      failed(error, "examples");
+    }
   }
 
   function previewResult() {
@@ -285,7 +515,7 @@ export function FieldAi({
     });
   }
 
-  async function ask(action: "improve" | "shorten") {
+  async function ask(action: "improve" | "shorten" | "ai-draft") {
     generation.current?.abort();
     const controller = new AbortController();
     generation.current = controller;
@@ -293,6 +523,39 @@ export function FieldAi({
     try {
       const snapshot = await services.prepare();
       if (!mounted.current || controller.signal.aborted) return;
+      if (action === "ai-draft") {
+        const draft = (await accountRequest(
+          "/api/ai/summary",
+          {
+            method: "POST",
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(65000)]),
+            body: JSON.stringify({
+              requestId: crypto.randomUUID(),
+              documentId: snapshot.id,
+              revision: snapshot.revision,
+              consent: true,
+            }),
+          },
+          services.owner ?? undefined,
+        )) as { text: string; message: string };
+        if (!mounted.current || controller.signal.aborted) return;
+        setConfirmed(false);
+        if (!draft.text)
+          return show({ stage: "note", message: draft.message }, draft.message);
+        return show(
+          {
+            stage: "review",
+            action,
+            before: text,
+            after: draft.text,
+            source: "ai",
+            detail:
+              draft.message ||
+              "Written by AI from your CV. Check every claim before you accept it.",
+          },
+          "A summary draft is ready to review.",
+        );
+      }
       const instruction = REWRITE_INSTRUCTIONS[action];
       const key = JSON.stringify([
         snapshot.id,
@@ -353,11 +616,7 @@ export function FieldAi({
         ].includes(error.code)
       )
         request.current = null;
-      const message =
-        error instanceof CloudRequestError && error.code === "NETWORK_ERROR"
-          ? "The assistant could not finish in time or lost its connection. Your CV was kept."
-          : (error as Error).message;
-      show({ stage: "error", message, retry: action }, message);
+      failed(error, action);
     }
   }
 
@@ -406,6 +665,8 @@ export function FieldAi({
       void rejectProposal(proposal).catch(() => {});
       attempt.current += 1;
       await ask(action);
+    } else if (session.action === "ai-draft") {
+      await ask("ai-draft");
     } else if (session.action === "result") {
       show({ stage: "ask-result" });
     } else if (session.action === "draft") {
@@ -440,14 +701,22 @@ export function FieldAi({
   }
 
   const actions = fieldActions(kind);
+  const grouped = new Set(actions.map((def) => def.source)).size > 1;
   const items: MenuItem[] = actions.map((def, index) => {
     const Icon = ICONS[def.id];
     const unavailable = def.source === "ai" && status !== "ready";
+    const starts = index === 0 || def.source !== actions[index - 1].source;
     return {
       label: def.label,
       hint: unavailable ? (SHORT_STATUS[status] ?? def.hint) : def.hint,
       icon: <Icon size={16} aria-hidden />,
-      separated: index > 0 && def.source !== actions[index - 1].source,
+      separated: index > 0 && starts,
+      group:
+        grouped && starts
+          ? def.source === "ai"
+            ? "AI writing help"
+            : "Quick (no AI)"
+          : undefined,
       onSelect: () => begin(def.id),
     };
   });
@@ -483,7 +752,13 @@ export function FieldAi({
             if (event.key !== "Escape" || session.stage === "working") return;
             event.preventDefault();
             event.stopPropagation();
-            if (session.stage === "review" || session.stage === "questions")
+            if (
+              session.stage === "review" ||
+              session.stage === "questions" ||
+              session.stage === "examples-summary" ||
+              session.stage === "examples-skills" ||
+              session.stage === "skills-ai"
+            )
               keepMine();
             else show(null);
             focusField();
@@ -498,25 +773,19 @@ export function FieldAi({
             </p>
           )}
           {session.stage === "error" && (
-            <p className="field-ai-error" role="alert">
-              {session.message}
-            </p>
+            <>
+              <p className="field-ai-error" role="alert">
+                {session.message}
+              </p>
+              {session.plans && (
+                <button type="button" className="primary" onClick={services.onSeePlans}>
+                  See plans
+                </button>
+              )}
+            </>
           )}
           {session.stage === "blocked" && (
-            <div className="field-ai-note">
-              <p>{REWRITE_STATUS_TEXT[session.status]}</p>
-              {(session.status === "account-needed" ||
-                session.status === "session-expired") && (
-                <button type="button" onClick={services.onOpenAccount}>
-                  Sign in
-                </button>
-              )}
-              {session.status === "browser-cv" && (
-                <button type="button" className="primary" onClick={services.onCopyToAccount}>
-                  Copy to my account
-                </button>
-              )}
-            </div>
+            <AiBlocked status={session.status} services={services} />
           )}
           {session.stage === "ask-result" && (
             <form
@@ -553,34 +822,222 @@ export function FieldAi({
               </div>
             </form>
           )}
+          {session.stage === "locked" && (
+            <div className="field-ai-note">
+              <p>{session.message}</p>
+              <button type="button" className="primary" onClick={services.onSeePlans}>
+                See plans
+              </button>
+            </div>
+          )}
           {session.stage === "consent" && (
-            <div className="field-ai-form">
-              <p>
-                <strong>{fieldAction(session.action).label}</strong> sends this
-                job&apos;s {sources} bullet{sources === 1 ? "" : "s"} and the
-                instruction to OpenAI. Contact details and other entries are not
-                sent.
+            <AiConsent
+              sends={sendsText(session.action)}
+              services={services}
+              primaryRef={setPrimary}
+              onAgreed={() => void run(session.action)}
+              onCancel={() => {
+                show(null);
+                focusField();
+              }}
+            />
+          )}
+          {session.stage === "examples-summary" && (
+            <div className="field-ai-form starter-review">
+              <p className="starter-label">Example — make it yours</p>
+              <p className="field-ai-help">
+                An example summary for “{session.jobTitle}”, not a fact about
+                you. Fill or delete every [blank] and change anything that is
+                not true.
               </p>
-              <label className="field-ai-check">
-                <input
+              <label>
+                Example summary
+                <textarea
                   ref={setPrimary}
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(event) => setConsent(event.target.checked)}
+                  rows={4}
+                  maxLength={1200}
+                  value={session.text}
+                  onChange={(event) =>
+                    setSession({ ...session, text: event.target.value })
+                  }
                 />
-                Send this to OpenAI
               </label>
+              {findBlanks(session.text).length > 0 && (
+                <p className="field-ai-help starter-blanks">
+                  Blanks left: {findBlanks(session.text).join(", ")}
+                </p>
+              )}
               <div className="field-ai-actions">
                 <button
                   type="button"
                   className="primary"
-                  disabled={!consent}
-                  onClick={() => void ask(session.action)}
+                  disabled={!starterReady(session.text)}
+                  onClick={() => {
+                    onApply(session.text.trim());
+                    show(
+                      { stage: "done", message: "Added. Undo restores your previous summary." },
+                      "Summary added. Undo restores your previous summary.",
+                    );
+                    focusField();
+                  }}
                 >
-                  Suggest a rewrite
+                  <Check size={16} aria-hidden /> Use my edited summary
                 </button>
-                <button type="button" onClick={() => show(null)}>
-                  Cancel
+                <button type="button" onClick={keepMine}>
+                  <X size={16} aria-hidden /> Keep mine
+                </button>
+              </div>
+            </div>
+          )}
+          {session.stage === "skills-ai" && (
+            <div className="field-ai-form starter-review">
+              {session.result.demonstrated.length > 0 && (
+                <fieldset>
+                  <legend>Shown in your CV</legend>
+                  {session.result.demonstrated.map((item) => (
+                    <div key={item.skill}>
+                      <label className="field-ai-check">
+                        <input
+                          type="checkbox"
+                          checked={session.picked.includes(item.skill)}
+                          onChange={(event) =>
+                            setSession({
+                              ...session,
+                              picked: event.target.checked
+                                ? [...session.picked, item.skill]
+                                : session.picked.filter((s) => s !== item.skill),
+                            })
+                          }
+                        />
+                        {item.skill}
+                      </label>
+                      <p className="entry-ai-source">
+                        From your CV: {item.evidence.map((e) => `“${e}”`).join(" ")}
+                      </p>
+                    </div>
+                  ))}
+                </fieldset>
+              )}
+              {session.result.roleSuggestions.length > 0 && (
+                <fieldset>
+                  <legend>
+                    Common for {session.result.role ? `“${session.result.role}”` : "your role"}: add only if true
+                  </legend>
+                  <p className="starter-label">Examples, not taken from your CV</p>
+                  {session.result.roleSuggestions.map((skill) => (
+                    <label key={skill} className="field-ai-check">
+                      <input
+                        type="checkbox"
+                        checked={session.picked.includes(skill)}
+                        onChange={(event) =>
+                          setSession({
+                            ...session,
+                            picked: event.target.checked
+                              ? [...session.picked, skill]
+                              : session.picked.filter((s) => s !== skill),
+                          })
+                        }
+                      />
+                      {skill}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {session.result.groups.length > 0 && (
+                <fieldset>
+                  <legend>Group your skills</legend>
+                  <label className="field-ai-check">
+                    <input
+                      type="checkbox"
+                      checked={session.group}
+                      onChange={(event) =>
+                        setSession({ ...session, group: event.target.checked })
+                      }
+                    />
+                    Arrange your listed skills into groups
+                  </label>
+                  <ul className="skills-ai-groups">
+                    {session.result.groups.map((group) => (
+                      <li key={group.name}>
+                        <strong>{group.name}:</strong> {group.skills.join(", ")}
+                      </li>
+                    ))}
+                  </ul>
+                </fieldset>
+              )}
+              {session.result.withheld > 0 && (
+                <p className="field-ai-help">
+                  {session.result.withheld} suggestion
+                  {session.result.withheld === 1 ? " was" : "s were"} withheld because
+                  your CV does not show {session.result.withheld === 1 ? "it" : "them"}.
+                </p>
+              )}
+              <div className="field-ai-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  ref={setPrimary}
+                  disabled={!session.picked.length && !session.group}
+                  onClick={() => {
+                    applySkills(session);
+                    focusField();
+                  }}
+                >
+                  <Check size={16} aria-hidden /> Add ticked
+                </button>
+                <button type="button" onClick={keepMine}>
+                  <X size={16} aria-hidden /> Keep mine
+                </button>
+              </div>
+            </div>
+          )}
+          {session.stage === "examples-skills" && (
+            <div className="field-ai-form starter-review">
+              <fieldset>
+                <legend>Common for “{session.jobTitle}”: add only if true</legend>
+                <p className="starter-label">Examples, not taken from your CV</p>
+                {session.skills.map((skill) => (
+                  <label key={skill} className="field-ai-check">
+                    <input
+                      type="checkbox"
+                      checked={session.picked.includes(skill)}
+                      onChange={(event) =>
+                        setSession({
+                          ...session,
+                          picked: event.target.checked
+                            ? [...session.picked, skill]
+                            : session.picked.filter((item) => item !== skill),
+                        })
+                      }
+                    />
+                    {skill}
+                  </label>
+                ))}
+              </fieldset>
+              <div className="field-ai-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!session.picked.length}
+                  onClick={() => {
+                    const count = session.picked.length;
+                    onApply(
+                      session.picked.reduce((all, skill) => addSkillToText(all, skill), text),
+                    );
+                    show(
+                      {
+                        stage: "done",
+                        message: `Added ${count} skill${count === 1 ? "" : "s"}. Undo removes them.`,
+                      },
+                      "Skills added. Undo removes them.",
+                    );
+                    focusField();
+                  }}
+                >
+                  <Check size={16} aria-hidden /> Add ticked skills
+                </button>
+                <button type="button" onClick={keepMine}>
+                  <X size={16} aria-hidden /> Keep mine
                 </button>
               </div>
             </div>
@@ -591,6 +1048,7 @@ export function FieldAi({
                 Asking the AI. This can take up to a minute. Nothing changes
                 until you accept.
               </p>
+              <p className="field-ai-help">{sendsText(session.action)}</p>
               <div className="field-ai-actions">
                 <button type="button" onClick={cancelAsk}>
                   Cancel

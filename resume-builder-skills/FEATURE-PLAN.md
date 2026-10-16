@@ -33,7 +33,7 @@ After establishing the baseline, start with the My CVs versus Demo examples sepa
 - DOCX import and OCR, each with a dedicated extraction/review acceptance gate.
 - More occupation-specific rubrics, language-specific analysis, and RTL template families after their own evaluations. Unicode preservation remains a launch requirement; it is not a claim of validated analysis in every language.
 - MFA/passkeys, collaboration, and public sharing only after defining their access policies. Public sharing cannot create anonymous file-download access.
-- Commercial pricing/tier refinement after usability and cost testing. Existing billing code needs live verification before paid release; lifetime/unlimited AI offers are not committed. No exact price is established by this plan.
+- Pricing (decided 2026-10-16): three monthly tiers, Free ($0), Go ($9.99) and Pro ($29.99), with a 30-day free Go period for new accounts during the beta. Stripe checkout and webhooks still need live verification before paid release; no lifetime or unlimited-AI offer is committed.
 
 ## Enterprise, when required
 

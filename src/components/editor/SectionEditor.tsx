@@ -5,6 +5,7 @@ import {
   isAchievementSection,
   labels,
   newEntry,
+  uid,
   type Entry,
   type ResumeDocument,
   type Section,
@@ -18,6 +19,7 @@ import { PhotoUploader } from "./PhotoUploader";
 import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import { FieldAi } from "./FieldAi";
+import { EntryAi } from "./EntryAi";
 import type { FocusTarget } from "./types";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Plus, Save, Settings2, Trash2, X } from "lucide-react";
 
@@ -502,6 +504,8 @@ export function SectionEditor({
                     <FieldAi
                       kind="skills"
                       label="Skills"
+                      sectionId={activeSection.id}
+                      entryId={entry.id}
                       text={entry.description}
                       disabled={busy}
                       onApply={(description) =>
@@ -518,6 +522,28 @@ export function SectionEditor({
                       disabled={busy}
                       onApply={(description) =>
                         editEntry(entry.id, { description })
+                      }
+                    />
+                  )}
+                  {isAchievementSection(activeSection.type) && (
+                    <EntryAi
+                      sectionId={activeSection.id}
+                      entry={entry}
+                      noun={ENTRY_NOUN[activeSection.type]}
+                      disabled={busy}
+                      onAdd={(texts, title) =>
+                        onUpdateDocument((d) => {
+                          const target = d.sections
+                            .find((sec) => sec.id === activeSection.id)
+                            ?.entries.find((item) => item.id === entry.id);
+                          if (!target) return;
+                          if (title && !target.title.trim()) target.title = title;
+                          // Drop an empty starter bullet so the added ones come first.
+                          target.bullets = target.bullets
+                            .filter((b) => b.text.trim())
+                            .concat(texts.map((text) => ({ id: uid(), text })))
+                            .slice(0, 100);
+                        })
                       }
                     />
                   )}

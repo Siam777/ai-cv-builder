@@ -19,12 +19,17 @@ test("AI persistence enforces ownership, retry receipts, revision checks, quotas
       "001-foundation.sql",
       "002-ai-proposals.sql",
       "003-ai-evidence.sql",
+      "004-subscriptions.sql",
     ])
       await client.executeMultiple(
         await readFile(`migrations/${name}`, "utf8"),
       );
     await client.execute(
       "INSERT INTO user VALUES ('alice','Alice','alice@example.test',0,NULL,0,0), ('bob','Bob','bob@example.test',0,NULL,0,0)",
+    );
+    // Pro, so these checks are not limited by Free's 5 AI requests a day.
+    await client.execute(
+      "INSERT INTO subscriptions VALUES ('sub_alice','alice','cus_alice',NULL,'pro','active',NULL,0,'2026-01-01','2026-01-01'), ('sub_bob','bob','cus_bob',NULL,'pro','active',NULL,0,'2026-01-01','2026-01-01')",
     );
     const doc = await saveResume("alice", createDocument(true), null);
     const bullet = doc.sections
@@ -130,7 +135,7 @@ test("AI persistence enforces ownership, retry receipts, revision checks, quotas
         { ...failed, requestId: randomUUID() },
         generator,
       ),
-      /daily AI request limit/,
+      /used today.s 3 AI rewrites/,
     );
     await removeResume("alice", doc.id, latest.revision);
     assert.equal(

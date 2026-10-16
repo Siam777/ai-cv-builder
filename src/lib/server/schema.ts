@@ -60,7 +60,7 @@ export const subscriptions = sqliteTable("subscriptions", {
     .references(() => user.id, { onDelete: "cascade" }),
   stripeCustomerId: text("stripe_customer_id").notNull().unique(),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
-  planId: text("plan_id").notNull(), // 'free' | 'job_hunter_monthly' | 'job_hunter_weekly' | 'lifetime'
+  planId: text("plan_id").notNull(), // 'free' | 'go' | 'pro' (old IDs are normalized)
   status: text("status").notNull(), // 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete'
   currentPeriodEnd: integer("current_period_end"),
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).default(false),

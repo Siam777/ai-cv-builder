@@ -168,7 +168,7 @@ export default function Home() {
               uploads and authorized exports are processed on the application
               server.
             </p>
-            <p>AI bullet suggestions require separate consent and review.</p>
+            <p>AI writing help is off until you turn it on, and you review every suggestion.</p>
             <Link href="/privacy">Read how your data is handled</Link>
           </div>
         </div>

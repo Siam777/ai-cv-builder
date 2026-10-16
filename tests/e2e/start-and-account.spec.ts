@@ -195,7 +195,9 @@ test("account settings use keyboard-operable tabs with a danger zone and billing
   await expect(panel.getByRole("tabpanel")).toContainText("Sign-in methods");
   await page.keyboard.press("End");
   await expect(tabs.getByRole("tab", { name: "Billing" })).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByRole("tabpanel")).toContainText("Current plan: Free");
+  // New accounts get Go free during the beta, with its end date shown.
+  await expect(panel.getByRole("tabpanel")).toContainText("Current plan: Go (free during the beta)");
+  await expect(panel.getByRole("tabpanel")).toContainText("Your free Go period ends on");
   await accountTab(page, "Data & privacy");
   const danger = panel.getByRole("group", { name: "Danger zone" });
   await expect(danger.getByRole("button", { name: "Delete account and cloud resumes" })).toBeVisible();
