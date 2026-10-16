@@ -124,7 +124,7 @@ describe("Suggest skills with AI and the AI interview", () => {
     assert.equal(result.groups.at(-1)!.name, "Other");
     assert.equal(result.role, "Product designer");
     assert.equal(fake.remaining(), 0);
-    for (const body of fake.sent) assert.doesNotMatch(body, /alex@example\.com|555/);
+    for (const body of fake.sent) assert.doesNotMatch(body, /alex@example\.com|010-2040/);
   });
 
   test("skills are Go and Pro; plan and consent are checked before any provider call", async () => {

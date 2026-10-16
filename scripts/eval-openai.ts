@@ -10,6 +10,10 @@ import {
   openAIModel,
   PROMPT_VERSION,
   STARTERS_PROMPT_VERSION,
+  generateSkillSuggestions,
+  SKILLS_PROMPT_VERSION,
+  generateInterviewStep,
+  INTERVIEW_PROMPT_VERSION,
 } from "../src/lib/server/openai-provider";
 import {
   checkStarters,
@@ -25,8 +29,16 @@ import {
   type StarterOutput,
   type Usage,
 } from "./lib/phase-a-evaluation";
+import {
+  INTERVIEW_CASES,
+  PHASE_B_HARNESS_VERSION,
+  SKILLS_CASES,
+  skillsCaseDoc,
+  type InterviewOutput,
+  type SkillsOutput,
+} from "./lib/phase-b-evaluation";
 
-const SUITES = ["rewrite", "entry", "starters"] as const;
+const SUITES = ["rewrite", "entry", "starters", "skills", "interview"] as const;
 type Suite = (typeof SUITES)[number];
 
 async function main() {
@@ -35,7 +47,7 @@ async function main() {
   const suiteArg = args.find((arg) => arg.startsWith("--suite="));
   if (args.some((arg) => arg !== "--save" && arg !== suiteArg))
     throw new Error(
-      "Use --suite=rewrite,entry,starters (default: all) and optionally --save.",
+      "Use --suite=rewrite,entry,starters,skills,interview (default: all) and optionally --save.",
     );
   const suites = (suiteArg?.split("=")[1].split(",") ?? [...SUITES]) as Suite[];
   if (!suites.length || suites.some((suite) => !SUITES.includes(suite)))
@@ -45,32 +57,60 @@ async function main() {
       "Set OPENAI_API_KEY privately in .env.local before running live evaluations.",
     );
   // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 12 (entry)
-  // + 6 (starters) = 26 paid API calls, with no retries.
+  // + 6 (starters) + 12 (skills) + 6 (interview) = 44 paid API calls, with no retries.
   console.log(
-    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
+    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
   let failures = suites.includes("rewrite") ? await rewriteSuite() : 0;
   const entry = suites.includes("entry") ? await entrySuite() : null;
   const starters = suites.includes("starters") ? await startersSuite() : null;
-  failures += (entry?.failures ?? 0) + (starters?.failures ?? 0);
+  const skills = suites.includes("skills") ? await skillsSuite() : null;
+  const interview = suites.includes("interview") ? await interviewSuite() : null;
+  failures +=
+    (entry?.failures ?? 0) +
+    (starters?.failures ?? 0) +
+    (skills?.failures ?? 0) +
+    (interview?.failures ?? 0);
+  const phaseB = Boolean(skills || interview);
+  const phaseA = Boolean(entry || starters);
   const report = {
-    harnessVersion: PHASE_A_HARNESS_VERSION,
+    harnessVersions: [
+      ...(phaseA ? [PHASE_A_HARNESS_VERSION] : []),
+      ...(phaseB ? [PHASE_B_HARNESS_VERSION] : []),
+    ],
     model: openAIModel(),
-    promptVersions: [PROMPT_VERSION, ENTRY_PROMPT_VERSION, STARTERS_PROMPT_VERSION],
+    promptVersions: [
+      PROMPT_VERSION,
+      ENTRY_PROMPT_VERSION,
+      STARTERS_PROMPT_VERSION,
+      SKILLS_PROMPT_VERSION,
+      INTERVIEW_PROMPT_VERSION,
+    ],
     ranAt: new Date().toISOString(),
     prices: { ...tokenPrices(), unit: "USD per million tokens" },
     entry: entry && costSummary(entry.usages),
     starters: starters && costSummary(starters.usages),
+    skills: skills && costSummary(skills.usages),
+    interview: interview && costSummary(interview.usages),
     failures,
   };
   console.log(JSON.stringify(report, null, 2));
-  if (args.includes("--save") && (entry || starters)) {
-    const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-phase-a-live.json`;
+  if (args.includes("--save") && (phaseA || phaseB)) {
+    const phase = phaseA && phaseB ? "phase-a-b" : phaseA ? "phase-a" : "phase-b";
+    const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-${phase}-live.json`;
     await mkdir("docs/plans/evaluations", { recursive: true });
     await writeFile(
       file,
       JSON.stringify(
-        { ...report, cases: [...(entry?.rows ?? []), ...(starters?.rows ?? [])] },
+        {
+          ...report,
+          cases: [
+            ...(entry?.rows ?? []),
+            ...(starters?.rows ?? []),
+            ...(skills?.rows ?? []),
+            ...(interview?.rows ?? []),
+          ],
+        },
         null,
         2,
       ) + "\n",
@@ -176,6 +216,94 @@ async function startersSuite() {
     } catch {
       failures++;
       line = { suite: "starters", fixture: row.id, result: "provider-or-validation-failure", usage };
+    }
+    rows.push(line);
+    console.log(JSON.stringify(line));
+  }
+  return { failures, usages, rows };
+}
+
+// Suggest skills: at most two paid calls per case (draft, one batch support check).
+async function skillsSuite() {
+  let failures = 0;
+  const usages: Usage[] = [];
+  const rows: unknown[] = [];
+  for (const row of SKILLS_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const doc = skillsCaseDoc(row);
+    const last: { output?: unknown } = {};
+    let line: unknown;
+    try {
+      // The first metered call is the draft; keep it to check raw drift.
+      let raw: unknown;
+      const transport = metered(fetch, usage, last);
+      const result = await generateSkillSuggestions(doc, {}, (async (url, init) => {
+        const response = await transport(url, init);
+        if (raw === undefined) raw = last.output;
+        return response;
+      }) as typeof fetch);
+      const problems = row.check(result, doc);
+      const rawProblems = raw ? row.check(raw as SkillsOutput, doc) : ["raw output unreadable"];
+      if (problems.length) failures++;
+      line = {
+        suite: "skills",
+        fixture: row.id,
+        check: problems.length ? "fail" : "pass",
+        problems,
+        rawProblems,
+        demonstrated: result.demonstrated.map((d) => ({ skill: d.skill, evidenceIds: d.evidenceIds })),
+        roleSuggestions: result.roleSuggestions,
+        groups: result.groups,
+        withheld: result.withheld,
+        usage,
+      };
+    } catch {
+      failures++;
+      line = { suite: "skills", fixture: row.id, result: "provider-or-validation-failure", usage };
+    }
+    rows.push(line);
+    console.log(JSON.stringify(line));
+  }
+  return { failures, usages, rows };
+}
+
+// Interview steps: one paid call per case; values must be the answer's own words.
+async function interviewSuite() {
+  let failures = 0;
+  const usages: Usage[] = [];
+  const rows: unknown[] = [];
+  for (const row of INTERVIEW_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const last: { output?: unknown } = {};
+    let line: unknown;
+    try {
+      const result = await generateInterviewStep(row.input, metered(fetch, usage, last));
+      const draft = last.output as
+        | { entries?: InterviewOutput["education"] } & Partial<InterviewOutput>
+        | undefined;
+      const raw: InterviewOutput | undefined = draft && {
+        education: draft.entries ?? [],
+        skills: draft.skills ?? [],
+        languages: draft.languages ?? [],
+        certifications: draft.certifications ?? [],
+      };
+      const problems = row.check(result);
+      const rawProblems = raw ? row.check(raw) : ["raw output unreadable"];
+      if (problems.length) failures++;
+      line = {
+        suite: "interview",
+        fixture: row.id,
+        check: problems.length ? "fail" : "pass",
+        problems,
+        rawProblems,
+        ...result,
+        usage,
+      };
+    } catch {
+      failures++;
+      line = { suite: "interview", fixture: row.id, result: "provider-or-validation-failure", usage };
     }
     rows.push(line);
     console.log(JSON.stringify(line));

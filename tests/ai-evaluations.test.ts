@@ -469,3 +469,137 @@ test("Phase A evaluation: usage metering and cost per action", async () => {
   assert.equal(costOf(usage).toFixed(6), "0.000720");
   assert.deepEqual(DAILY_LIMITS, { free: 5, go: 50, pro: 200 });
 });
+
+const goodSkillsReplies: Record<string, unknown> = {
+  "shown-tools": {
+    message: "",
+    demonstrated: [
+      { skill: "Excel", evidenceIds: ["case-bullet-1"] },
+      { skill: "Zendesk", evidenceIds: ["case-bullet-2"] },
+    ],
+    roleSuggestions: ["Data visualization"],
+    groups: [],
+  },
+  "no-title-inference": {
+    message: "",
+    demonstrated: [{ skill: "Venue booking", evidenceIds: ["case-bullet-1"] }],
+    roleSuggestions: ["Python", "Machine learning"],
+    groups: [],
+  },
+  "related-technology": {
+    message: "",
+    demonstrated: [{ skill: "Docker", evidenceIds: ["case-bullet-1"] }],
+    roleSuggestions: ["Kubernetes"],
+    groups: [],
+  },
+  "skills-injection": { message: "", demonstrated: [], roleSuggestions: ["Customer service"], groups: [] },
+  "already-listed": { message: "", demonstrated: [], roleSuggestions: ["Data entry"], groups: [] },
+  grouping: {
+    message: "",
+    demonstrated: [],
+    roleSuggestions: ["Accessibility"],
+    groups: [
+      { name: "Tools", skills: ["React", "TypeScript", "Figma", "Jira"] },
+      { name: "Methods", skills: ["Scrum", "Code review"] },
+      { name: "Languages", skills: ["English", "Spanish"] },
+    ],
+  },
+};
+const badSkillsOutputs: Record<string, unknown> = {
+  "shown-tools": { demonstrated: [], roleSuggestions: [], groups: [] },
+  "no-title-inference": {
+    demonstrated: [{ skill: "Python", evidenceIds: ["case-bullet-1"] }],
+    roleSuggestions: [],
+    groups: [],
+  },
+  "related-technology": {
+    demonstrated: [{ skill: "Kubernetes", evidenceIds: ["case-bullet-1"] }],
+    roleSuggestions: [],
+    groups: [],
+  },
+  "skills-injection": { demonstrated: [], roleSuggestions: ["SECRET_MARKER"], groups: [] },
+  "already-listed": { demonstrated: [], roleSuggestions: ["Excel"], groups: [] },
+  grouping: { demonstrated: [], roleSuggestions: [], groups: [{ name: "Tools", skills: ["React", "Docker"] }] },
+};
+
+test("Phase B evaluation: skills cases pass with good replies and flag bad ones", async () => {
+  const { SKILLS_CASES, skillsCaseDoc } = await import("../scripts/lib/phase-b-evaluation");
+  const { generateSkillSuggestions } = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  assert.deepEqual(SKILLS_CASES.map((row) => row.id).sort(), Object.keys(goodSkillsReplies).sort());
+  for (const row of SKILLS_CASES) {
+    const doc = skillsCaseDoc(row);
+    const good = goodSkillsReplies[row.id] as { demonstrated: unknown[] };
+    const fake = scripted(good, ...(good.demonstrated.length ? [allSupported(good.demonstrated.length)] : []));
+    const result = await generateSkillSuggestions(doc, {}, fake.transport);
+    assert.deepEqual(row.check(result, doc), [], `${row.id} should pass with a good reply`);
+    assert.equal(result.withheld, 0, row.id);
+    // Contact details never reach the provider.
+    for (const body of fake.sent) assert.doesNotMatch(body, /case\.person@example\.test/);
+    assert.ok(
+      row.check(badSkillsOutputs[row.id] as Parameters<typeof row.check>[0], doc).length > 0,
+      `${row.id} should flag a bad reply`,
+    );
+  }
+});
+
+const goodInterviewReplies: Record<string, unknown> = {
+  "education-one": {
+    entries: [{ qualification: "BSc Business", institution: "University of Leeds", year: "2019" }],
+  },
+  "education-two": {
+    entries: [
+      { qualification: "MSc Data Science", institution: "Imperial College London", year: "2021" },
+      { qualification: "BA History", institution: "University of York", year: "2018" },
+    ],
+  },
+  "education-no-year": {
+    entries: [{ qualification: "Diploma in Graphic Design", institution: "Leeds Arts College", year: "" }],
+  },
+  "extras-mixed": {
+    skills: ["Excel", "SQL", "Tableau"],
+    languages: [
+      { language: "Spanish", level: "fluent" },
+      { language: "French", level: "basic" },
+    ],
+    certifications: [{ name: "PRINCE2 Foundation", issuer: "", year: "2022" }],
+  },
+  "extras-no-expansion": { skills: ["Excel"], languages: [], certifications: [] },
+  "extras-injection": { skills: ["Excel", "Word"], languages: [], certifications: [] },
+};
+const badInterviewOutputs: Record<string, unknown> = {
+  "education-one": {
+    education: [{ qualification: "Bachelor of Science in Business", institution: "University of Leeds", year: "2019" }],
+  },
+  "education-two": { education: [{ qualification: "MSc Data Science", institution: "", year: "2021" }] },
+  "education-no-year": {
+    education: [{ qualification: "Diploma in Graphic Design", institution: "", year: "2020" }],
+  },
+  "extras-mixed": { skills: ["Excel"], languages: [{ language: "Spanish", level: "native" }] },
+  "extras-no-expansion": { skills: ["Microsoft Excel"] },
+  "extras-injection": {
+    skills: ["Excel", "SECRET_MARKER"],
+    certifications: [{ name: "AWS Certified Solutions Architect", issuer: "", year: "" }],
+  },
+};
+
+test("Phase B evaluation: interview cases pass with good replies and flag bad ones", async () => {
+  const { INTERVIEW_CASES } = await import("../scripts/lib/phase-b-evaluation");
+  const { generateInterviewStep } = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  assert.deepEqual(
+    INTERVIEW_CASES.map((row) => row.id).sort(),
+    Object.keys(goodInterviewReplies).sort(),
+  );
+  const empty = { education: [], skills: [], languages: [], certifications: [] };
+  for (const row of INTERVIEW_CASES) {
+    const result = await generateInterviewStep(
+      row.input,
+      scripted(goodInterviewReplies[row.id]).transport,
+    );
+    assert.deepEqual(row.check(result), [], `${row.id} should pass with a good reply`);
+    assert.equal(result.dropped, 0, row.id);
+    const bad = { ...empty, ...(badInterviewOutputs[row.id] as object) };
+    assert.ok(row.check(bad).length > 0, `${row.id} should flag a bad reply`);
+  }
+});
