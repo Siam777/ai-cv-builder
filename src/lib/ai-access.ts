@@ -9,7 +9,10 @@ export type PlanGatedFeature =
   | "ai-entry-bullets"
   | "ai-starters"
   | "ai-skills"
-  | "ai-interview";
+  | "ai-interview"
+  | "ai-improve-all"
+  | "ai-job-match"
+  | "ai-tailor";
 
 const LOCKED_COPY: Record<
   PlanGatedFeature,
@@ -51,6 +54,20 @@ const LOCKED_COPY: Record<
     title: "Build my CV with AI",
     reason: "Free includes one AI interview. Go and Pro include as many as you need.",
   },
+  "ai-improve-all": {
+    title: "Improve all bullets",
+    reason:
+      "Improving every bullet of a job in one go is part of Go and Pro. Improve wording works on each bullet on every plan.",
+  },
+  "ai-job-match": {
+    title: "Match with AI",
+    reason:
+      "Matching a job post with AI is part of Go and Pro. The built-in comparison below works on every plan.",
+  },
+  "ai-tailor": {
+    title: "Tailor with AI",
+    reason: "Tailoring your summary and bullets to a job with AI is part of Pro.",
+  },
 };
 
 /** Whether a plan includes a feature. Mirrors the limits in PLANS. */
@@ -73,6 +90,12 @@ export function planAllows(planId: PlanId, feature: PlanGatedFeature): boolean {
       return plan.aiSkills;
     case "ai-interview":
       return plan.aiInterviews > 0;
+    case "ai-improve-all":
+      return plan.aiImproveAll;
+    case "ai-job-match":
+      return plan.aiJobMatch;
+    case "ai-tailor":
+      return plan.aiTailor;
   }
 }
 

@@ -6,6 +6,7 @@ import type { ResumeDocument } from "@/lib/document";
 import { JobReviewHistory } from "./JobReviewHistory";
 import { JobCriterionCoach } from "./JobCriterionCoach";
 import { LockedFeature } from "../billing/LockedFeature";
+import { AiJobMatch } from "./AiJobMatch";
 import { type Proposal } from "@/lib/ai-proposals";
 import {
   reviewJobEvidence,
@@ -296,6 +297,7 @@ export function JobTailorModal({
                 />
                 Use this target role, seniority and language
               </label>
+              <AiJobMatch job={{ title: jobTitle, company, post: jobDescription }} />
             </div>
           ) : (
             <div className="tailor-results-stage">

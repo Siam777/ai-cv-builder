@@ -12,8 +12,65 @@ export const generateSchema = z.strictObject({
   instruction: z.string().trim().min(1).max(1000),
   consent: z.literal(true),
   job: jobCoachInputSchema.optional(),
+  /**
+   * rewrite (default) and continue work on one bullet; selection rewrites
+   * only the selected characters; entry improves every bullet of the bullet's
+   * entry in one proposal (Go and Pro).
+   */
+  mode: z.enum(["rewrite", "continue", "selection", "entry"]).optional(),
+  selection: z
+    .strictObject({ start: z.number().int().nonnegative(), end: z.number().int().positive() })
+    .optional(),
 });
 export type GenerateRequest = z.infer<typeof generateSchema>;
+export type RewriteMode = NonNullable<GenerateRequest["mode"]>;
+/** Improve all bullets: one draft for up to 10 bullets of one entry. */
+export const improveAllDraftSchema = z.strictObject({
+  message: z.string().max(1500),
+  questions: z.array(z.string().max(400)).max(3),
+  rewrites: z
+    .array(
+      z.strictObject({
+        bulletId: z.string().max(100),
+        text: z.string().max(3000),
+        evidenceIds: z.array(z.string().max(100)).max(10),
+      }),
+    )
+    .max(10),
+});
+export const batchSupportSchema = z.strictObject({
+  results: z
+    .array(
+      z.strictObject({
+        index: z.number().int().min(0).max(19),
+        supported: z.boolean(),
+        reason: z.string().max(400),
+      }),
+    )
+    .max(20),
+});
+/** Continue writing must keep the words already written, exactly, at the start. */
+export function keepsStart(original: string, proposed: string) {
+  const norm = (value: string) => value.replace(/\s+/g, " ").trim();
+  const a = norm(original);
+  const b = norm(proposed);
+  return b.length > a.length && b.startsWith(a);
+}
+/** Rewrite selection may only change the selected characters. */
+export function keepsOutsideSelection(
+  original: string,
+  proposed: string,
+  selection: { start: number; end: number },
+) {
+  const before = original.slice(0, selection.start);
+  const after = original.slice(selection.end);
+  return (
+    proposed.startsWith(before) &&
+    proposed.endsWith(after) &&
+    proposed.length > before.length + after.length &&
+    proposed !== original
+  );
+}
 export const draftSchema = z.strictObject({
   message: z.string().max(1500),
   questions: z.array(z.string().max(400)).max(3),
@@ -27,6 +84,8 @@ export const supportSchema = z.strictObject({
 export const decisionSchema = z.strictObject({
   decision: z.enum(["accept", "reject"]),
   confirmed: z.literal(true),
+  /** Accept only these bullets of a multi-bullet proposal (Improve all). */
+  bulletIds: z.array(z.string().min(1).max(100)).min(1).max(10).optional(),
 });
 
 export function rewriteContext(doc: ResumeDocument, bulletId: string) {
@@ -392,4 +451,142 @@ const comparable = (value: string) =>
 export function statedIn(value: string, answer: string) {
   const needle = comparable(value);
   return needle.trim().length > 0 && comparable(answer).includes(needle);
+}
+
+/** A pasted job post. It is context only, never evidence of the person's facts. */
+export const jobPostSchema = z.strictObject({
+  title: z.string().trim().min(1).max(120),
+  company: z.string().trim().max(120).optional(),
+  post: z.string().trim().min(50).max(12000),
+});
+export type JobPost = z.infer<typeof jobPostSchema>;
+
+/** Match a job post with AI (Go and Pro). */
+export const jobMatchRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  documentId: z.string().min(1).max(100),
+  revision: z.number().int().nonnegative(),
+  job: jobPostSchema,
+});
+export type JobMatchRequest = z.infer<typeof jobMatchRequestSchema>;
+export const jobMatchDraftSchema = z.strictObject({
+  requirements: z
+    .array(
+      z.strictObject({
+        text: z.string().max(200),
+        priority: z.enum(["required", "preferred"]),
+        evidenceIds: z.array(z.string().max(100)).max(3),
+      }),
+    )
+    .max(15),
+});
+export interface JobMatchRequirement {
+  id: string;
+  text: string;
+  priority: "required" | "preferred";
+  /** shown: the CV shows it (quoted evidence); gap: it does not. */
+  status: "shown" | "gap";
+  evidence: { id: string; text: string }[];
+}
+export interface JobMatchResult {
+  requestId: string;
+  requirements: JobMatchRequirement[];
+  /** "Shown" claims the support check did not back up (listed as gaps). */
+  withheld: number;
+}
+
+/** A gap the person says they have: their one line becomes a bullet or a skill. */
+export const gapLineRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  documentId: z.string().min(1).max(100),
+  revision: z.number().int().nonnegative(),
+  requirement: z.string().trim().min(1).max(200),
+  line: z.string().trim().min(3).max(300),
+});
+export type GapLineRequest = z.infer<typeof gapLineRequestSchema>;
+export const gapLineDraftSchema = z.strictObject({
+  placement: z.enum(["entry", "skill", "none"]),
+  entryId: z.string().max(100),
+  text: z.string().max(400),
+  message: z.string().max(500),
+});
+export interface GapLineResult {
+  requestId: string;
+  placement: "entry" | "skill" | "none";
+  sectionId: string;
+  entryId: string;
+  /** The job or project the bullet goes to, such as "Support Agent at Northwind". */
+  entryLabel: string;
+  text: string;
+  message: string;
+}
+
+/** Tailor with AI (Pro): a reworded summary and up to 8 bullet rewrites. */
+export const tailorRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  documentId: z.string().min(1).max(100),
+  revision: z.number().int().nonnegative(),
+  job: jobPostSchema,
+  /** Requirements the CV shows, from Match with AI; emphasis only. */
+  requirements: z.array(z.string().trim().min(1).max(200)).max(15),
+});
+export type TailorRequest = z.infer<typeof tailorRequestSchema>;
+export const tailorDraftSchema = z.strictObject({
+  summary: z.strictObject({
+    text: z.string().max(1200),
+    evidenceIds: z.array(z.string().max(100)).max(30),
+  }),
+  rewrites: z
+    .array(
+      z.strictObject({
+        bulletId: z.string().max(100),
+        text: z.string().max(3000),
+        evidenceIds: z.array(z.string().max(100)).max(10),
+      }),
+    )
+    .max(8),
+});
+export interface TailorResult {
+  requestId: string;
+  summary: { before: string; text: string } | null;
+  rewrites: {
+    bulletId: string;
+    sectionId: string;
+    entryId: string;
+    entryLabel: string;
+    before: string;
+    text: string;
+  }[];
+  withheld: number;
+}
+
+const FILLER = new Set(["and", "the", "with", "for", "from", "into", "your", "you", "our", "are", "who", "will", "able"]);
+/**
+ * True when at least half of a requirement's content words (3+ letters) are in
+ * the job post, so requirements come from the post, not the model.
+ */
+export function fromPost(requirement: string, post: string) {
+  const text = ` ${post.toLowerCase()} `;
+  const words = requirement
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}+#]+/u)
+    .filter((word) => word.length >= 3 && !FILLER.has(word));
+  const found = words.filter((word) => text.includes(word)).length;
+  return words.length > 0 && found >= Math.ceil(words.length / 2);
+}
+
+/** Jobs and projects a gap line may be added to, labelled for people and the AI. */
+export function placementEntries(doc: ResumeDocument) {
+  return doc.sections
+    .filter((section) => section.type === "experience" || section.type === "projects")
+    .flatMap((section) =>
+      section.entries
+        .filter((entry) => entry.title.trim() || entry.organization.trim())
+        .map((entry) => ({
+          id: entry.id,
+          sectionId: section.id,
+          label: [entry.title.trim(), entry.organization.trim()].filter(Boolean).join(" at "),
+        })),
+    )
+    .slice(0, 20);
 }

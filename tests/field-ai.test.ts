@@ -19,7 +19,7 @@ import { synthesizeVerifiedXyzBullet } from "../src/lib/vault/impact-coach";
 test("each field kind has its own sparkle actions, and only rewrites use AI", () => {
   assert.deepEqual(
     fieldActions("bullet").map((a) => a.id),
-    ["improve", "shorten", "result", "grammar"],
+    ["improve", "shorten", "continue", "selection", "result", "grammar"],
   );
   assert.deepEqual(
     fieldActions("summary").map((a) => a.id),
@@ -32,7 +32,7 @@ test("each field kind has its own sparkle actions, and only rewrites use AI", ()
   const ai = fieldActions("bullet")
     .filter((a) => a.source === "ai")
     .map((a) => a.id);
-  assert.deepEqual(ai, ["improve", "shorten"]);
+  assert.deepEqual(ai, ["improve", "shorten", "continue", "selection"]);
   assert.equal(fieldAction("ai-draft").source, "ai");
   assert.equal(fieldAction("draft").source, "local");
   // Built-in helpers are never labelled as AI.

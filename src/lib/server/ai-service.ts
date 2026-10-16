@@ -22,6 +22,15 @@ import {
   type InterviewStepRequest,
   type InterviewStepResult,
   interviewStepSchema,
+  type JobMatchRequest,
+  type JobMatchResult,
+  jobMatchRequestSchema,
+  type GapLineRequest,
+  type GapLineResult,
+  gapLineRequestSchema,
+  type TailorRequest,
+  type TailorResult,
+  tailorRequestSchema,
 } from "../ai-contract";
 import { createCoachingProposal, JOB_COACH_PROMPT_VERSION } from "../job-coach";
 import { jobCoachContext } from "./job-coach-context";
@@ -32,6 +41,7 @@ import {
 } from "../ai-proposals";
 import { documentSchema } from "../document";
 import {
+  generateImproveAll,
   generateRewrite,
   generateJobCoaching,
   generateSummary,
@@ -44,6 +54,12 @@ import {
   SKILLS_PROMPT_VERSION,
   generateInterviewStep,
   INTERVIEW_PROMPT_VERSION,
+  generateJobMatch,
+  JOB_MATCH_PROMPT_VERSION,
+  generateGapLine,
+  GAP_LINE_PROMPT_VERSION,
+  generateTailoring,
+  TAILOR_PROMPT_VERSION,
   openAIConfigured,
   openAIModel,
   PROMPT_VERSION,
@@ -64,14 +80,69 @@ const limit = (value: string | undefined, fallback: number) =>
 /** The plan's daily AI requests; AI_DAILY_USER_LIMIT, when set, caps every plan. */
 export const dailyLimit = (planLimit: number) =>
   Math.min(planLimit, limit(process.env.AI_DAILY_USER_LIMIT, planLimit));
+/** Stores a reviewed proposal for acceptance; shared by every /api/ai mode. */
+async function storeProposal(
+  owner: string,
+  doc: Awaited<ReturnType<typeof getResume>>,
+  requestId: string,
+  started: number,
+  mode: string,
+  proposal: ReturnType<typeof proposalSchema.parse>,
+  sources: unknown,
+  promptVersion: string,
+) {
+  reviewProposal(doc, proposal);
+  if ((await getResume(owner, doc.id)).revision !== doc.revision) throw conflict();
+  const saved = await database().client.execute({
+    sql: "UPDATE ai_requests SET status='review',proposal=?,evidence_snapshot=?,prompt_version=?,model=? WHERE owner_id=? AND id=? AND status='generating'",
+    args: [
+      JSON.stringify(proposal),
+      JSON.stringify(sources),
+      promptVersion,
+      openAIModel(),
+      owner,
+      requestId,
+    ],
+  });
+  if (saved.rowsAffected !== 1) throw conflict();
+  logOperation({
+    level: "info",
+    event: "ai_proposal_generated",
+    ownerId: owner,
+    documentId: doc.id,
+    revision: doc.revision,
+    durationMs: Date.now() - started,
+    statusCode: 200,
+    metadata: {
+      model: openAIModel(),
+      promptVersion,
+      mode,
+      operationCount: proposal.operations.length,
+      hasOperation: proposal.operations.length > 0,
+      questionCount: proposal.questions.length,
+    },
+  });
+  return proposal;
+}
+
 export async function requestRewrite(
   owner: string,
   input: GenerateRequest,
   generator = generateRewrite,
   coachGenerator = generateJobCoaching,
+  entryGenerator = generateImproveAll,
 ) {
   input = generateSchema.parse(input);
+  const mode = input.mode ?? "rewrite";
   const { plan } = await getUserSubscription(owner);
+  if (input.job && mode !== "rewrite")
+    throw new HttpError(400, "AI_MODE", "Job coaching works on one bullet at a time.");
+  if (mode === "entry" && !plan.aiImproveAll)
+    throw new HttpError(
+      402,
+      "PLAN_REQUIRED",
+      "Improving every bullet of a job in one go is part of Go and Pro. Improve wording works on each bullet on every plan.",
+    );
   if (input.job && !plan.jobCoaching)
     throw new HttpError(
       402,
@@ -81,7 +152,15 @@ export async function requestRewrite(
   const doc = await getResume(owner, input.documentId);
   if (doc.revision !== input.revision) throw conflict();
   try {
-    rewriteContext(doc, input.bulletId);
+    const { selected } = rewriteContext(doc, input.bulletId);
+    if (
+      mode === "selection" &&
+      (!input.selection ||
+        input.selection.start >= input.selection.end ||
+        input.selection.end > selected.text.length ||
+        !selected.text.slice(input.selection.start, input.selection.end).trim())
+    )
+      throw new Error("Select some words in this bullet first.");
   } catch (error) {
     throw new HttpError(400, "AI_CONTEXT", (error as Error).message);
   }
@@ -96,6 +175,7 @@ export async function requestRewrite(
         input.bulletId,
         input.instruction,
         ...(input.job ? [input.job] : []),
+        ...(mode !== "rewrite" ? [mode, input.selection ?? null] : []),
       ]),
     )
     .digest("hex");
@@ -198,10 +278,46 @@ export async function requestRewrite(
   } finally {
     tx.close();
   }
+  const saveProposal = (
+    proposal: ReturnType<typeof proposalSchema.parse>,
+    sources: unknown,
+    promptVersion: string,
+  ) => storeProposal(owner, doc, input.requestId, now, mode, proposal, sources, promptVersion);
   try {
+    if (mode === "entry") {
+      const improved = await entryGenerator(doc, input.bulletId, input.instruction);
+      const entryOf = (id: string) => improved.context.sources.find((source) => source.id === id)!;
+      const notes = improved.withheld
+        ? ` ${improved.withheld} suggestion${improved.withheld === 1 ? " was" : "s were"} withheld because your bullets do not support ${improved.withheld === 1 ? "it" : "them"}.`
+        : "";
+      const proposal = proposalSchema.parse({
+        schemaVersion: 1,
+        id: input.requestId,
+        documentId: doc.id,
+        baseRevision: doc.revision,
+        message: `${improved.message}${notes}`.trim().slice(0, 2000),
+        questions: improved.questions,
+        operations: improved.rewrites.map((rewrite) => ({
+          type: "replaceBullet",
+          sectionId: entryOf(rewrite.bulletId).sectionId,
+          entryId: entryOf(rewrite.bulletId).entryId,
+          bulletId: rewrite.bulletId,
+          before: rewrite.before,
+          text: rewrite.text,
+          evidenceIds: rewrite.evidenceIds,
+        })),
+      });
+      return await saveProposal(proposal, improved.context.sources, PROMPT_VERSION);
+    }
     const draft = job
       ? await coachGenerator(doc, input.bulletId, input.instruction, job)
-      : await generator(doc, input.bulletId, input.instruction);
+      : await generator(
+          doc,
+          input.bulletId,
+          input.instruction,
+          undefined,
+          mode === "rewrite" ? {} : { mode, selection: input.selection },
+        );
     const promptVersion = job ? JOB_COACH_PROMPT_VERSION : PROMPT_VERSION;
     const target = draft.context.selected;
     const proposal =
@@ -238,37 +354,7 @@ export async function requestRewrite(
                 ]
               : [],
           });
-    reviewProposal(doc, proposal);
-    if ((await getResume(owner, doc.id)).revision !== doc.revision)
-      throw conflict();
-    const saved = await client.execute({
-      sql: "UPDATE ai_requests SET status='review',proposal=?,evidence_snapshot=?,prompt_version=?,model=? WHERE owner_id=? AND id=? AND status='generating'",
-      args: [
-        JSON.stringify(proposal),
-        JSON.stringify(draft.context.sources),
-        promptVersion,
-        openAIModel(),
-        owner,
-        input.requestId,
-      ],
-    });
-    if (saved.rowsAffected !== 1) throw conflict();
-    logOperation({
-      level: "info",
-      event: "ai_proposal_generated",
-      ownerId: owner,
-      documentId: doc.id,
-      revision: doc.revision,
-      durationMs: Date.now() - now,
-      statusCode: 200,
-      metadata: {
-        model: openAIModel(),
-        promptVersion,
-        hasOperation: proposal.operations.length > 0,
-        questionCount: proposal.questions.length,
-      },
-    });
-    return proposal;
+    return await saveProposal(proposal, draft.context.sources, promptVersion);
   } catch (error) {
     logOperation({
       level: "warn",
@@ -291,6 +377,7 @@ export async function decideProposal(
   owner: string,
   id: string,
   decision: "accept" | "reject",
+  bulletIds?: string[],
 ) {
   const tx = await database().client.transaction("write");
   try {
@@ -341,11 +428,17 @@ export async function decideProposal(
       doc.revision !== Number(row.base_revision)
     )
       throw conflict();
-    const result = applyReviewedProposal(
-      doc,
-      JSON.parse(String(row.proposal)),
-      new Set(),
-    );
+    let result;
+    try {
+      result = applyReviewedProposal(
+        doc,
+        JSON.parse(String(row.proposal)),
+        new Set(),
+        bulletIds ? new Set(bulletIds) : undefined,
+      );
+    } catch (error) {
+      throw new HttpError(400, "AI_DECISION", (error as Error).message);
+    }
     const next = await saveResume(owner, result.document, doc.revision, tx);
     await tx.execute({
       sql: "UPDATE ai_requests SET status='applied',result_revision=? WHERE owner_id=? AND id=?",
@@ -787,4 +880,146 @@ export async function requestInterviewStep(
     });
     throw error;
   }
+}
+
+/** Plan, consent, provider, ownership and revision: checked before any provider call. */
+async function preparePlanned(
+  owner: string,
+  allowed: (plan: Awaited<ReturnType<typeof getUserSubscription>>["plan"]) => boolean,
+  refusal: string,
+  documentId: string,
+  revision: number,
+) {
+  const { plan } = await getUserSubscription(owner);
+  if (!allowed(plan)) throw new HttpError(402, "PLAN_REQUIRED", refusal);
+  await requireAiConsent(owner);
+  if (!openAIConfigured())
+    throw new HttpError(503, "AI_NOT_CONFIGURED", "OpenAI is not configured on this installation yet.");
+  const doc = await getResume(owner, documentId);
+  if (doc.revision !== revision) throw conflict();
+  return { plan, doc };
+}
+
+/** Runs one counted AI request with metadata-only logging. */
+async function counted<T>(
+  owner: string,
+  plan: { aiRequestsPerDay: number; name: string },
+  doc: { id: string; revision: number },
+  event: string,
+  promptVersion: string,
+  work: () => Promise<T>,
+  metadata: (result: T) => Record<string, number> = () => ({}),
+) {
+  await reserveDailyRequest(owner, plan.aiRequestsPerDay, plan.name);
+  const started = Date.now();
+  try {
+    const result = await work();
+    logOperation({
+      level: "info",
+      event: `${event}_generated`,
+      ownerId: owner,
+      documentId: doc.id,
+      revision: doc.revision,
+      durationMs: Date.now() - started,
+      statusCode: 200,
+      metadata: { model: openAIModel(), promptVersion, ...metadata(result) },
+    });
+    return result;
+  } catch (error) {
+    logOperation({
+      level: "warn",
+      event: `${event}_failed`,
+      ownerId: owner,
+      documentId: doc.id,
+      revision: doc.revision,
+      durationMs: Date.now() - started,
+      statusCode: error instanceof HttpError ? error.status : 500,
+    });
+    throw error;
+  }
+}
+
+/** Match a job post with AI (Go and Pro): requirements, shown evidence and gaps. */
+export async function requestJobMatch(
+  owner: string,
+  input: JobMatchRequest,
+  generator: (
+    doc: Awaited<ReturnType<typeof getResume>>,
+    job: JobMatchRequest["job"],
+  ) => ReturnType<typeof generateJobMatch> = generateJobMatch,
+): Promise<JobMatchResult> {
+  input = jobMatchRequestSchema.parse(input);
+  const { plan, doc } = await preparePlanned(
+    owner,
+    (p) => p.aiJobMatch,
+    "Matching a job post with AI is part of Go and Pro. The built-in comparison works on every plan.",
+    input.documentId,
+    input.revision,
+  );
+  const result = await counted(
+    owner,
+    plan,
+    doc,
+    "ai_job_match",
+    JOB_MATCH_PROMPT_VERSION,
+    () => generator(doc, input.job),
+    (r) => ({
+      requirementCount: r.requirements.length,
+      shownCount: r.requirements.filter((x) => x.status === "shown").length,
+      withheldCount: r.withheld,
+    }),
+  );
+  return { requestId: input.requestId, ...result };
+}
+
+/** A gap the person has: their one line becomes a bullet or skill to review. */
+export async function requestGapLine(
+  owner: string,
+  input: GapLineRequest,
+  generator: (
+    doc: Awaited<ReturnType<typeof getResume>>,
+    input: GapLineRequest,
+  ) => ReturnType<typeof generateGapLine> = generateGapLine,
+): Promise<GapLineResult> {
+  input = gapLineRequestSchema.parse(input);
+  const { plan, doc } = await preparePlanned(
+    owner,
+    (p) => p.aiJobMatch,
+    "Matching a job post with AI is part of Go and Pro.",
+    input.documentId,
+    input.revision,
+  );
+  const result = await counted(owner, plan, doc, "ai_gap_line", GAP_LINE_PROMPT_VERSION, () =>
+    generator(doc, input),
+  );
+  return { requestId: input.requestId, ...result };
+}
+
+/** Tailor with AI (Pro): reviewed wording saved by the editor as a tailored copy. */
+export async function requestTailoring(
+  owner: string,
+  input: TailorRequest,
+  generator: (
+    doc: Awaited<ReturnType<typeof getResume>>,
+    input: TailorRequest,
+  ) => ReturnType<typeof generateTailoring> = generateTailoring,
+): Promise<TailorResult> {
+  input = tailorRequestSchema.parse(input);
+  const { plan, doc } = await preparePlanned(
+    owner,
+    (p) => p.aiTailor,
+    "Tailoring your summary and bullets to a job with AI is part of Pro.",
+    input.documentId,
+    input.revision,
+  );
+  const result = await counted(
+    owner,
+    plan,
+    doc,
+    "ai_tailor",
+    TAILOR_PROMPT_VERSION,
+    () => generator(doc, input),
+    (r) => ({ rewriteCount: r.rewrites.length, hasSummary: r.summary ? 1 : 0, withheldCount: r.withheld }),
+  );
+  return { requestId: input.requestId, ...result };
 }

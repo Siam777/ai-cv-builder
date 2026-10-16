@@ -778,3 +778,98 @@ label.field-ai-check {
   font: inherit;
   font-weight: 400;
 }
+
+/* Improve all bullets (one job, or the whole CV entry by entry) */
+.improve-all {
+  display: grid;
+  gap: var(--space-2);
+}
+.improve-all-start {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  min-height: 44px;
+}
+.improve-all-diff {
+  display: grid;
+  gap: var(--space-1);
+}
+.improve-all-diff .field-ai-label {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.improve-all-cv {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.improve-all-cv > button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  min-height: 44px;
+}
+
+/* Match with AI, inside Match a job */
+.ai-job-match {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius-md);
+  background: var(--green-25);
+}
+.ai-job-match h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.ai-job-match > button {
+  justify-self: start;
+  min-height: 44px;
+}
+.ai-job-match-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-job-match-list li {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+.ai-job-match-list li > svg {
+  vertical-align: -3px;
+  color: var(--color-brand);
+}
+.ai-job-match-priority {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.ai-job-match-list input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.ai-job-match-tailor {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.ai-job-match-tailor > button {
+  justify-self: start;
+  min-height: 44px;
+}

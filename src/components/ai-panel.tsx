@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
+import { ImproveAllCv } from "./editor/ImproveAll";
 import { CircleAlert, CircleCheck, Sparkles } from "lucide-react";
 import type { ResumeDocument } from "@/lib/document";
 import { helpMeFinish, type HelpItem } from "@/lib/help-me-finish";
@@ -164,6 +165,7 @@ export function AIPanel({
             </button>
           </div>
         )}
+        <ImproveAllCv />
       </div>
 
       <div

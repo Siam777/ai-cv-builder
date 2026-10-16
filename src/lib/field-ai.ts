@@ -14,7 +14,9 @@ export type FieldActionId =
   | "ai-draft"
   | "skills"
   | "examples"
-  | "ai-skills";
+  | "ai-skills"
+  | "continue"
+  | "selection";
 
 export interface FieldActionDef {
   id: FieldActionId;
@@ -36,6 +38,18 @@ const ACTIONS: Record<FieldActionId, FieldActionDef> = {
     label: "Add a result (you type it)",
     hint: "Built-in: adds the result you type",
     source: "local",
+  },
+  continue: {
+    id: "continue",
+    label: "Continue writing",
+    hint: "AI finishes a half-written bullet from this job",
+    source: "ai",
+  },
+  selection: {
+    id: "selection",
+    label: "Rewrite selection",
+    hint: "AI rewrites only the words you selected",
+    source: "ai",
   },
   shorten: {
     id: "shorten",
@@ -85,7 +99,7 @@ const ACTIONS: Record<FieldActionId, FieldActionDef> = {
 export function fieldActions(kind: FieldKind): FieldActionDef[] {
   const ids: FieldActionId[] =
     kind === "bullet"
-      ? ["improve", "shorten", "result", "grammar"]
+      ? ["improve", "shorten", "continue", "selection", "result", "grammar"]
       : kind === "summary"
         ? ["ai-draft", "examples", "draft", "grammar"]
         : ["ai-skills", "examples", "skills"];
@@ -102,7 +116,19 @@ export const REWRITE_INSTRUCTIONS = {
     "Make this bullet clearer and stronger in wording without adding or strengthening facts.",
   shorten:
     "Shorten this bullet while preserving every responsibility and fact.",
+  continue:
+    "Finish this half-written bullet. Keep the words already written exactly as they are at the start.",
+  selection:
+    "Rewrite only the selected words so they read more clearly. Keep every other word exactly as written.",
 } as const;
+
+/** Which bullet action Check my CV's Fix with AI runs for a finding, if any. */
+export function aiFixFor(issue: { ruleId: string; id: string; bulletId?: string }) {
+  if (!issue.bulletId) return null;
+  if (issue.ruleId === "weak_verb") return "improve" as const;
+  if (issue.ruleId === "bullet_length") return issue.id.startsWith("short-") ? ("improve" as const) : ("shorten" as const);
+  return null;
+}
 
 export interface DiffPart {
   type: "same" | "del" | "ins";

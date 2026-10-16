@@ -20,10 +20,12 @@ import { AIPanel } from "./ai-panel";
 import {
   FieldAiProvider,
   useRewriteAvailability,
+  type FieldAiServices,
   type PendingFieldAction,
 } from "./editor/FieldAiContext";
 import type { HelpItem } from "@/lib/help-me-finish";
 import { planAllows } from "@/lib/ai-access";
+import { aiFixFor } from "@/lib/field-ai";
 import type { Proposal } from "@/lib/ai-proposals";
 import type { LayoutBlock } from "@/lib/layout";
 import {
@@ -977,7 +979,7 @@ export function ResumeStudio({
     };
   }
 
-  async function acceptAI(proposal: Proposal) {
+  async function acceptAI(proposal: Proposal, bulletIds?: string[]) {
     const before = await prepareAI();
     if (
       proposal.documentId !== before.id ||
@@ -988,7 +990,11 @@ export function ResumeStudio({
       `/api/ai/${encodeURIComponent(proposal.id)}`,
       {
         method: "POST",
-        body: JSON.stringify({ decision: "accept", confirmed: true }),
+        body: JSON.stringify({
+          decision: "accept",
+          confirmed: true,
+          ...(bulletIds ? { bulletIds } : {}),
+        }),
       },
       cloudUser!.id,
     )) as { document: unknown };
@@ -1373,6 +1379,26 @@ export function ResumeStudio({
     return () => clearTimeout(timer);
   }, [pendingField]);
 
+  /** Check my CV: run Improve wording or Shorten on the finding's bullet. */
+  function fixIssueWithAi(issue: AtsLintIssue) {
+    const action = aiFixFor(issue);
+    if (!doc || !action || !issue.bulletId) return;
+    const section = doc.sections.find((s) => s.id === issue.sectionId);
+    startFieldAction({
+      id: `check-${issue.id}`,
+      kind: "bullet",
+      action,
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: issue.sectionId ?? null,
+      sectionType: section?.type === "projects" ? "projects" : "experience",
+      entryId: issue.entryId,
+      bulletId: issue.bulletId,
+    });
+    if (sheetLayout) setShowAts(false);
+  }
+
   /** Show a step and, unless a field will take focus, move focus to its form. */
   function goToStep(id: string, focusForm = true) {
     setSectionId(id);
@@ -1383,6 +1409,34 @@ export function ResumeStudio({
       if (focusForm) form?.focus({ preventScroll: true });
     });
   }
+
+  // Everything a sparkle menu or AI view needs; shared by the form and the AI Assistant.
+  const fieldAiServices: FieldAiServices | null = doc
+    ? {
+      doc,
+      owner: cloudUser?.id ?? null,
+      availability: rewriteAvailability,
+      signedIn: !!sessionUser,
+      onCopyToAccount: () => void copyCurrentToAccount(),
+      summaryDrafts: planAllows(currentPlanId, "ai-summary"),
+      aiConsent,
+      grantConsent: grantAiConsent,
+      starterTitle: starterTitle(doc),
+      skillsAi: planAllows(currentPlanId, "ai-skills"),
+      updateDocument: (mutator) => update(mutator),
+      onSeePlans: () => setShowPricing(true),
+      prepare: prepareAI,
+      accept: acceptAI,
+      onOpenAccount: signInForAi,
+      pending: pendingField,
+      consumePending: (id) =>
+        setPendingField((open) => (open?.id === id ? null : open)),
+      improveAll: planAllows(currentPlanId, "ai-improve-all"),
+      jobMatch: planAllows(currentPlanId, "ai-job-match"),
+      tailor: planAllows(currentPlanId, "ai-tailor"),
+      saveTailoredCopy: applyTailoredVariant,
+    }
+    : null;
 
   return (
     <div
@@ -1951,28 +2005,7 @@ export function ResumeStudio({
                 }}
               />
 
-              <FieldAiProvider
-                value={{
-                  doc,
-                  owner: cloudUser?.id ?? null,
-                  availability: rewriteAvailability,
-                  signedIn: !!sessionUser,
-                  onCopyToAccount: () => void copyCurrentToAccount(),
-                  summaryDrafts: planAllows(currentPlanId, "ai-summary"),
-                  aiConsent,
-                  grantConsent: grantAiConsent,
-                  starterTitle: starterTitle(doc),
-                  skillsAi: planAllows(currentPlanId, "ai-skills"),
-                  updateDocument: (mutator) => update(mutator),
-                  onSeePlans: () => setShowPricing(true),
-                  prepare: prepareAI,
-                  accept: acceptAI,
-                  onOpenAccount: signInForAi,
-                  pending: pendingField,
-                  consumePending: (id) =>
-                    setPendingField((open) => (open?.id === id ? null : open)),
-                }}
-              >
+              <FieldAiProvider value={fieldAiServices!}>
                 {doc.id === interviewDocId ? (
                   <AiInterview doc={doc} onFinish={finishInterview} />
                 ) : (
@@ -2040,6 +2073,7 @@ export function ResumeStudio({
                       onDismiss={(id) => setDismissedFor(id, true)}
                       onRestore={(id) => setDismissedFor(id, false)}
                       onFix={fixIssue}
+                      onFixWithAi={fixIssueWithAi}
                       onOpenStep={(id) => {
                         goToStep(id, false);
                         setFocusTarget({
@@ -2051,6 +2085,7 @@ export function ResumeStudio({
                     />
                   )}
                   {activePanel === "ai" && (
+                    <FieldAiProvider value={fieldAiServices!}>
                     <AIPanel
                       key={`${cloudUser?.id ?? "local"}:${doc.id}`}
                       doc={doc}
@@ -2116,6 +2151,7 @@ export function ResumeStudio({
                         )
                       }
                     />
+                    </FieldAiProvider>
                   )}
                 </SidePanel>
               )}

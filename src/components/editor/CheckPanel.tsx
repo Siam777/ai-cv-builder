@@ -12,8 +12,10 @@ import {
   TriangleAlert,
   Undo2,
   X,
+  Sparkles,
 } from "lucide-react";
 import type { ResumeDocument } from "@/lib/document";
+import { aiFixFor } from "@/lib/field-ai";
 import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { auditAtsExtraction } from "@/lib/linter/ats-plain-text";
 import type { CvStrength } from "@/lib/cv-strength";
@@ -35,6 +37,8 @@ export interface CheckPanelProps {
   onDismiss: (id: string) => void;
   onRestore: (id: string) => void;
   onFix: (issue: AtsLintIssue) => void;
+  /** Runs the matching bullet action (Improve wording or Shorten) with AI. */
+  onFixWithAi?: (issue: AtsLintIssue) => void;
   onOpenStep: (stepId: string) => void;
 }
 
@@ -44,6 +48,7 @@ function FindingRow({
   active,
   dismissed,
   onFix,
+  onFixWithAi,
   onDismiss,
   onRestore,
 }: {
@@ -52,6 +57,7 @@ function FindingRow({
   active: boolean;
   dismissed: boolean;
   onFix: () => void;
+  onFixWithAi?: () => void;
   onDismiss: () => void;
   onRestore: () => void;
 }) {
@@ -86,6 +92,15 @@ function FindingRow({
             <button type="button" onClick={onFix} aria-label={`Fix: ${copy.title}`}>
               Fix
             </button>
+            {onFixWithAi && (
+              <button
+                type="button"
+                onClick={onFixWithAi}
+                aria-label={`Fix with AI: ${copy.title}`}
+              >
+                <Sparkles size={16} aria-hidden /> Fix with AI
+              </button>
+            )}
             <button
               type="button"
               className="icon-button"
@@ -111,6 +126,7 @@ export function CheckPanel({
   onDismiss,
   onRestore,
   onFix,
+  onFixWithAi,
   onOpenStep,
 }: CheckPanelProps) {
   const [tab, setTab] = useState<"fix" | "role">("fix");
@@ -298,6 +314,14 @@ export function CheckPanel({
                     active={issue.id === activeId}
                     dismissed={dismissed.has(issue.id)}
                     onFix={() => fix(issue)}
+                    onFixWithAi={
+                      onFixWithAi && aiFixFor(issue)
+                        ? () => {
+                            setActiveId(issue.id);
+                            onFixWithAi(issue);
+                          }
+                        : undefined
+                    }
                     onDismiss={() => onDismiss(issue.id)}
                     onRestore={() => onRestore(issue.id)}
                   />

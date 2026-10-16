@@ -1,6 +1,6 @@
 # AI Assistance Plan — "Build the CV with AI, from your own facts"
 
-Status: **Phases A and B delivered** (items 0, 1, 2, 3 and 6, 2026-10-16; not yet run against the real OpenAI API). Phases C–E are planned and not implemented. See PLAN.md §39.
+Status: **Phases A, B and C delivered** (items 0–6, 2026-10-16; not yet run against the real OpenAI API). Phases D and E are planned and not implemented. See PLAN.md §39.
 
 Goal: someone should be able to build most of a good CV by telling the app about their work in plain words, or by starting from suggestions for their job title. AI turns rough notes into a summary, jobs with bullets, skills and a cover letter, matches the CV to a job post, then helps fix what Check my CV finds.
 

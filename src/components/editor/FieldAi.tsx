@@ -7,6 +7,8 @@ import {
   FileText,
   Lightbulb,
   ListPlus,
+  PenLine,
+  TextCursorInput,
   Scissors,
   Sparkles,
   SpellCheck,
@@ -57,10 +59,20 @@ const ICONS: Record<FieldActionId, LucideIcon> = {
   skills: ListPlus,
   examples: Lightbulb,
   "ai-skills": Sparkles,
+  continue: PenLine,
+  selection: TextCursorInput,
 };
 
 /** Actions that ask the AI provider. */
-type AiAction = "improve" | "shorten" | "ai-draft" | "examples" | "ai-skills";
+type AiAction =
+  | "improve"
+  | "shorten"
+  | "continue"
+  | "selection"
+  | "ai-draft"
+  | "examples"
+  | "ai-skills";
+type BulletAction = "improve" | "shorten" | "continue" | "selection";
 
 const SHORT_STATUS: Partial<Record<RewriteStatus, string>> = {
   checking: "Checking…",
@@ -166,6 +178,8 @@ export function FieldAi({
   const generation = useRef<AbortController | null>(null);
   const request = useRef<{ key: string; id: string } | null>(null);
   const attempt = useRef(0);
+  // Rewrite selection: the characters selected in the bullet when it started.
+  const selected = useRef<{ start: number; end: number } | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -286,6 +300,22 @@ export function FieldAi({
     if (action === "result") {
       setMetric("");
       return show({ stage: "ask-result" });
+    }
+    if (action === "selection") {
+      const field = focusId
+        ? (document.getElementById(focusId) as HTMLTextAreaElement | HTMLInputElement | null)
+        : null;
+      const start = field?.selectionStart ?? 0;
+      const end = field?.selectionEnd ?? 0;
+      if (end <= start || !text.slice(start, end).trim())
+        return show(
+          {
+            stage: "note",
+            message: "Select the words you want rewritten in the bullet first, then choose Rewrite selection.",
+          },
+          "Select some words first.",
+        );
+      selected.current = { start, end };
     }
     // improve, shorten, ai-draft or examples: needs the AI provider.
     if (status !== "ready")
@@ -426,6 +456,8 @@ export function FieldAi({
       return `Sends only the job title “${services.starterTitle}” to OpenAI.`;
     if (action === "ai-skills")
       return "Sends your headline, jobs, bullets and listed skills to OpenAI. Contact details are not sent.";
+    if (action === "selection" && selected.current)
+      return `Rewrites only “${text.slice(selected.current.start, selected.current.end)}”. Sends this job’s ${sources} bullet${sources === 1 ? "" : "s"} to OpenAI. Contact details are not sent.`;
     return `Sends this job’s ${sources} bullet${sources === 1 ? "" : "s"} and the instruction to OpenAI. Contact details and other entries are not sent.`;
   }
 
@@ -515,7 +547,7 @@ export function FieldAi({
     });
   }
 
-  async function ask(action: "improve" | "shorten" | "ai-draft") {
+  async function ask(action: BulletAction | "ai-draft") {
     generation.current?.abort();
     const controller = new AbortController();
     generation.current = controller;
@@ -557,11 +589,16 @@ export function FieldAi({
         );
       }
       const instruction = REWRITE_INSTRUCTIONS[action];
+      const mode =
+        action === "continue" || action === "selection" ? action : undefined;
+      const selection = action === "selection" ? selected.current : null;
       const key = JSON.stringify([
         snapshot.id,
         snapshot.revision,
         bulletId,
         instruction,
+        mode ?? null,
+        selection,
         attempt.current,
       ]);
       if (request.current?.key !== key)
@@ -578,6 +615,8 @@ export function FieldAi({
             bulletId,
             instruction,
             consent: true,
+            ...(mode ? { mode } : {}),
+            ...(selection ? { selection } : {}),
           }),
         },
         services.owner ?? undefined,
@@ -661,7 +700,7 @@ export function FieldAi({
     if (session?.stage !== "review") return;
     if (session.source === "ai" && session.proposal) {
       const proposal = session.proposal;
-      const action = session.action as "improve" | "shorten";
+      const action = session.action as BulletAction;
       void rejectProposal(proposal).catch(() => {});
       attempt.current += 1;
       await ask(action);

@@ -42,11 +42,19 @@ export interface FieldAiServices {
   starterTitle: string;
   /** The plan includes Suggest skills with AI (Go and Pro). */
   skillsAi: boolean;
+  /** The plan includes Improve all bullets (Go and Pro). */
+  improveAll: boolean;
+  /** The plan includes Match with AI (Go and Pro) and Tailor with AI (Pro). */
+  jobMatch: boolean;
+  tailor: boolean;
+  /** Saves a reviewed tailored copy of the CV it was made from. */
+  saveTailoredCopy: (tailored: ResumeDocument, sourceSnapshot: string) => Promise<boolean>;
   /** Applies one change to the open CV (one Undo step). */
   updateDocument: (mutator: (draft: ResumeDocument) => void) => void;
   onSeePlans: () => void;
   prepare: () => Promise<ResumeDocument>;
-  accept: (proposal: Proposal) => Promise<void>;
+  /** Accepts a proposal; bulletIds limits a multi-bullet proposal to the ticked ones. */
+  accept: (proposal: Proposal, bulletIds?: string[]) => Promise<void>;
   onOpenAccount: () => void;
   pending: PendingFieldAction | null;
   consumePending: (id: number) => void;

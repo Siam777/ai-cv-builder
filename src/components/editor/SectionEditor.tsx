@@ -20,6 +20,7 @@ import { templates } from "@/lib/presentation";
 import { SkillEntryEditor } from "./SkillEntryEditor";
 import { FieldAi } from "./FieldAi";
 import { EntryAi } from "./EntryAi";
+import { ImproveAll } from "./ImproveAll";
 import type { FocusTarget } from "./types";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Lightbulb, Plus, Save, Settings2, Trash2, X } from "lucide-react";
 
@@ -547,6 +548,18 @@ export function SectionEditor({
                       }
                     />
                   )}
+                  {isAchievementSection(activeSection.type) &&
+                    entry.bullets.filter((b) => b.text.trim()).length > 1 && (
+                      <ImproveAll
+                        target={{
+                          sectionId: activeSection.id,
+                          entryId: entry.id,
+                          label:
+                            [entry.title.trim(), entry.organization.trim()].filter(Boolean).join(" at ") ||
+                            `this ${ENTRY_NOUN[activeSection.type]}`,
+                        }}
+                      />
+                    )}
                   {activeSection.type !== "summary" && (
                     <BulletList
                       bullets={entry.bullets}

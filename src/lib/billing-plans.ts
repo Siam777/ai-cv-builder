@@ -31,6 +31,12 @@ export interface PlanConfig {
   aiSkills: boolean;
   /** AI interview starts allowed in total; `Infinity` means unlimited. */
   aiInterviews: number;
+  /** Improve all bullets of a job in one request. */
+  aiImproveAll: boolean;
+  /** Match a job post with AI: requirements, shown evidence, gaps. */
+  aiJobMatch: boolean;
+  /** Tailor with AI: a reworded summary and bullets saved as a tailored copy. */
+  aiTailor: boolean;
 }
 
 export const PLANS: Record<PlanId, PlanConfig> = {
@@ -59,6 +65,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiStarters: true,
     aiSkills: false,
     aiInterviews: 1,
+    aiImproveAll: false,
+    aiJobMatch: false,
+    aiTailor: false,
   },
   go: {
     id: "go",
@@ -87,6 +96,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiStarters: true,
     aiSkills: true,
     aiInterviews: Infinity,
+    aiImproveAll: true,
+    aiJobMatch: true,
+    aiTailor: false,
   },
   pro: {
     id: "pro",
@@ -113,6 +125,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiStarters: true,
     aiSkills: true,
     aiInterviews: Infinity,
+    aiImproveAll: true,
+    aiJobMatch: true,
+    aiTailor: true,
   },
 };
 
