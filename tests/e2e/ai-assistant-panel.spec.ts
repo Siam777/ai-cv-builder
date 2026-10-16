@@ -153,7 +153,7 @@ test("summary and skills have sparkle menus built from details already in the CV
   await expect(skillsHelp).toContainText("No new skills found");
 });
 
-test("the AI Assistant is one panel with three modes and the retired entry points are gone", async ({
+test("the AI Assistant is one panel with four modes and the retired entry points are gone", async ({
   page,
 }) => {
   await page.goto("/builder");
@@ -169,7 +169,7 @@ test("the AI Assistant is one panel with three modes and the retired entry point
   const panel = page.getByRole("complementary", { name: "AI Assistant" });
   await expect(panel).toBeVisible();
   const tabs = panel.getByRole("tab");
-  await expect(tabs).toHaveText(["Help me finish", "Match a job", "Cover letter"]);
+  await expect(tabs).toHaveText(["Help me finish", "Match a job", "Cover letter", "Ask the AI"]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
 
   // Retired entry points: separate writing tools, bullet chips, review button, XYZ coach.
@@ -198,6 +198,10 @@ test("the AI Assistant is one panel with three modes and the retired entry point
   await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(panel.getByRole("region", { name: "Job Tailoring Engine" })).toBeVisible();
   await page.keyboard.press("End");
+  await expect(tabs.nth(3)).toHaveAttribute("aria-selected", "true");
+  // Ask the AI is Go and Pro; this guest is on Free.
+  await expect(panel.locator("#ai-tabpanel-ask")).toContainText("part of Go and Pro");
+  await page.keyboard.press("ArrowLeft");
   await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   // Cover letters are a Go and Pro feature; this guest is on Free.
   await expect(panel.getByRole("group", { name: "Locked: Cover letters" })).toBeVisible();

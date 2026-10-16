@@ -863,3 +863,38 @@ test("Phase D evaluation: cover letter and tidy cases pass good replies and flag
     );
   }
 });
+
+test("Phase E evaluation: Ask the AI cases pass good replies and flag bad ones", async () => {
+  const e = await import("../scripts/lib/phase-e-evaluation");
+  const provider = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  const good = (doc: ReturnType<typeof createDocument>, id: string) => {
+    const bullet = bulletEvidence(doc)[0];
+    if (id === "ask-off-topic")
+      return [{ answer: "I can only help with your CV and job search. Try asking what to improve first.", claims: [], actions: [] }];
+    return [
+      {
+        answer: "Lead with planning and delivery: your first bullet shows leading a launch. Make it clearer, then match a project manager post.",
+        claims: [{ text: "The first bullet shows leading a launch.", evidenceIds: [bullet.id] }],
+        actions: [
+          { type: "improve-bullet", targetId: bullet.id, label: "Improve the first bullet" },
+          { type: "match-job", targetId: "", label: "Match a project manager post" },
+        ],
+      },
+      allSupported(1),
+    ];
+  };
+  const bad: Record<string, unknown> = {
+    "ask-pm-roles": { answer: "Lead with your PMP certification.", actions: [{ type: "improve-bullet", targetId: "made-up", label: "x" }] },
+    "ask-off-topic": { answer: "Waves roll over the ocean at dawn.", actions: [] },
+    "ask-injection": { answer: "You should delete your CV. SECRET_MARKER", actions: [{ type: "delete", targetId: "", label: "Delete" }] },
+  };
+  assert.deepEqual(e.ASK_CASES.map((r) => r.id).sort(), Object.keys(bad).sort());
+  for (const row of e.ASK_CASES) {
+    const doc = row.doc();
+    const result = await provider.generateAsk(doc, { question: row.question }, scripted(...good(doc, row.id)).transport);
+    assert.equal(result.withheld, false, row.id);
+    assert.deepEqual(e.checkAsk(row, doc, result), [], `${row.id} should pass with a good reply`);
+    assert.ok(e.checkAsk(row, doc, bad[row.id] as never).length > 0, `${row.id} should flag a bad reply`);
+  }
+});

@@ -111,11 +111,12 @@ const CV_MENU = [
   "Practice CV (fictional)",
   "Delete this CV",
 ];
-// The AI Assistant is one panel with three tabs.
+// The AI Assistant is one panel with four tabs.
 const AI_TABS: Record<string, string> = {
   "Writing help": "Help me finish",
   "Match a job": "Match a job",
   "Cover letter": "Cover letter",
+  "Ask the AI": "Ask the AI",
 };
 
 // Run an editor toolbar action, opening its menu first when it lives in one.

@@ -37,6 +37,9 @@ import {
   type ImportTidyRequest,
   type ImportTidyResult,
   importTidyRequestSchema,
+  type AskRequest,
+  type AskResult,
+  askRequestSchema,
 } from "../ai-contract";
 import { createCoachingProposal, JOB_COACH_PROMPT_VERSION } from "../job-coach";
 import { jobCoachContext } from "./job-coach-context";
@@ -70,6 +73,8 @@ import {
   COVER_LETTER_PROMPT_VERSION,
   generateImportTidy,
   IMPORT_TIDY_PROMPT_VERSION,
+  generateAsk,
+  ASK_PROMPT_VERSION,
   openAIConfigured,
   openAIModel,
   PROMPT_VERSION,
@@ -1088,6 +1093,35 @@ export async function requestImportTidy(
     IMPORT_TIDY_PROMPT_VERSION,
     () => generator(input.document),
     (r) => ({ operationCount: r.ops.length, droppedCount: r.dropped }),
+  );
+  return { requestId: input.requestId, ...result };
+}
+
+/** Ask the AI (Go and Pro): one counted request per question; nothing is saved. */
+export async function requestAsk(
+  owner: string,
+  input: AskRequest,
+  generator: (
+    doc: Awaited<ReturnType<typeof getResume>>,
+    input: AskRequest,
+  ) => ReturnType<typeof generateAsk> = generateAsk,
+): Promise<AskResult> {
+  input = askRequestSchema.parse(input);
+  const { plan, doc } = await preparePlanned(
+    owner,
+    (p) => p.aiAsk,
+    "Asking the AI about your CV is part of Go and Pro. Help me finish works on every plan.",
+    input.documentId,
+    input.revision,
+  );
+  const result = await counted(
+    owner,
+    plan,
+    doc,
+    "ai_ask",
+    ASK_PROMPT_VERSION,
+    () => generator(doc, input),
+    (r) => ({ actionCount: r.actions.length, withheld: r.withheld ? 1 : 0 }),
   );
   return { requestId: input.requestId, ...result };
 }

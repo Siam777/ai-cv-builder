@@ -50,6 +50,8 @@ import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
 import { StartScreen } from "./editor/StartScreen";
 import { AiInterview } from "./editor/AiInterview";
+import { AskAi } from "./editor/AskAi";
+import type { AskAction } from "@/lib/ai-contract";
 import { BrowserCvsBanner } from "./editor/BrowserCvsBanner";
 import {
   ImportReviewModal,
@@ -1379,6 +1381,58 @@ export function ResumeStudio({
     return () => clearTimeout(timer);
   }, [pendingField]);
 
+  /** Ask the AI buttons: start an existing tool on the right field; nothing is changed here. */
+  function runAskAction(action: AskAction) {
+    if (!doc) return;
+    if (action.type === "check") {
+      setActivePanel("check");
+      return;
+    }
+    if (action.type === "open-section") {
+      goToStep(action.targetId);
+      if (sheetLayout) setShowAI(false);
+      return;
+    }
+    if (action.type === "improve-bullet") {
+      const section = doc.sections.find((s) =>
+        s.entries.some((e) => e.bullets.some((b) => b.id === action.targetId)),
+      );
+      const entry = section?.entries.find((e) => e.bullets.some((b) => b.id === action.targetId));
+      if (!section || !entry) return;
+      startFieldAction({
+        id: `ask-${action.targetId}`,
+        kind: "bullet",
+        action: "improve",
+        title: "",
+        detail: "",
+        buttonLabel: "",
+        sectionId: section.id,
+        sectionType: section.type === "projects" ? "projects" : "experience",
+        entryId: entry.id,
+        bulletId: action.targetId,
+      });
+      return;
+    }
+    const kind = action.type === "write-summary" ? "summary" : "skills";
+    startFieldAction({
+      id: `ask-${kind}`,
+      kind,
+      action:
+        kind === "summary"
+          ? planAllows(currentPlanId, "ai-summary")
+            ? "ai-draft"
+            : "draft"
+          : planAllows(currentPlanId, "ai-skills")
+            ? "ai-skills"
+            : "skills",
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: doc.sections.find((s) => s.type === kind)?.id ?? null,
+      sectionType: kind,
+    });
+  }
+
   /** Check my CV: run Improve wording or Shorten on the finding's bullet. */
   function fixIssueWithAi(issue: AtsLintIssue) {
     const action = aiFixFor(issue);
@@ -1435,6 +1489,7 @@ export function ResumeStudio({
       jobMatch: planAllows(currentPlanId, "ai-job-match"),
       tailor: planAllows(currentPlanId, "ai-tailor"),
       coverLetterAi: planAllows(currentPlanId, "ai-cover-letter"),
+      askAi: planAllows(currentPlanId, "ai-ask"),
       saveTailoredCopy: applyTailoredVariant,
     }
     : null;
@@ -2110,6 +2165,15 @@ export function ResumeStudio({
                       onStartAction={startFieldAction}
                       onOpenAccount={signInForAi}
                       onOpenCheck={() => setActivePanel("check")}
+                      askTab={(selectTab) => (
+                        <AskAi
+                          onAction={(action) => {
+                            if (action.type === "match-job") return selectTab("job");
+                            if (action.type === "cover-letter") return selectTab("letter");
+                            runAskAction(action);
+                          }}
+                        />
+                      )}
                       jobTab={
                         <JobTailorModal
                           embedded

@@ -638,3 +638,79 @@ export interface ImportTidyResult {
   ops: TidyOperation[];
   dropped: number;
 }
+
+/** Ask the AI (Go and Pro): advice plus buttons that start existing tools. */
+export const ASK_ACTIONS = [
+  "improve-bullet",
+  "write-summary",
+  "suggest-skills",
+  "open-section",
+  "check",
+  "match-job",
+  "cover-letter",
+] as const;
+export type AskActionType = (typeof ASK_ACTIONS)[number];
+export const askRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  documentId: z.string().min(1).max(100),
+  revision: z.number().int().nonnegative(),
+  question: z.string().trim().min(2).max(500),
+  /** The last exchanges, sent by the editor; the server keeps no chat memory. */
+  history: z
+    .array(z.strictObject({ question: z.string().max(500), answer: z.string().max(1500) }))
+    .max(3)
+    .optional(),
+});
+export type AskRequest = z.infer<typeof askRequestSchema>;
+export const askDraftSchema = z.strictObject({
+  answer: z.string().max(1500),
+  /** Statements about the candidate's CV, each with the evidence IDs it rests on. */
+  claims: z
+    .array(z.strictObject({ text: z.string().max(300), evidenceIds: z.array(z.string().max(100)).max(5) }))
+    .max(6),
+  actions: z
+    .array(
+      z.strictObject({
+        type: z.string().max(30),
+        /** A bullet ID (improve-bullet) or section ID (open-section); empty otherwise. */
+        targetId: z.string().max(100),
+        label: z.string().max(80),
+      }),
+    )
+    .max(4),
+});
+export interface AskAction {
+  type: AskActionType;
+  targetId: string;
+  label: string;
+}
+export interface AskResult {
+  requestId: string;
+  answer: string;
+  actions: AskAction[];
+  /** True when the answer was withheld because it described the CV wrongly. */
+  withheld: boolean;
+}
+
+/** Keeps only actions of a known type whose target exists in the CV. */
+export function validAskActions(doc: ResumeDocument, actions: { type: string; targetId: string; label: string }[]) {
+  const bullets = new Set(
+    doc.sections.flatMap((s) => s.entries.flatMap((e) => e.bullets.filter((b) => b.text.trim()).map((b) => b.id))),
+  );
+  const sections = new Set(doc.sections.map((s) => s.id));
+  const seen = new Set<string>();
+  const kept: AskAction[] = [];
+  for (const action of actions) {
+    const type = action.type as AskActionType;
+    if (!ASK_ACTIONS.includes(type)) continue;
+    if (type === "improve-bullet" && !bullets.has(action.targetId)) continue;
+    if (type === "open-section" && !sections.has(action.targetId)) continue;
+    const targetId = type === "improve-bullet" || type === "open-section" ? action.targetId : "";
+    const key = `${type}:${targetId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = action.label.replace(/\s+/g, " ").trim().slice(0, 80);
+    kept.push({ type, targetId, label: label || type });
+  }
+  return kept;
+}

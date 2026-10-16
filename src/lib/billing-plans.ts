@@ -41,6 +41,8 @@ export interface PlanConfig {
   aiCoverLetter: boolean;
   /** Tidy with AI after an import: structure only. */
   aiImportTidy: boolean;
+  /** Ask the AI: advice with buttons that start the other tools. */
+  aiAsk: boolean;
 }
 
 export const PLANS: Record<PlanId, PlanConfig> = {
@@ -74,6 +76,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiTailor: false,
     aiCoverLetter: false,
     aiImportTidy: false,
+    aiAsk: false,
   },
   go: {
     id: "go",
@@ -107,6 +110,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiTailor: false,
     aiCoverLetter: true,
     aiImportTidy: true,
+    aiAsk: true,
   },
   pro: {
     id: "pro",
@@ -138,6 +142,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiTailor: true,
     aiCoverLetter: true,
     aiImportTidy: true,
+    aiAsk: true,
   },
 };
 

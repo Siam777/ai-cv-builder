@@ -908,3 +908,51 @@ label.field-ai-check {
   margin: 0;
   padding-left: var(--space-5);
 }
+
+/* Ask the AI tab */
+.ask-ai {
+  display: grid;
+  gap: var(--space-3);
+}
+.ask-ai-thread {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 50vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.ask-ai-thread li {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+.ask-ai-question,
+.ask-ai-answer {
+  margin: 0;
+  line-height: 1.5;
+}
+.ask-ai-answer.withheld {
+  color: var(--color-text-muted);
+}
+.ask-ai textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.ask-ai-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ask-ai-examples button {
+  min-height: 44px;
+  text-align: left;
+}

@@ -25,6 +25,8 @@ import {
   COVER_LETTER_PROMPT_VERSION,
   generateImportTidy,
   IMPORT_TIDY_PROMPT_VERSION,
+  generateAsk,
+  ASK_PROMPT_VERSION,
 } from "../src/lib/server/openai-provider";
 import {
   checkStarters,
@@ -71,10 +73,11 @@ import {
   PHASE_D_HARNESS_VERSION,
   TIDY_CASES,
 } from "./lib/phase-d-evaluation";
+import { ASK_CASES, checkAsk, PHASE_E_HARNESS_VERSION, type AskOutput } from "./lib/phase-e-evaluation";
 import { createDocument as sampleDocument } from "../src/lib/document";
 import type { ImportTidyDraft } from "../src/lib/import-tidy";
 
-const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve", "letter", "tidy"] as const;
+const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve", "letter", "tidy", "ask"] as const;
 type Suite = (typeof SUITES)[number];
 
 async function main() {
@@ -83,7 +86,7 @@ async function main() {
   const suiteArg = args.find((arg) => arg.startsWith("--suite="));
   if (args.some((arg) => arg !== "--save" && arg !== suiteArg))
     throw new Error(
-      "Use --suite=rewrite,entry,starters,skills,interview,match,improve,letter,tidy (default: all) and optionally --save.",
+      "Use --suite=rewrite,entry,starters,skills,interview,match,improve,letter,tidy,ask (default: all) and optionally --save.",
     );
   const suites = (suiteArg?.split("=")[1].split(",") ?? [...SUITES]) as Suite[];
   if (!suites.length || suites.some((suite) => !SUITES.includes(suite)))
@@ -94,9 +97,9 @@ async function main() {
     );
   // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 12 (entry)
   // + 6 (starters) + 12 (skills) + 6 (interview) + 24 (match) + 12 (improve)
-  // + 6 (letter) + 3 (tidy) = 89 paid API calls, with no retries.
+  // + 6 (letter) + 3 (tidy) + 6 (ask) = 95 paid API calls, with no retries.
   console.log(
-    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
+    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}, ${ASK_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
   let failures = suites.includes("rewrite") ? await rewriteSuite() : 0;
   const entry = suites.includes("entry") ? await entrySuite() : null;
@@ -107,6 +110,7 @@ async function main() {
   const improve = suites.includes("improve") ? await improveSuite() : null;
   const letter = suites.includes("letter") ? await letterSuite() : null;
   const tidy = suites.includes("tidy") ? await tidySuite() : null;
+  const ask = suites.includes("ask") ? await askSuite() : null;
   failures +=
     (entry?.failures ?? 0) +
     (starters?.failures ?? 0) +
@@ -115,10 +119,12 @@ async function main() {
     (match?.failures ?? 0) +
     (improve?.failures ?? 0) +
     (letter?.failures ?? 0) +
-    (tidy?.failures ?? 0);
+    (tidy?.failures ?? 0) +
+    (ask?.failures ?? 0);
   const phaseB = Boolean(skills || interview);
   const phaseC = Boolean(match || improve);
   const phaseD = Boolean(letter || tidy);
+  const phaseE = Boolean(ask);
   const phaseA = Boolean(entry || starters);
   const report = {
     harnessVersions: [
@@ -126,6 +132,7 @@ async function main() {
       ...(phaseB ? [PHASE_B_HARNESS_VERSION] : []),
       ...(phaseC ? [PHASE_C_HARNESS_VERSION] : []),
       ...(phaseD ? [PHASE_D_HARNESS_VERSION] : []),
+      ...(phaseE ? [PHASE_E_HARNESS_VERSION] : []),
     ],
     model: openAIModel(),
     promptVersions: [
@@ -139,6 +146,7 @@ async function main() {
       TAILOR_PROMPT_VERSION,
       COVER_LETTER_PROMPT_VERSION,
       IMPORT_TIDY_PROMPT_VERSION,
+      ASK_PROMPT_VERSION,
     ],
     ranAt: new Date().toISOString(),
     prices: { ...tokenPrices(), unit: "USD per million tokens" },
@@ -153,11 +161,12 @@ async function main() {
     continueOrSelection: improve && costSummary(improve.modeUsages),
     coverLetter: letter && costSummary(letter.usages),
     importTidy: tidy && costSummary(tidy.usages),
+    ask: ask && costSummary(ask.usages),
     failures,
   };
   console.log(JSON.stringify(report, null, 2));
-  if (args.includes("--save") && (phaseA || phaseB || phaseC || phaseD)) {
-    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c", phaseD && "d"].filter(Boolean).join("-")}`;
+  if (args.includes("--save") && (phaseA || phaseB || phaseC || phaseD || phaseE)) {
+    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c", phaseD && "d", phaseE && "e"].filter(Boolean).join("-")}`;
     const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-${phase}-live.json`;
     await mkdir("docs/plans/evaluations", { recursive: true });
     await writeFile(
@@ -174,6 +183,7 @@ async function main() {
             ...(improve?.rows ?? []),
             ...(letter?.rows ?? []),
             ...(tidy?.rows ?? []),
+            ...(ask?.rows ?? []),
           ],
         },
         null,
@@ -578,6 +588,31 @@ async function tidySuite() {
         problems: [...checkTidyDraft(doc, checked), ...row.check(checked, doc)],
         rawProblems: raw ? [...checkTidyDraft(doc, raw), ...row.check(raw, doc)] : ["raw output unreadable"],
         output: tidy,
+      };
+    });
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  }
+  return { failures, rows, usages };
+}
+
+// Ask the AI: at most two paid calls per case (answer, one batch support check).
+async function askSuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const usages: Usage[] = [];
+  for (const row of ASK_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const doc = row.doc();
+    const result = await runCase("ask", row.id, usage, async (transport, first) => {
+      const answer = await generateAsk(doc, { question: row.question }, transport);
+      const raw = first.output as AskOutput | undefined;
+      return {
+        problems: answer.withheld ? ["answer withheld"] : checkAsk(row, doc, answer),
+        rawProblems: raw ? checkAsk(row, doc, raw) : ["raw output unreadable"],
+        output: answer,
       };
     });
     if (result.failed) failures++;

@@ -10,12 +10,13 @@ import {
 } from "@/lib/ai-access";
 import type { RewriteAvailability } from "./editor/FieldAiContext";
 
-export type AiTab = "help" | "job" | "letter";
+export type AiTab = "help" | "job" | "letter" | "ask";
 
-const TABS: { id: AiTab; label: string }[] = [
+const ALL_TABS: { id: AiTab; label: string }[] = [
   { id: "help", label: "Help me finish" },
   { id: "job", label: "Match a job" },
   { id: "letter", label: "Cover letter" },
+  { id: "ask", label: "Ask the AI" },
 ];
 
 export interface AIPanelProps {
@@ -33,6 +34,8 @@ export interface AIPanelProps {
   /** The "Match a job" and "Cover letter" tools, built by the studio. */
   jobTab: ReactNode;
   letterTab: ReactNode;
+  /** Ask the AI; given a way to switch tabs so its buttons can open Match a job or Cover letter. */
+  askTab?: (selectTab: (tab: AiTab) => void) => ReactNode;
 }
 
 /**
@@ -51,7 +54,9 @@ export function AIPanel({
   onOpenCheck,
   jobTab,
   letterTab,
+  askTab,
 }: AIPanelProps) {
+  const TABS = ALL_TABS.filter((item) => item.id !== "ask" || askTab);
   const [tab, setTab] = useState<AiTab>(initialTab);
   // Tools keep what was typed in them while another tab is open.
   const [visited, setVisited] = useState<Set<AiTab>>(new Set([initialTab]));
@@ -184,6 +189,16 @@ export function AIPanel({
       >
         {visited.has("letter") && letterTab}
       </div>
+      {askTab && (
+        <div
+          role="tabpanel"
+          id="ai-tabpanel-ask"
+          aria-labelledby="ai-tab-ask"
+          hidden={tab !== "ask"}
+        >
+          {visited.has("ask") && askTab(select)}
+        </div>
+      )}
     </section>
   );
 }
