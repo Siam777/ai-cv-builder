@@ -30,14 +30,14 @@ test("cover letter copy requires sign-in and Markdown uses reviewed edits", asyn
   await page.goto("/builder");
   await startSampleResume(page);
   await editorTool(page, "Cover letter");
-  await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
+  await page.getByRole("button", { name: /Quick draft \(template\)/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   await page.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect(page.locator(".account-panel")).toBeVisible();
   await page.getByRole("button", { name: "Close account settings" }).click();
   await authenticateForExport(page);
   await editorTool(page, "Cover letter");
-  await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
+  await page.getByRole("button", { name: /Quick draft \(template\)/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: /Download.*md/ }).click();

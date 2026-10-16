@@ -37,6 +37,10 @@ export interface PlanConfig {
   aiJobMatch: boolean;
   /** Tailor with AI: a reworded summary and bullets saved as a tailored copy. */
   aiTailor: boolean;
+  /** Write a cover letter with AI from the CV. */
+  aiCoverLetter: boolean;
+  /** Tidy with AI after an import: structure only. */
+  aiImportTidy: boolean;
 }
 
 export const PLANS: Record<PlanId, PlanConfig> = {
@@ -68,6 +72,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiImproveAll: false,
     aiJobMatch: false,
     aiTailor: false,
+    aiCoverLetter: false,
+    aiImportTidy: false,
   },
   go: {
     id: "go",
@@ -99,6 +105,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiImproveAll: true,
     aiJobMatch: true,
     aiTailor: false,
+    aiCoverLetter: true,
+    aiImportTidy: true,
   },
   pro: {
     id: "pro",
@@ -128,6 +136,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     aiImproveAll: true,
     aiJobMatch: true,
     aiTailor: true,
+    aiCoverLetter: true,
+    aiImportTidy: true,
   },
 };
 

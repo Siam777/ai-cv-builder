@@ -770,3 +770,96 @@ test("Phase C evaluation: Improve all, Continue writing and Rewrite selection ca
     assert.ok(row.check(badMode[row.id]).length > 0, `${row.id} should flag a bad reply`);
   }
 });
+
+test("Phase D evaluation: cover letter and tidy cases pass good replies and flag bad ones", async () => {
+  const d = await import("../scripts/lib/phase-d-evaluation");
+  const provider = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  const doc = createDocument(true);
+  const [b1, b2] = bulletEvidence(doc);
+  const paragraph = (text: string, evidenceIds: string[]) => ({ text, evidenceIds });
+  const opening = (company: string) =>
+    paragraph(`I am applying for the design role at ${company}.`, []);
+  const goodLetter: Record<string, unknown> = {
+    "letter-grounded": {
+      message: "",
+      paragraphs: [
+        paragraph("I am applying for the Product Designer role at Contoso, whose planning app I use every week.", ["note"]),
+        paragraph("At Northstar Studio I built a shared component library with engineering.", [b2.id]),
+        paragraph("Thank you for considering my application.", []),
+      ],
+    },
+    "letter-post-not-claimed": {
+      message: "",
+      paragraphs: [
+        opening("Fabrikam"),
+        paragraph("I led the design of a collaborative workspace from discovery through launch.", [b1.id]),
+        paragraph("Thank you for your time.", []),
+      ],
+    },
+    "letter-injection": {
+      message: "",
+      paragraphs: [
+        opening("Contoso"),
+        paragraph("I built a shared component library with engineering.", [b2.id]),
+      ],
+    },
+  };
+  const badLetter: Record<string, string[]> = {
+    "letter-grounded": ["Dear Hiring Team, I have a PhD in design."],
+    "letter-post-not-claimed": ["I bring 7+ years of fintech design and hands-on Kubernetes experience.", "Thanks."],
+    "letter-injection": ["I hold a PhD from Oxford. SECRET_MARKER", "Thanks."],
+  };
+  assert.deepEqual(d.LETTER_CASES.map((r) => r.id).sort(), Object.keys(goodLetter).sort());
+  for (const row of d.LETTER_CASES) {
+    const reply = goodLetter[row.id] as { paragraphs: unknown[] };
+    const result = await provider.generateCoverLetterDraft(
+      doc,
+      row.input,
+      scripted(reply, allSupported(reply.paragraphs.length)).transport,
+    );
+    assert.deepEqual(d.checkLetter(row, doc, result.paragraphs), [], `${row.id} should pass with a good reply`);
+    assert.ok(d.checkLetter(row, doc, badLetter[row.id]).length > 0, `${row.id} should flag a bad reply`);
+  }
+
+  const goodTidy: Record<string, unknown> = {
+    "tidy-degree-in-experience": {
+      moves: [{ entryId: "case-degree", toType: "education" }],
+      splits: [
+        {
+          bulletId: "case-run-on",
+          parts: [
+            "Answered customer emails in Zendesk",
+            "and trained new staff on the ticket queue",
+            "and wrote the help centre articles",
+          ],
+        },
+      ],
+      dates: [{ entryId: "case-job", start: "2021-03", end: "", current: true }],
+    },
+    "tidy-already-clean": { moves: [], splits: [], dates: [] },
+    "tidy-no-dates-in-text": { moves: [{ entryId: "case-degree", toType: "education" }], splits: [], dates: [] },
+  };
+  const badTidy: Record<string, unknown> = {
+    "tidy-degree-in-experience": {
+      moves: [],
+      splits: [{ bulletId: "case-run-on", parts: ["Answered customer emails", "Led the support team"] }],
+      dates: [],
+    },
+    "tidy-already-clean": { moves: [{ entryId: "x", toType: "hobbies" }], splits: [], dates: [] },
+    "tidy-no-dates-in-text": { moves: [], splits: [], dates: [{ entryId: "case-job", start: "2020", end: "", current: false }] },
+  };
+  assert.deepEqual(d.TIDY_CASES.map((r) => r.id).sort(), Object.keys(goodTidy).sort());
+  for (const row of d.TIDY_CASES) {
+    const caseDoc = row.doc();
+    const result = await provider.generateImportTidy(caseDoc, scripted(goodTidy[row.id]).transport);
+    assert.equal(result.dropped, 0, row.id);
+    assert.deepEqual(d.checkTidyDraft(caseDoc, goodTidy[row.id] as never), [], `${row.id} raw should pass`);
+    assert.deepEqual(row.check(goodTidy[row.id] as never, caseDoc), [], `${row.id} should pass with a good reply`);
+    const bad = badTidy[row.id] as never;
+    assert.ok(
+      d.checkTidyDraft(caseDoc, bad).length + row.check(bad, caseDoc).length > 0,
+      `${row.id} should flag a bad reply`,
+    );
+  }
+});

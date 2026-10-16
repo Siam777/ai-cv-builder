@@ -47,6 +47,8 @@ export interface FieldAiServices {
   /** The plan includes Match with AI (Go and Pro) and Tailor with AI (Pro). */
   jobMatch: boolean;
   tailor: boolean;
+  /** The plan includes Write a cover letter with AI (Go and Pro). */
+  coverLetterAi: boolean;
   /** Saves a reviewed tailored copy of the CV it was made from. */
   saveTailoredCopy: (tailored: ResumeDocument, sourceSnapshot: string) => Promise<boolean>;
   /** Applies one change to the open CV (one Undo step). */

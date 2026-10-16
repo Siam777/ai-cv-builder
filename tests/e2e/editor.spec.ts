@@ -530,7 +530,7 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
 
   // Click Generate
   await modal
-    .getByRole("button", { name: /Generate Grounded Cover Letter/ })
+    .getByRole("button", { name: /Quick draft \(template\)/ })
     .click();
 
   // Verify generated preview

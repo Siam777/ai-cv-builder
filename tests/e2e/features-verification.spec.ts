@@ -100,7 +100,7 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     const clModal = page.getByRole("region", { name: "Cover letter" });
     await expect(clModal).toBeVisible();
     await clModal
-      .getByRole("button", { name: /Generate Grounded Cover Letter/i })
+      .getByRole("button", { name: /Quick draft \(template\)/i })
       .click();
     await expect(clModal.locator(".cover-letter-sheet")).toBeVisible();
     await expect(clModal.locator(".letterhead-editable-body")).toBeVisible();

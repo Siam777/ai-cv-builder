@@ -841,7 +841,7 @@ export function ResumeStudio({
     await accountRequest(
       "/api/account",
       { method: "PATCH", body: JSON.stringify({ aiWritingHelp: true }) },
-      cloudUser?.id,
+      (cloudUser ?? sessionUser)?.id,
     );
     setAiConsentSet(true);
   }
@@ -1434,6 +1434,7 @@ export function ResumeStudio({
       improveAll: planAllows(currentPlanId, "ai-improve-all"),
       jobMatch: planAllows(currentPlanId, "ai-job-match"),
       tailor: planAllows(currentPlanId, "ai-tailor"),
+      coverLetterAi: planAllows(currentPlanId, "ai-cover-letter"),
       saveTailoredCopy: applyTailoredVariant,
     }
     : null;
@@ -1710,6 +1711,19 @@ export function ResumeStudio({
           staged={staged}
           hasActiveDoc={!!doc && !showStart}
           busy={busy}
+          tidy={{
+            owner: sessionUser?.id ?? null,
+            allowed: planAllows(currentPlanId, "ai-import-tidy"),
+            configured:
+              typeof rewriteAvailability === "object" && rewriteAvailability
+                ? rewriteAvailability.configured
+                : null,
+            consent: aiConsent,
+            grantConsent: grantAiConsent,
+            onSeePlans: () => setShowPricing(true),
+            onSignIn: signInForAi,
+            onTidied: (document) => setStaged((open) => (open ? { ...open, document } : open)),
+          }}
           onRestoreAsNew={() => {
             void action(async () => {
               await addDocument(

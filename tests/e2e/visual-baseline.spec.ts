@@ -217,7 +217,7 @@ for (const width of [360, 768, 1440]) {
     await editorTool(page, "Cover letter");
     await capture("letter-input");
     await page
-      .getByRole("button", { name: /Generate Grounded Cover Letter/ })
+      .getByRole("button", { name: /Quick draft \(template\)/ })
       .click();
     await expect(
       page.getByRole("button", { name: "Adjust Inputs" }),

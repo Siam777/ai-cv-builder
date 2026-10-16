@@ -12,7 +12,9 @@ export type PlanGatedFeature =
   | "ai-interview"
   | "ai-improve-all"
   | "ai-job-match"
-  | "ai-tailor";
+  | "ai-tailor"
+  | "ai-cover-letter"
+  | "ai-import-tidy";
 
 const LOCKED_COPY: Record<
   PlanGatedFeature,
@@ -68,6 +70,14 @@ const LOCKED_COPY: Record<
     title: "Tailor with AI",
     reason: "Tailoring your summary and bullets to a job with AI is part of Pro.",
   },
+  "ai-cover-letter": {
+    title: "Write a cover letter with AI",
+    reason: "Writing a cover letter with AI is part of Go and Pro.",
+  },
+  "ai-import-tidy": {
+    title: "Tidy with AI",
+    reason: "Tidying an imported CV with AI is part of Go and Pro.",
+  },
 };
 
 /** Whether a plan includes a feature. Mirrors the limits in PLANS. */
@@ -96,6 +106,10 @@ export function planAllows(planId: PlanId, feature: PlanGatedFeature): boolean {
       return plan.aiJobMatch;
     case "ai-tailor":
       return plan.aiTailor;
+    case "ai-cover-letter":
+      return plan.aiCoverLetter;
+    case "ai-import-tidy":
+      return plan.aiImportTidy;
   }
 }
 

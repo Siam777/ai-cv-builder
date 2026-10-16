@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { type ResumeDocument } from "./document";
+import { documentSchema, type ResumeDocument } from "./document";
+import type { TidyOperation } from "./import-tidy";
 import { bulletEvidence } from "./ai-proposals";
 import { jobCoachInputSchema } from "./job-coach-contract";
 import { parseSkillsFromText } from "./skills-taxonomy";
@@ -589,4 +590,51 @@ export function placementEntries(doc: ResumeDocument) {
         })),
     )
     .slice(0, 20);
+}
+
+/** AI cover letter (Go and Pro): 3–4 paragraphs from the CV and the person's note. */
+export const coverLetterRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  documentId: z.string().min(1).max(100),
+  revision: z.number().int().nonnegative(),
+  job: z.strictObject({
+    title: z.string().trim().min(1).max(120),
+    company: z.string().trim().max(120).optional(),
+    post: z.string().trim().max(12000).optional(),
+  }),
+  recipient: z.string().trim().max(120).optional(),
+  /** Why the person wants this job, in their words. */
+  note: z.string().trim().max(500).optional(),
+});
+export type CoverLetterRequest = z.infer<typeof coverLetterRequestSchema>;
+export const coverLetterDraftSchema = z.strictObject({
+  message: z.string().max(500),
+  paragraphs: z
+    .array(
+      z.strictObject({
+        text: z.string().max(1200),
+        evidenceIds: z.array(z.string().max(100)).max(12),
+      }),
+    )
+    .max(4),
+});
+export interface CoverLetterResult {
+  requestId: string;
+  /** The letter body, salutation and sign-off excluded. */
+  paragraphs: string[];
+  /** Paragraphs that failed a check (their wording is never returned). */
+  withheld: number;
+  message: string;
+}
+
+/** Tidy with AI after an import (Go and Pro). The document is not saved yet. */
+export const importTidyRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  document: documentSchema,
+});
+export type ImportTidyRequest = z.infer<typeof importTidyRequestSchema>;
+export interface ImportTidyResult {
+  requestId: string;
+  ops: TidyOperation[];
+  dropped: number;
 }

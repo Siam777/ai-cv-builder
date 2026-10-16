@@ -21,6 +21,10 @@ import {
   generateTailoring,
   TAILOR_PROMPT_VERSION,
   generateImproveAll,
+  generateCoverLetterDraft,
+  COVER_LETTER_PROMPT_VERSION,
+  generateImportTidy,
+  IMPORT_TIDY_PROMPT_VERSION,
 } from "../src/lib/server/openai-provider";
 import {
   checkStarters,
@@ -60,8 +64,17 @@ import {
   type ImproveOutput,
   type TailorOutput,
 } from "./lib/phase-c-evaluation";
+import {
+  checkLetter,
+  checkTidyDraft,
+  LETTER_CASES,
+  PHASE_D_HARNESS_VERSION,
+  TIDY_CASES,
+} from "./lib/phase-d-evaluation";
+import { createDocument as sampleDocument } from "../src/lib/document";
+import type { ImportTidyDraft } from "../src/lib/import-tidy";
 
-const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve"] as const;
+const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve", "letter", "tidy"] as const;
 type Suite = (typeof SUITES)[number];
 
 async function main() {
@@ -70,7 +83,7 @@ async function main() {
   const suiteArg = args.find((arg) => arg.startsWith("--suite="));
   if (args.some((arg) => arg !== "--save" && arg !== suiteArg))
     throw new Error(
-      "Use --suite=rewrite,entry,starters,skills,interview,match,improve (default: all) and optionally --save.",
+      "Use --suite=rewrite,entry,starters,skills,interview,match,improve,letter,tidy (default: all) and optionally --save.",
     );
   const suites = (suiteArg?.split("=")[1].split(",") ?? [...SUITES]) as Suite[];
   if (!suites.length || suites.some((suite) => !SUITES.includes(suite)))
@@ -81,9 +94,9 @@ async function main() {
     );
   // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 12 (entry)
   // + 6 (starters) + 12 (skills) + 6 (interview) + 24 (match) + 12 (improve)
-  // = 80 paid API calls, with no retries.
+  // + 6 (letter) + 3 (tidy) = 89 paid API calls, with no retries.
   console.log(
-    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
+    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
   let failures = suites.includes("rewrite") ? await rewriteSuite() : 0;
   const entry = suites.includes("entry") ? await entrySuite() : null;
@@ -92,21 +105,27 @@ async function main() {
   const interview = suites.includes("interview") ? await interviewSuite() : null;
   const match = suites.includes("match") ? await matchSuite() : null;
   const improve = suites.includes("improve") ? await improveSuite() : null;
+  const letter = suites.includes("letter") ? await letterSuite() : null;
+  const tidy = suites.includes("tidy") ? await tidySuite() : null;
   failures +=
     (entry?.failures ?? 0) +
     (starters?.failures ?? 0) +
     (skills?.failures ?? 0) +
     (interview?.failures ?? 0) +
     (match?.failures ?? 0) +
-    (improve?.failures ?? 0);
+    (improve?.failures ?? 0) +
+    (letter?.failures ?? 0) +
+    (tidy?.failures ?? 0);
   const phaseB = Boolean(skills || interview);
   const phaseC = Boolean(match || improve);
+  const phaseD = Boolean(letter || tidy);
   const phaseA = Boolean(entry || starters);
   const report = {
     harnessVersions: [
       ...(phaseA ? [PHASE_A_HARNESS_VERSION] : []),
       ...(phaseB ? [PHASE_B_HARNESS_VERSION] : []),
       ...(phaseC ? [PHASE_C_HARNESS_VERSION] : []),
+      ...(phaseD ? [PHASE_D_HARNESS_VERSION] : []),
     ],
     model: openAIModel(),
     promptVersions: [
@@ -118,6 +137,8 @@ async function main() {
       JOB_MATCH_PROMPT_VERSION,
       GAP_LINE_PROMPT_VERSION,
       TAILOR_PROMPT_VERSION,
+      COVER_LETTER_PROMPT_VERSION,
+      IMPORT_TIDY_PROMPT_VERSION,
     ],
     ranAt: new Date().toISOString(),
     prices: { ...tokenPrices(), unit: "USD per million tokens" },
@@ -130,11 +151,13 @@ async function main() {
     tailor: match && costSummary(match.tailorUsages),
     improveAll: improve && costSummary(improve.improveUsages),
     continueOrSelection: improve && costSummary(improve.modeUsages),
+    coverLetter: letter && costSummary(letter.usages),
+    importTidy: tidy && costSummary(tidy.usages),
     failures,
   };
   console.log(JSON.stringify(report, null, 2));
-  if (args.includes("--save") && (phaseA || phaseB || phaseC)) {
-    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c"].filter(Boolean).join("-")}`;
+  if (args.includes("--save") && (phaseA || phaseB || phaseC || phaseD)) {
+    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c", phaseD && "d"].filter(Boolean).join("-")}`;
     const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-${phase}-live.json`;
     await mkdir("docs/plans/evaluations", { recursive: true });
     await writeFile(
@@ -149,6 +172,8 @@ async function main() {
             ...(interview?.rows ?? []),
             ...(match?.rows ?? []),
             ...(improve?.rows ?? []),
+            ...(letter?.rows ?? []),
+            ...(tidy?.rows ?? []),
           ],
         },
         null,
@@ -502,6 +527,64 @@ async function improveSuite() {
     );
   }
   return { failures, rows, improveUsages, modeUsages };
+}
+
+// AI cover letter: at most two paid calls per case (draft, one batch support check).
+async function letterSuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const usages: Usage[] = [];
+  for (const row of LETTER_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const doc = sampleDocument(true);
+    const result = await runCase("letter", row.id, usage, async (transport, first) => {
+      const letter = await generateCoverLetterDraft(doc, row.input, transport);
+      const raw = (first.output as { paragraphs?: { text: string }[] } | undefined)?.paragraphs;
+      return {
+        // An empty, withheld letter passes the content checks but is reported as such.
+        problems: letter.paragraphs.length ? checkLetter(row, doc, letter.paragraphs) : ["letter withheld"],
+        rawProblems: raw ? checkLetter(row, doc, raw.map((p) => p.text)) : ["raw output unreadable"],
+        output: letter,
+      };
+    });
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  }
+  return { failures, rows, usages };
+}
+
+// Tidy with AI: one paid call per case; the checked operations are what users get.
+async function tidySuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const usages: Usage[] = [];
+  for (const row of TIDY_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const doc = row.doc();
+    const result = await runCase("tidy", row.id, usage, async (transport, first) => {
+      const tidy = await generateImportTidy(doc, transport);
+      const raw = first.output as ImportTidyDraft | undefined;
+      const checked: ImportTidyDraft = {
+        moves: tidy.ops.flatMap((op) => (op.type === "move" ? [{ entryId: op.entryId, toType: op.toType }] : [])),
+        splits: tidy.ops.flatMap((op) => (op.type === "split" ? [{ bulletId: op.bulletId, parts: op.parts }] : [])),
+        dates: tidy.ops.flatMap((op) =>
+          op.type === "dates" ? [{ entryId: op.entryId, start: op.start, end: op.end, current: op.current }] : [],
+        ),
+      };
+      return {
+        problems: [...checkTidyDraft(doc, checked), ...row.check(checked, doc)],
+        rawProblems: raw ? [...checkTidyDraft(doc, raw), ...row.check(raw, doc)] : ["raw output unreadable"],
+        output: tidy,
+      };
+    });
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  }
+  return { failures, rows, usages };
 }
 
 // Single-bullet rewrite smoke cases: at most eight paid API calls.

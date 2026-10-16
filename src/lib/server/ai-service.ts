@@ -31,6 +31,12 @@ import {
   type TailorRequest,
   type TailorResult,
   tailorRequestSchema,
+  type CoverLetterRequest,
+  type CoverLetterResult,
+  coverLetterRequestSchema,
+  type ImportTidyRequest,
+  type ImportTidyResult,
+  importTidyRequestSchema,
 } from "../ai-contract";
 import { createCoachingProposal, JOB_COACH_PROMPT_VERSION } from "../job-coach";
 import { jobCoachContext } from "./job-coach-context";
@@ -60,6 +66,10 @@ import {
   GAP_LINE_PROMPT_VERSION,
   generateTailoring,
   TAILOR_PROMPT_VERSION,
+  generateCoverLetterDraft,
+  COVER_LETTER_PROMPT_VERSION,
+  generateImportTidy,
+  IMPORT_TIDY_PROMPT_VERSION,
   openAIConfigured,
   openAIModel,
   PROMPT_VERSION,
@@ -1020,6 +1030,64 @@ export async function requestTailoring(
     TAILOR_PROMPT_VERSION,
     () => generator(doc, input),
     (r) => ({ rewriteCount: r.rewrites.length, hasSummary: r.summary ? 1 : 0, withheldCount: r.withheld }),
+  );
+  return { requestId: input.requestId, ...result };
+}
+
+/** Write a cover letter with AI (Go and Pro). Nothing is saved here. */
+export async function requestCoverLetter(
+  owner: string,
+  input: CoverLetterRequest,
+  generator: (
+    doc: Awaited<ReturnType<typeof getResume>>,
+    input: CoverLetterRequest,
+  ) => ReturnType<typeof generateCoverLetterDraft> = generateCoverLetterDraft,
+): Promise<CoverLetterResult> {
+  input = coverLetterRequestSchema.parse(input);
+  const { plan, doc } = await preparePlanned(
+    owner,
+    (p) => p.aiCoverLetter,
+    "Writing a cover letter with AI is part of Go and Pro.",
+    input.documentId,
+    input.revision,
+  );
+  const result = await counted(
+    owner,
+    plan,
+    doc,
+    "ai_cover_letter",
+    COVER_LETTER_PROMPT_VERSION,
+    () => generator(doc, input),
+    (r) => ({ paragraphCount: r.paragraphs.length, withheldCount: r.withheld }),
+  );
+  return { requestId: input.requestId, ...result };
+}
+
+/**
+ * Tidy with AI after an import (Go and Pro): structure-only operations on a
+ * document that is not saved yet. Needs a signed-in account with AI writing
+ * help on; counts as one AI request.
+ */
+export async function requestImportTidy(
+  owner: string,
+  input: ImportTidyRequest,
+  generator: (doc: ImportTidyRequest["document"]) => ReturnType<typeof generateImportTidy> = generateImportTidy,
+): Promise<ImportTidyResult> {
+  input = importTidyRequestSchema.parse(input);
+  const { plan } = await getUserSubscription(owner);
+  if (!plan.aiImportTidy)
+    throw new HttpError(402, "PLAN_REQUIRED", "Tidying an imported CV with AI is part of Go and Pro.");
+  await requireAiConsent(owner);
+  if (!openAIConfigured())
+    throw new HttpError(503, "AI_NOT_CONFIGURED", "OpenAI is not configured on this installation yet.");
+  const result = await counted(
+    owner,
+    plan,
+    { id: input.document.id, revision: 0 },
+    "ai_import_tidy",
+    IMPORT_TIDY_PROMPT_VERSION,
+    () => generator(input.document),
+    (r) => ({ operationCount: r.ops.length, droppedCount: r.dropped }),
   );
   return { requestId: input.requestId, ...result };
 }
