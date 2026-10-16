@@ -19,9 +19,8 @@ import {
 import { Menu, type MenuItem } from "./Menu";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { BlankFiller, blankState, blanksReady, composeBlanks, type BlankState } from "./BlankFiller";
 import {
-  findBlanks,
-  starterReady,
   type SkillsResult,
   type StartersResult,
 } from "@/lib/ai-contract";
@@ -94,7 +93,7 @@ type Session =
   | { stage: "questions"; proposal: Proposal }
   | { stage: "error"; message: string; retry?: AiAction; plans?: boolean }
   | { stage: "done"; message: string }
-  | { stage: "examples-summary"; jobTitle: string; text: string }
+  | { stage: "examples-summary"; jobTitle: string; blanks: BlankState }
   | { stage: "examples-skills"; jobTitle: string; skills: string[]; picked: string[] }
   | { stage: "skills-ai"; result: SkillsResult; picked: string[]; group: boolean }
   | {
@@ -509,7 +508,7 @@ export function FieldAi({
             "No example summary.",
           );
         return show(
-          { stage: "examples-summary", jobTitle, text: result.summary },
+          { stage: "examples-summary", jobTitle, blanks: blankState(result.summary) },
           "An example summary is ready. Fill its blanks before you add it.",
         );
       }
@@ -572,8 +571,11 @@ export function FieldAi({
         )) as { text: string; message: string };
         if (!mounted.current || controller.signal.aborted) return;
         setConfirmed(false);
-        if (!draft.text)
-          return show({ stage: "note", message: draft.message }, draft.message);
+        // The AI may decline rather than invent; say plainly that nothing was written.
+        if (!draft.text) {
+          const message = `No summary was written. ${draft.message || "Add more to your CV first."}`;
+          return show({ stage: "note", message }, message);
+        }
         return show(
           {
             stage: "review",
@@ -886,33 +888,22 @@ export function FieldAi({
               <p className="starter-label">Example — make it yours</p>
               <p className="field-ai-help">
                 An example summary for “{session.jobTitle}”, not a fact about
-                you. Fill or delete every [blank] and change anything that is
-                not true.
+                you. Type your own details into the blanks, remove the ones you
+                do not need, and change anything that is not true.
               </p>
-              <label>
-                Example summary
-                <textarea
-                  ref={setPrimary}
-                  rows={4}
-                  maxLength={1200}
-                  value={session.text}
-                  onChange={(event) =>
-                    setSession({ ...session, text: event.target.value })
-                  }
-                />
-              </label>
-              {findBlanks(session.text).length > 0 && (
-                <p className="field-ai-help starter-blanks">
-                  Blanks left: {findBlanks(session.text).join(", ")}
-                </p>
-              )}
+              <BlankFiller
+                label="Example summary"
+                maxLength={1200}
+                state={session.blanks}
+                onChange={(blanks) => setSession({ ...session, blanks })}
+              />
               <div className="field-ai-actions">
                 <button
                   type="button"
                   className="primary"
-                  disabled={!starterReady(session.text)}
+                  disabled={!blanksReady(session.blanks)}
                   onClick={() => {
-                    onApply(session.text.trim());
+                    onApply(composeBlanks(session.blanks));
                     show(
                       { stage: "done", message: "Added. Undo restores your previous summary." },
                       "Summary added. Undo restores your previous summary.",

@@ -205,3 +205,53 @@ describe("Phase E: Ask the AI", () => {
     );
   });
 });
+
+test("a failed OpenAI response explains the reason from its status and error code only", async () => {
+  const { providerError } = await import("../src/lib/server/openai-provider");
+  const reply = (status: number, body: unknown) =>
+    new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+  const quota = await providerError(
+    reply(429, { error: { code: "insufficient_quota", message: "You exceeded your quota, see your CV text here" } }),
+    "cv_ask",
+  );
+  assert.match(quota.message, /no credit left \(insufficient_quota\).*HTTP 429, insufficient_quota/);
+  assert.doesNotMatch(quota.message, /CV text here/);
+  assert.equal(quota.code, "AI_UNAVAILABLE");
+  assert.match((await providerError(reply(401, { error: { code: "invalid_api_key" } }), "x")).message, /rejected the API key.*HTTP 401/);
+  assert.match((await providerError(reply(404, { error: { code: "model_not_found" } }), "x")).message, /Check OPENAI_MODEL/);
+  assert.match((await providerError(reply(429, { error: { code: "rate_limit_exceeded" } }), "x")).message, /rate limiting/);
+  assert.match((await providerError(reply(400, { error: { code: "invalid_json_schema" } }), "x")).message, /refused the request format.*invalid_json_schema/);
+  assert.match((await providerError(reply(502, "<html>bad gateway</html>"), "x")).message, /having problems.*HTTP 502\.\)/);
+  // Codes that do not look like codes are not echoed.
+  assert.doesNotMatch((await providerError(reply(400, { error: { code: "a b <script>" } }), "x")).message, /script/);
+});
+
+test("dotenvValue reads quoted, unquoted, exported and commented values", async () => {
+  const { dotenvValue } = await import("../src/lib/server/openai-provider");
+  const text = [
+    "# OPENAI_API_KEY=commented-out",
+    "OTHER=1",
+    "export OPENAI_MODEL = 'gpt-test-model'  ",
+    'OPENAI_API_KEY="sk-local-example"',
+    "PLAIN=value # a comment",
+    "EMPTY=",
+  ].join("\r\n");
+  assert.equal(dotenvValue(text, "OPENAI_API_KEY"), "sk-local-example");
+  assert.equal(dotenvValue(text, "OPENAI_MODEL"), "gpt-test-model");
+  assert.equal(dotenvValue(text, "PLAIN"), "value");
+  assert.equal(dotenvValue(text, "EMPTY"), undefined);
+  assert.equal(dotenvValue(text, "MISSING"), undefined);
+});
+
+test("outside a Next server the key comes from the environment only", async () => {
+  const { openAIConfigured } = await import("../src/lib/server/openai-provider");
+  const saved = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    // Unit tests never read .env.local, so a local key cannot reach them.
+    assert.equal(process.env.NEXT_RUNTIME, undefined);
+    assert.equal(openAIConfigured(), false);
+  } finally {
+    if (saved !== undefined) process.env.OPENAI_API_KEY = saved;
+  }
+});

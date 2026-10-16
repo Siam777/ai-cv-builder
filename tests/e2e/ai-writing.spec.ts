@@ -207,22 +207,29 @@ test("examples for a job title stay disabled until every blank is filled, then a
     expect(requests[0]).toMatchObject({ jobTitle: job.title, section: "experience" });
     expect(Object.keys(requests[0]).sort()).toEqual(["jobTitle", "requestId", "section"]);
 
-    const add = card.getByRole("button", { name: "Add ticked" });
-    await card.getByLabel("Example 1 — make it yours").check();
+    const add = card.getByRole("button", { name: /^Add \d* ?to this job$/ });
     await expect(add).toBeDisabled();
-    await expect(card).toContainText("Blanks left: [number], [team]");
-    await expect(card).toContainText("Fill or delete every [blank]");
-    const example = card.getByLabel("Example 1", { exact: true });
-    await example.fill("Led 4 design reviews a month with [team].");
+    // Each blank is its own field; typing in one picks the example.
+    await card.getByLabel("Example 1: number").fill("4");
+    await expect(card.getByLabel("Use example 1")).toBeChecked();
+    await expect(card).toContainText("1 of 2 blanks filled");
+    await expect(card).toContainText("Fill or remove every blank");
     await expect(add).toBeDisabled();
-    await example.fill("Led 4 design reviews a month with the product team.");
+    await card.getByLabel("Example 1: team").fill("the product team");
+    await expect(card).toContainText("Ready to add");
     await expect(add).toBeEnabled();
     // Choosing a level asks again for that level.
     await card.getByLabel("Level").selectOption("senior");
     await expect.poll(() => requests.length).toBe(2);
     expect(requests[1]).toMatchObject({ seniority: "senior" });
-    await card.getByLabel("Example 1 — make it yours").check();
-    await card.getByLabel("Example 1", { exact: true }).fill("Led 4 design reviews a month with the product team.");
+    // The whole sentence can also be rewritten; leftover [blanks] still block adding.
+    await card.getByRole("button", { name: "Edit the whole sentence" }).first().click();
+    const sentence = card.getByLabel("Example 1", { exact: true });
+    await expect(sentence).toHaveValue("Led [number] design reviews a month with [team].");
+    await sentence.fill("Led 4 design reviews a month with [team].");
+    await card.getByLabel("Use example 1").check();
+    await expect(add).toBeDisabled();
+    await sentence.fill("Led 4 design reviews a month with the product team.");
     await add.click();
     await expect(card).toContainText("Added 1 bullet.");
     await expect
@@ -241,9 +248,9 @@ test("examples for a job title stay disabled until every blank is filled, then a
     await expect(summary).toContainText("Example — make it yours");
     const use = summary.getByRole("button", { name: "Use my edited summary" });
     await expect(use).toBeDisabled();
-    await summary
-      .getByLabel("Example summary")
-      .fill("Product designer with 6 years of experience in fintech.");
+    await summary.getByLabel("Example summary: years").fill("6");
+    await expect(use).toBeDisabled();
+    await summary.getByLabel("Example summary: industry").fill("fintech");
     await use.click();
     await expect(page.getByRole("textbox", { name: "Professional summary" })).toHaveValue(
       "Product designer with 6 years of experience in fintech.",

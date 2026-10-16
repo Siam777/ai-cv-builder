@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Lightbulb, Sparkles, X } from "lucide-react";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { BlankFiller, blankState, blanksReady, composeBlanks, type BlankState } from "./BlankFiller";
 import {
   REWRITE_STATUS_TEXT,
   rewriteStatus,
@@ -11,8 +12,6 @@ import {
 } from "@/lib/ai-access";
 import {
   STARTER_SENIORITY,
-  findBlanks,
-  starterReady,
   type EntryBulletsResult,
   type StartersResult,
 } from "@/lib/ai-contract";
@@ -44,7 +43,7 @@ type Session =
       jobTitle: string;
       seniority: Seniority | "";
       cached: boolean;
-      bullets: Pick[];
+      bullets: { id: string; blanks: BlankState; picked: boolean }[];
     }
   | { stage: "error"; message: string; flow: Flow; plans?: boolean }
   | { stage: "done"; message: string };
@@ -227,11 +226,11 @@ export function EntryAi({
           cached: result.cached,
           bullets: result.bullets.map((text) => ({
             id: crypto.randomUUID(),
-            text,
+            blanks: blankState(text),
             picked: false,
           })),
         },
-        "Examples are ready. Tick one, then fill or delete its blanks.",
+        "Examples are ready. Fill in the blanks of the ones that are true for you.",
       );
     } catch (error) {
       if (!mounted.current || abort.signal.aborted) return;
@@ -259,7 +258,7 @@ export function EntryAi({
   const examplesPicked =
     session?.stage === "examples" ? session.bullets.filter((b) => b.picked) : [];
   const examplesReady =
-    examplesPicked.length > 0 && examplesPicked.every((b) => starterReady(b.text));
+    examplesPicked.length > 0 && examplesPicked.every((b) => blanksReady(b.blanks));
 
   return (
     <div className="entry-ai field-ai" data-entry-ai={entry.id}>
@@ -518,79 +517,69 @@ export function EntryAi({
           {session.stage === "examples" && (
             <div className="field-ai-form starter-review">
               <p className="starter-label">Examples — make them yours</p>
-              <p className="field-ai-help">
-                Examples for “{session.jobTitle}”. They are not about you: tick
-                one, then fill or delete every [blank] and change anything that
-                is not true.
-              </p>
-              <label>
-                Level
-                <select
-                  value={session.seniority}
-                  onChange={(event) =>
-                    void fetchExamples(event.target.value as Seniority | "")
-                  }
-                >
-                  <option value="">Any level</option>
-                  {STARTER_SENIORITY.map((level) => (
-                    <option key={level} value={level}>
-                      {SENIORITY_LABEL[level]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <ul className="entry-ai-list">
-                {session.bullets.map((bullet, index) => {
-                  const blanks = findBlanks(bullet.text);
-                  return (
-                    <li key={bullet.id}>
-                      <label className="field-ai-check">
-                        <input
-                          type="checkbox"
-                          ref={index === 0 ? setPrimary : undefined}
-                          checked={bullet.picked}
-                          onChange={(event) =>
-                            setSession({
-                              ...session,
-                              bullets: session.bullets.map((item) =>
-                                item.id === bullet.id
-                                  ? { ...item, picked: event.target.checked }
-                                  : item,
-                              ),
-                            })
-                          }
-                        />
-                        Example {index + 1} — make it yours
-                      </label>
-                      <textarea
-                        aria-label={`Example ${index + 1}`}
-                        rows={2}
-                        maxLength={400}
-                        value={bullet.text}
+              <div className="starter-intro">
+                <p className="field-ai-help">
+                  Examples for “{session.jobTitle}”, not facts about you. Type
+                  your own details into the blanks of the ones that are true,
+                  or remove a blank you do not need.
+                </p>
+                <label className="starter-level">
+                  Level
+                  <select
+                    value={session.seniority}
+                    onChange={(event) =>
+                      void fetchExamples(event.target.value as Seniority | "")
+                    }
+                  >
+                    <option value="">Any level</option>
+                    {STARTER_SENIORITY.map((level) => (
+                      <option key={level} value={level}>
+                        {SENIORITY_LABEL[level]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <ul className="starter-list">
+                {session.bullets.map((bullet, index) => (
+                  <li key={bullet.id} className={bullet.picked ? "picked" : undefined}>
+                    <label className="starter-pick">
+                      <input
+                        type="checkbox"
+                        ref={index === 0 ? setPrimary : undefined}
+                        checked={bullet.picked}
                         onChange={(event) =>
                           setSession({
                             ...session,
                             bullets: session.bullets.map((item) =>
                               item.id === bullet.id
-                                ? { ...item, text: event.target.value }
+                                ? { ...item, picked: event.target.checked }
                                 : item,
                             ),
                           })
                         }
                       />
-                      {blanks.length > 0 && (
-                        <p className="entry-ai-source starter-blanks">
-                          Blanks left: {blanks.join(", ")}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
+                      <span>Use example {index + 1}</span>
+                    </label>
+                    <BlankFiller
+                      label={`Example ${index + 1}`}
+                      state={bullet.blanks}
+                      onChange={(blanks) =>
+                        setSession({
+                          ...session,
+                          // Working on an example picks it.
+                          bullets: session.bullets.map((item) =>
+                            item.id === bullet.id ? { ...item, blanks, picked: true } : item,
+                          ),
+                        })
+                      }
+                    />
+                  </li>
+                ))}
               </ul>
               {examplesPicked.length > 0 && !examplesReady && (
                 <p className="field-ai-help" role="status">
-                  Fill or delete every [blank] in the examples you ticked
-                  before adding them.
+                  Fill or remove every blank in the examples you picked to add them.
                 </p>
               )}
               <div className="field-ai-actions">
@@ -599,12 +588,12 @@ export function EntryAi({
                   className="primary"
                   disabled={!examplesReady}
                   onClick={() => {
-                    const picked = examplesPicked.map((b) => b.text.trim());
+                    const picked = examplesPicked.map((b) => composeBlanks(b.blanks));
                     onAdd(picked);
                     finish(picked.length);
                   }}
                 >
-                  <Check size={16} aria-hidden /> Add ticked
+                  <Check size={16} aria-hidden /> Add {examplesPicked.length || ""} to this job
                 </button>
                 <button
                   type="button"
@@ -612,8 +601,8 @@ export function EntryAi({
                     begin(
                       "write",
                       examplesPicked.length
-                        ? examplesPicked.map((b) => b.text)
-                        : session.bullets.slice(0, 3).map((b) => b.text),
+                        ? examplesPicked.map((b) => b.blanks.template)
+                        : session.bullets.slice(0, 3).map((b) => b.blanks.template),
                     )
                   }
                 >

@@ -7,6 +7,7 @@ import {
   rewriteContext,
   type SummaryRequest,
   summaryRequestSchema,
+  summaryEvidence,
   type EntryBulletsRequest,
   type EntryBulletsResult,
   entryBulletsRequestSchema,
@@ -517,6 +518,10 @@ async function reserveDailyRequest(owner: string, perDay: number, planName: stri
   }
 }
 
+/** Shown when the CV has only a headline and job titles: nothing is sent to the AI. */
+export const THIN_CV_MESSAGE =
+  "Your CV only has a headline and job titles so far, which is too little to write a summary from without making things up. Add a few bullets to a job (Write with AI can turn rough notes into bullets) or list your skills, then try again. This did not use one of today's AI requests.";
+
 /**
  * Drafts a professional summary from the saved CV (Go and Pro). Nothing is
  * saved here: the person reviews the draft and accepts it in the editor.
@@ -538,6 +543,15 @@ export async function requestSummaryDraft(
     throw new HttpError(503, "AI_NOT_CONFIGURED", "OpenAI is not configured on this installation yet.");
   const doc = await getResume(owner, input.documentId);
   if (doc.revision !== input.revision) throw conflict();
+  // A headline and job titles alone are too little to write from without
+  // inventing; say so without spending one of the day's AI requests.
+  const evidence = summaryEvidence(doc);
+  if (!evidence.some((item) => ["bullet", "skills", "education", "project"].includes(item.kind)))
+    return {
+      requestId: input.requestId,
+      text: "",
+      message: THIN_CV_MESSAGE,
+    };
   await reserveDailyRequest(owner, plan.aiRequestsPerDay, plan.name);
   const started = Date.now();
   try {

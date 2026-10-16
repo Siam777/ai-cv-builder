@@ -585,6 +585,8 @@ export function ResumeStudio({
           target.isContentEditable);
 
       // Global Undo/Redo: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y when NOT typing in a field
+      // Browser autofill fires keydown events without a key; ignore those.
+      if (typeof e.key !== "string") return;
       const key = e.key.toLowerCase();
       const redo =
         (e.ctrlKey || e.metaKey) &&
