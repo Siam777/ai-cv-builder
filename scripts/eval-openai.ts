@@ -14,6 +14,13 @@ import {
   SKILLS_PROMPT_VERSION,
   generateInterviewStep,
   INTERVIEW_PROMPT_VERSION,
+  generateJobMatch,
+  JOB_MATCH_PROMPT_VERSION,
+  generateGapLine,
+  GAP_LINE_PROMPT_VERSION,
+  generateTailoring,
+  TAILOR_PROMPT_VERSION,
+  generateImproveAll,
 } from "../src/lib/server/openai-provider";
 import {
   checkStarters,
@@ -37,8 +44,24 @@ import {
   type InterviewOutput,
   type SkillsOutput,
 } from "./lib/phase-b-evaluation";
+import {
+  caseDoc,
+  GAP_CASES,
+  IMPROVE_CASES,
+  improveCaseDoc,
+  MATCH_CASES,
+  MODE_CASES,
+  modeCaseDoc,
+  modeSelection,
+  PHASE_C_HARNESS_VERSION,
+  rawMatch,
+  TAILOR_CASES,
+  type GapOutput,
+  type ImproveOutput,
+  type TailorOutput,
+} from "./lib/phase-c-evaluation";
 
-const SUITES = ["rewrite", "entry", "starters", "skills", "interview"] as const;
+const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve"] as const;
 type Suite = (typeof SUITES)[number];
 
 async function main() {
@@ -47,7 +70,7 @@ async function main() {
   const suiteArg = args.find((arg) => arg.startsWith("--suite="));
   if (args.some((arg) => arg !== "--save" && arg !== suiteArg))
     throw new Error(
-      "Use --suite=rewrite,entry,starters,skills,interview (default: all) and optionally --save.",
+      "Use --suite=rewrite,entry,starters,skills,interview,match,improve (default: all) and optionally --save.",
     );
   const suites = (suiteArg?.split("=")[1].split(",") ?? [...SUITES]) as Suite[];
   if (!suites.length || suites.some((suite) => !SUITES.includes(suite)))
@@ -57,26 +80,33 @@ async function main() {
       "Set OPENAI_API_KEY privately in .env.local before running live evaluations.",
     );
   // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 12 (entry)
-  // + 6 (starters) + 12 (skills) + 6 (interview) = 44 paid API calls, with no retries.
+  // + 6 (starters) + 12 (skills) + 6 (interview) + 24 (match) + 12 (improve)
+  // = 80 paid API calls, with no retries.
   console.log(
-    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
+    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
   let failures = suites.includes("rewrite") ? await rewriteSuite() : 0;
   const entry = suites.includes("entry") ? await entrySuite() : null;
   const starters = suites.includes("starters") ? await startersSuite() : null;
   const skills = suites.includes("skills") ? await skillsSuite() : null;
   const interview = suites.includes("interview") ? await interviewSuite() : null;
+  const match = suites.includes("match") ? await matchSuite() : null;
+  const improve = suites.includes("improve") ? await improveSuite() : null;
   failures +=
     (entry?.failures ?? 0) +
     (starters?.failures ?? 0) +
     (skills?.failures ?? 0) +
-    (interview?.failures ?? 0);
+    (interview?.failures ?? 0) +
+    (match?.failures ?? 0) +
+    (improve?.failures ?? 0);
   const phaseB = Boolean(skills || interview);
+  const phaseC = Boolean(match || improve);
   const phaseA = Boolean(entry || starters);
   const report = {
     harnessVersions: [
       ...(phaseA ? [PHASE_A_HARNESS_VERSION] : []),
       ...(phaseB ? [PHASE_B_HARNESS_VERSION] : []),
+      ...(phaseC ? [PHASE_C_HARNESS_VERSION] : []),
     ],
     model: openAIModel(),
     promptVersions: [
@@ -85,6 +115,9 @@ async function main() {
       STARTERS_PROMPT_VERSION,
       SKILLS_PROMPT_VERSION,
       INTERVIEW_PROMPT_VERSION,
+      JOB_MATCH_PROMPT_VERSION,
+      GAP_LINE_PROMPT_VERSION,
+      TAILOR_PROMPT_VERSION,
     ],
     ranAt: new Date().toISOString(),
     prices: { ...tokenPrices(), unit: "USD per million tokens" },
@@ -92,11 +125,16 @@ async function main() {
     starters: starters && costSummary(starters.usages),
     skills: skills && costSummary(skills.usages),
     interview: interview && costSummary(interview.usages),
+    jobMatch: match && costSummary(match.matchUsages),
+    gapLine: match && costSummary(match.gapUsages),
+    tailor: match && costSummary(match.tailorUsages),
+    improveAll: improve && costSummary(improve.improveUsages),
+    continueOrSelection: improve && costSummary(improve.modeUsages),
     failures,
   };
   console.log(JSON.stringify(report, null, 2));
-  if (args.includes("--save") && (phaseA || phaseB)) {
-    const phase = phaseA && phaseB ? "phase-a-b" : phaseA ? "phase-a" : "phase-b";
+  if (args.includes("--save") && (phaseA || phaseB || phaseC)) {
+    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c"].filter(Boolean).join("-")}`;
     const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-${phase}-live.json`;
     await mkdir("docs/plans/evaluations", { recursive: true });
     await writeFile(
@@ -109,6 +147,8 @@ async function main() {
             ...(starters?.rows ?? []),
             ...(skills?.rows ?? []),
             ...(interview?.rows ?? []),
+            ...(match?.rows ?? []),
+            ...(improve?.rows ?? []),
           ],
         },
         null,
@@ -309,6 +349,159 @@ async function interviewSuite() {
     console.log(JSON.stringify(line));
   }
   return { failures, usages, rows };
+}
+
+/** Runs one case, records usage, raw and filtered problems; never throws. */
+async function runCase(
+  suite: string,
+  id: string,
+  usage: Usage,
+  work: (transport: typeof fetch, last: { output?: unknown }) => Promise<{ problems: string[]; rawProblems: string[]; output: unknown }>,
+) {
+  const last: { output?: unknown } = {};
+  let raw: unknown;
+  const metering = metered(fetch, usage, last);
+  // Keep the first (draft) answer for raw checks; later calls are support checks.
+  const transport = (async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    const response = await metering(url, init);
+    if (raw === undefined) raw = last.output;
+    return response;
+  }) as typeof fetch;
+  try {
+    const { problems, rawProblems, output } = await work(transport, {
+      get output() {
+        return raw;
+      },
+    });
+    return { failed: problems.length > 0, line: { suite, fixture: id, check: problems.length ? "fail" : "pass", problems, rawProblems, output, usage } };
+  } catch {
+    return { failed: true, line: { suite, fixture: id, result: "provider-or-validation-failure", usage } };
+  }
+}
+
+// Job post matching: job match (1-2 calls), gap lines (1-2), tailoring (1-2).
+async function matchSuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const matchUsages: Usage[] = [];
+  const gapUsages: Usage[] = [];
+  const tailorUsages: Usage[] = [];
+  const record = (result: { failed: boolean; line: unknown }) => {
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  };
+  for (const row of MATCH_CASES) {
+    const usage = emptyUsage();
+    matchUsages.push(usage);
+    const doc = caseDoc();
+    record(
+      await runCase("match", row.id, usage, async (transport, first) => {
+        const result = await generateJobMatch(doc, row.job, transport);
+        const raw = rawMatch(first.output as never, doc);
+        return {
+          problems: row.check(result, doc),
+          rawProblems: raw ? row.check(raw, doc) : ["raw output unreadable"],
+          output: result,
+        };
+      }),
+    );
+  }
+  for (const row of GAP_CASES) {
+    const usage = emptyUsage();
+    gapUsages.push(usage);
+    const doc = caseDoc();
+    record(
+      await runCase("gap", row.id, usage, async (transport, first) => {
+        const result = await generateGapLine(doc, row, transport);
+        const raw = first.output as GapOutput | undefined;
+        return {
+          problems: row.check(result, doc),
+          rawProblems: raw ? row.check(raw, doc) : ["raw output unreadable"],
+          output: result,
+        };
+      }),
+    );
+  }
+  for (const row of TAILOR_CASES) {
+    const usage = emptyUsage();
+    tailorUsages.push(usage);
+    const doc = caseDoc();
+    record(
+      await runCase("tailor", row.id, usage, async (transport, first) => {
+        const result = await generateTailoring(doc, row, transport);
+        const draft = first.output as
+          | { summary: { text: string }; rewrites: TailorOutput["rewrites"] }
+          | undefined;
+        const filtered: TailorOutput = { summary: result.summary?.text ?? "", rewrites: result.rewrites };
+        return {
+          problems: row.check(filtered, doc),
+          rawProblems: draft ? row.check({ summary: draft.summary.text, rewrites: draft.rewrites }, doc) : ["raw output unreadable"],
+          output: result,
+        };
+      }),
+    );
+  }
+  return { failures, rows, matchUsages, gapUsages, tailorUsages };
+}
+
+// Improve all (1-2 calls per case) and Continue / Rewrite selection (1-2 calls).
+async function improveSuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const improveUsages: Usage[] = [];
+  const modeUsages: Usage[] = [];
+  const record = (result: { failed: boolean; line: unknown }) => {
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  };
+  for (const row of IMPROVE_CASES) {
+    const usage = emptyUsage();
+    improveUsages.push(usage);
+    const doc = improveCaseDoc(row);
+    record(
+      await runCase("improve", row.id, usage, async (transport, first) => {
+        const result = await generateImproveAll(
+          doc,
+          "case-bullet-1",
+          "Make these bullets clearer and stronger in wording without adding or strengthening facts.",
+          transport,
+        );
+        const raw = first.output as ImproveOutput | undefined;
+        return {
+          problems: row.check({ rewrites: result.rewrites }, doc),
+          rawProblems: raw ? row.check(raw, doc) : ["raw output unreadable"],
+          output: { rewrites: result.rewrites, withheld: result.withheld, questions: result.questions },
+        };
+      }),
+    );
+  }
+  for (const row of MODE_CASES) {
+    const usage = emptyUsage();
+    modeUsages.push(usage);
+    const doc = modeCaseDoc(row);
+    record(
+      await runCase(row.mode, row.id, usage, async (transport, first) => {
+        const result = await generateRewrite(
+          doc,
+          "case-bullet-1",
+          row.mode === "continue"
+            ? "Finish this half-written bullet. Keep the words already written exactly as they are at the start."
+            : "Rewrite only the selected words so they read more clearly. Keep every other word exactly as written.",
+          transport,
+          { mode: row.mode, selection: modeSelection(row) },
+        );
+        const raw = (first.output as { text?: string } | undefined)?.text;
+        return {
+          problems: row.check(result.text),
+          rawProblems: raw === undefined ? ["raw output unreadable"] : row.check(raw),
+          output: { text: result.text, message: result.message, questions: result.questions },
+        };
+      }),
+    );
+  }
+  return { failures, rows, improveUsages, modeUsages };
 }
 
 // Single-bullet rewrite smoke cases: at most eight paid API calls.

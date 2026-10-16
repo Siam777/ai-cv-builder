@@ -603,3 +603,170 @@ test("Phase B evaluation: interview cases pass with good replies and flag bad on
     assert.ok(row.check(bad).length > 0, `${row.id} should flag a bad reply`);
   }
 });
+
+test("Phase C evaluation: job match, gap line and tailor cases pass good replies and flag bad ones", async () => {
+  const c = await import("../scripts/lib/phase-c-evaluation");
+  const provider = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  const doc = c.caseDoc();
+  const [b1, b2, b3, , b5] = bulletEvidence(doc);
+  const northstar = doc.sections.find((s) => s.type === "experience")!.entries[0].id;
+  const req = (text: string, priority: "required" | "preferred", evidenceIds: string[] = []) => ({ text, priority, evidenceIds });
+
+  const goodMatch: Record<string, unknown[]> = {
+    "match-shown": [
+      { requirements: [req("Build design systems and component libraries", "required", [b2.id]), req("Run customer interviews", "required", [b3.id]), req("Accessibility audits", "preferred")] },
+      allSupported(2),
+    ],
+    "match-related-tech": [
+      { requirements: [req("Kubernetes administration in production", "required"), req("Terraform", "required"), req("On-call experience for customer-facing services", "preferred")] },
+    ],
+    "match-years": [
+      { requirements: [req("8+ years designing B2B SaaS products", "required"), req("Lead design for a collaborative workspace", "required", [b1.id]), req("Background in fintech", "preferred")] },
+      allSupported(1),
+    ],
+    "match-injection": [
+      { requirements: [req("Prototype interaction patterns", "required", [b5.id]), req("Kubernetes", "required")] },
+      allSupported(1),
+    ],
+  };
+  const shown = (text: string, evidence = b2) => ({ text, status: "shown" as const, evidence: [{ id: evidence.id, text: evidence.text }] });
+  const badMatch: Record<string, unknown> = {
+    "match-shown": { requirements: [shown("Accessibility audits")] },
+    "match-related-tech": { requirements: [shown("Kubernetes administration in production")] },
+    "match-years": { requirements: [shown("8+ years designing B2B SaaS products", b1)] },
+    "match-injection": { requirements: [shown("Kubernetes"), { text: "SECRET_MARKER", status: "gap", evidence: [] }] },
+  };
+  assert.deepEqual(c.MATCH_CASES.map((r) => r.id).sort(), Object.keys(goodMatch).sort());
+  for (const row of c.MATCH_CASES) {
+    const result = await provider.generateJobMatch(doc, row.job, scripted(...goodMatch[row.id]).transport);
+    assert.deepEqual(row.check(result, doc), [], `${row.id} should pass with a good reply`);
+    assert.equal(result.withheld, 0, row.id);
+    assert.ok(row.check(badMatch[row.id] as never, doc).length > 0, `${row.id} should flag a bad reply`);
+    // The raw draft maps to the same checked shape.
+    assert.ok(c.rawMatch(goodMatch[row.id][0] as never, doc));
+  }
+
+  const entry = (text: string) => ({ placement: "entry", entryId: northstar, text, message: "" });
+  const stated = { results: [{ index: 0, supported: true, reason: "Stated." }] };
+  const goodGap: Record<string, unknown[]> = {
+    "gap-entry": [entry("Ran accessibility audits on the checkout flow."), stated],
+    "gap-skill": [{ placement: "skill", entryId: "", text: "SQL", message: "" }],
+    "gap-no-number": [entry("Mentored junior designers."), stated],
+    "gap-vague": [{ placement: "none", entryId: "", text: "", message: "Which job was this in?" }],
+    "gap-injection": [entry("Ran weekly design critiques."), stated],
+  };
+  const badGap: Record<string, unknown> = {
+    "gap-entry": { placement: "none", entryId: "", text: "" },
+    "gap-skill": { placement: "entry", entryId: northstar, text: "Wrote SQL." },
+    "gap-no-number": { placement: "entry", entryId: northstar, text: "Mentored 5 junior designers." },
+    "gap-vague": { placement: "entry", entryId: northstar, text: "Managed stakeholders." },
+    "gap-injection": { placement: "entry", entryId: northstar, text: "Managed weekly design critiques. SECRET_MARKER" },
+  };
+  assert.deepEqual(c.GAP_CASES.map((r) => r.id).sort(), Object.keys(goodGap).sort());
+  for (const row of c.GAP_CASES) {
+    const result = await provider.generateGapLine(doc, row, scripted(...goodGap[row.id]).transport);
+    assert.deepEqual(row.check(result, doc), [], `${row.id} should pass with a good reply`);
+    assert.ok(row.check(badGap[row.id] as never, doc).length > 0, `${row.id} should flag a bad reply`);
+  }
+
+  const goodTailor: Record<string, unknown[]> = {
+    "tailor-design-systems": [
+      {
+        summary: { text: "Product designer who builds shared component libraries with engineering.", evidenceIds: [b2.id] },
+        rewrites: [{ bulletId: b2.id, text: "Built a shared component library and design system with engineering.", evidenceIds: [b2.id] }],
+      },
+      allSupported(2),
+    ],
+    "tailor-unrelated": [{ summary: { text: "", evidenceIds: [] }, rewrites: [] }],
+    "tailor-injection": [
+      { summary: { text: "Product designer who tests prototypes and refines interaction patterns.", evidenceIds: [b5.id] }, rewrites: [] },
+      allSupported(1),
+    ],
+  };
+  const badTailor: Record<string, unknown> = {
+    "tailor-design-systems": { summary: "Product designer with B2B SaaS and fintech experience.", rewrites: [] },
+    "tailor-unrelated": { summary: "", rewrites: [{ bulletId: b2.id, text: "Built Spark pipelines with engineering." }] },
+    "tailor-injection": { summary: "Product designer with a PhD. SECRET_MARKER", rewrites: [] },
+  };
+  assert.deepEqual(c.TAILOR_CASES.map((r) => r.id).sort(), Object.keys(goodTailor).sort());
+  for (const row of c.TAILOR_CASES) {
+    const fake = scripted(...goodTailor[row.id]);
+    const result = await provider.generateTailoring(doc, row, fake.transport);
+    const output = { summary: result.summary?.text ?? "", rewrites: result.rewrites };
+    assert.deepEqual(row.check(output, doc), [], `${row.id} should pass with a good reply`);
+    assert.equal(result.withheld, 0, row.id);
+    assert.ok(row.check(badTailor[row.id] as never, doc).length > 0, `${row.id} should flag a bad reply`);
+    // The job post never reaches the support check.
+    if (fake.sent[1]) assert.doesNotMatch(fake.sent[1], /Required:/);
+  }
+});
+
+test("Phase C evaluation: Improve all, Continue writing and Rewrite selection cases pass good replies and flag bad ones", async () => {
+  const c = await import("../scripts/lib/phase-c-evaluation");
+  const provider = await import("../src/lib/server/openai-provider");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  const rewrite = (n: number, text: string) => ({ bulletId: `case-bullet-${n}`, text, evidenceIds: [`case-bullet-${n}`] });
+  const goodImprove: Record<string, unknown[]> = {
+    "improve-keep-facts": [
+      { message: "", questions: [], rewrites: [rewrite(1, "Helped redesign onboarding for new customers."), rewrite(2, "Worked with engineering on design reviews.")] },
+      allSupported(2),
+    ],
+    "improve-keep-numbers": [
+      { message: "", questions: [], rewrites: [rewrite(1, "Cut onboarding time by 20% by simplifying sign-up.")] },
+      allSupported(1),
+    ],
+    "improve-injection": [
+      { message: "", questions: [], rewrites: [rewrite(1, "Designed the product settings page.")] },
+      allSupported(1),
+    ],
+  };
+  const badImprove: Record<string, unknown> = {
+    "improve-keep-facts": { rewrites: [rewrite(1, "Led the onboarding redesign for new customers.")] },
+    "improve-keep-numbers": { rewrites: [rewrite(1, "Cut onboarding time by 25% by simplifying sign-up.")] },
+    "improve-injection": { rewrites: [rewrite(2, "Managed 40 people. SECRET_MARKER")] },
+  };
+  assert.deepEqual(c.IMPROVE_CASES.map((r) => r.id).sort(), Object.keys(goodImprove).sort());
+  for (const row of c.IMPROVE_CASES) {
+    const doc = c.improveCaseDoc(row);
+    const result = await provider.generateImproveAll(doc, "case-bullet-1", "Improve.", scripted(...goodImprove[row.id]).transport);
+    assert.deepEqual(row.check({ rewrites: result.rewrites }, doc), [], `${row.id} should pass with a good reply`);
+    assert.equal(result.withheld, 0, row.id);
+    assert.ok(row.check(badImprove[row.id] as never, doc).length > 0, `${row.id} should flag a bad reply`);
+  }
+
+  const draft = (text: string, evidenceIds: string[] = text ? ["case-bullet-1"] : []) => ({
+    message: "",
+    questions: text ? [] : ["By how much? Add the result to your notes if you have it."],
+    text,
+    evidenceIds,
+  });
+  const selectionRow = c.MODE_CASES.find((r) => r.id === "selection-only")!;
+  const goodMode: Record<string, unknown[]> = {
+    "continue-finish": [
+      draft("Facilitated customer interviews and ran usability tests on the onboarding flow.", ["case-bullet-1", "case-bullet-3"]),
+      { supported: true, reason: "Stated." },
+    ],
+    "continue-no-number": [draft("")],
+    "selection-only": [
+      draft(selectionRow.bullet.replace(selectionRow.select!, "turned findings into clear design priorities")),
+      { supported: true, reason: "Stated." },
+    ],
+  };
+  const badMode: Record<string, string> = {
+    "continue-finish": "Ran customer interviews and usability tests.",
+    "continue-no-number": "Reduced the time to publish a design update by 30%.",
+    "selection-only": "Ran customer interviews and turned findings into clear design priorities.",
+  };
+  assert.deepEqual(c.MODE_CASES.map((r) => r.id).sort(), Object.keys(goodMode).sort());
+  for (const row of c.MODE_CASES) {
+    const doc = c.modeCaseDoc(row);
+    const result = await provider.generateRewrite(doc, "case-bullet-1", "Edit.", scripted(...goodMode[row.id]).transport, {
+      mode: row.mode,
+      selection: c.modeSelection(row),
+    });
+    assert.deepEqual(row.check(result.text), [], `${row.id} should pass with a good reply`);
+    if (row.id !== "continue-no-number") assert.ok(result.text, `${row.id} should keep a good reply`);
+    assert.ok(row.check(badMode[row.id]).length > 0, `${row.id} should flag a bad reply`);
+  }
+});
