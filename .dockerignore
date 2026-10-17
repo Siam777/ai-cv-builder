@@ -1,0 +1,17 @@
+﻿node_modules
+.next
+.git
+.github
+deploy/.env
+deploy/production.env
+deploy/staging.env
+data/
+test-results/
+.env*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.claude
+.agents
+*.tsbuildinfo

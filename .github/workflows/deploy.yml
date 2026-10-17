@@ -1,0 +1,152 @@
+﻿name: Production Deployment to Contabo VPS
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - dev-contabo
+  workflow_dispatch:
+
+concurrency:
+  group: cv-builder-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ── STAGE 1: VERIFY & TEST ──────────────────────────────────────────
+  validate:
+    name: Lint, Typecheck & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Run unit & integration tests
+        run: npm test
+
+      - name: Verify Next.js production build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+  # ── STAGE 2: DEPLOY TO VPS OVER SSH ──────────────────────────────────
+  deploy:
+    name: Deploy to Contabo VPS
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          username: ${{ secrets.SSH_USER || 'deploy' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            echo "=== [1/5] Pulling Latest Commits ==="
+            cd /opt/elfasys/repos/ai-cv-builder
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "=== [2/5] Syncing Environment Configuration ==="
+            if [ -f "/opt/elfasys/config/ai-cv-builder/production.env" ]; then
+              cp /opt/elfasys/config/ai-cv-builder/production.env deploy/production.env
+            fi
+            if [ -f "deploy/production.env" ]; then
+              sed -i '/HTTP_PORT=/d' deploy/production.env 2>/dev/null || true
+              echo "HTTP_PORT=7892" >> deploy/production.env
+              sed -i '/^CV_ENV_FILE=/d' deploy/production.env 2>/dev/null || true
+              echo "CV_ENV_FILE=production.env" >> deploy/production.env
+              chmod 644 deploy/production.env
+            fi
+
+            # Clean up any bogus deploy/.env directory created by docker bind-mount
+            if [ -d "deploy/.env" ]; then
+              sudo rm -rf deploy/.env 2>/dev/null || rm -rf deploy/.env 2>/dev/null || true
+            fi
+            # Sync deploy/.env as well so any fallback to .env works seamlessly
+            if [ -f "deploy/production.env" ]; then
+              cp deploy/production.env deploy/.env
+              chmod 644 deploy/.env
+            fi
+
+            echo "=== [3/5] Ensuring Host Data Directory & Permissions ==="
+            DATA_DIR="/opt/elfasys/data/ai-cv-builder/data"
+            if [ -f "deploy/production.env" ]; then
+              VAL=$(grep -E "^CV_HOST_DATA_DIR=" deploy/production.env | head -n1 | cut -d= -f2- | tr -d '\r"')
+              if [ -n "$VAL" ]; then
+                DATA_DIR="$VAL"
+              fi
+            fi
+            mkdir -p "$DATA_DIR" 2>/dev/null || sudo mkdir -p "$DATA_DIR" 2>/dev/null || true
+            sudo chown -R 10001:10001 "$DATA_DIR" 2>/dev/null || true
+            sudo chmod -R 775 "$DATA_DIR" 2>/dev/null || true
+
+            # Sync Nginx configuration to point to port 7892 if site conf exists
+            if [ -f "/etc/nginx/sites-available/cv.elfasyssolution.com.conf" ]; then
+              sudo sed -i -E "s/127\.0\.0\.1:[0-9]+/127.0.0.1:7892/g" /etc/nginx/sites-available/cv.elfasyssolution.com.conf 2>/dev/null || true
+              sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
+            fi
+
+            echo "=== [4/5] Building & Updating Docker Containers ==="
+            docker compose -p cv-production \
+              --env-file deploy/production.env \
+              -f deploy/docker-compose.yml \
+              -f deploy/compose.vps.yml \
+              stop web 2>/dev/null || true
+            docker compose -p cv-production \
+              --env-file deploy/production.env \
+              -f deploy/docker-compose.yml \
+              -f deploy/compose.vps.yml \
+              rm -f web 2>/dev/null || true
+            if ! docker compose -p cv-production \
+              --env-file deploy/production.env \
+              -f deploy/docker-compose.yml \
+              -f deploy/compose.vps.yml \
+              up -d --build --force-recreate --remove-orphans; then
+              echo "!!! Deployment failed: docker compose up failed. Dumping container logs: !!!"
+              docker compose -p cv-production logs --tail=100 web || true
+              docker compose -p cv-production ps -a || true
+              exit 1
+            fi
+
+            echo "=== [5/5] Verification Health Smoke Test ==="
+            WEB_PORT="7892"
+            echo "Checking web application on port ${WEB_PORT}..."
+            CHECK_SUCCESS=false
+            for i in $(seq 1 8); do
+              if curl -fsS "http://127.0.0.1:${WEB_PORT}/api/healthz"; then
+                CHECK_SUCCESS=true
+                echo ""
+                echo "AI CV Builder is healthy on port ${WEB_PORT}!"
+                break
+              fi
+              echo "Waiting for container to accept traffic (attempt $i/8)..."
+              sleep 3
+            done
+
+            if [ "$CHECK_SUCCESS" != "true" ]; then
+              echo "Failed to connect to health endpoint on port ${WEB_PORT}"
+              docker compose -p cv-production logs --tail=50 web || true
+              exit 1
+            fi
+
+            # End-to-end check through Nginx domain if domain resolves locally
+            curl -fsS -k "https://cv.elfasyssolution.com/api/healthz" 2>/dev/null && echo "Public Nginx domain is live!" || true
+
+            echo "=== AI CV Builder Deployment Successful! ==="

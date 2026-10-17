@@ -1,0 +1,20 @@
+﻿name: ai-cv-builder
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: cv-builder-web:${CV_ENV:-local}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-7892}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+    volumes:
+      - cv-data:/app/data
+
+volumes:
+  cv-data:

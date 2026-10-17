@@ -1,0 +1,17 @@
+﻿# Production compose overlay for Contabo VPS
+# Used with:
+#   docker compose -p cv-production \
+#     --env-file deploy/production.env \
+#     -f deploy/docker-compose.yml \
+#     -f deploy/compose.vps.yml up -d --build
+
+services:
+  web:
+    env_file:
+      - ${CV_ENV_FILE:-production.env}
+    volumes:
+      # Persistent host VPS storage for SQLite database / local files
+      - type: bind
+        source: ${CV_HOST_DATA_DIR:-/opt/elfasys/data/ai-cv-builder/data}
+        target: /app/data
+        read_only: false
