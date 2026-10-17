@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Wand2, X } from "lucide-react";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { AiProgress } from "./AiProgress";
 import { rewriteStatus, REWRITE_STATUS_TEXT, type RewriteStatus } from "@/lib/ai-access";
 import { proposalSchema, type Proposal } from "@/lib/ai-proposals";
 import { REWRITE_INSTRUCTIONS, diffWords } from "@/lib/field-ai";
@@ -247,15 +248,12 @@ export function ImproveAll({
             />
           )}
           {session.stage === "working" && (
-            <div className="field-ai-form">
-              <p role="status">Asking the AI. This can take up to a minute. Nothing changes until you accept.</p>
-              <p className="field-ai-help">Sends the {count} bullets of {target.label}. Contact details are not sent.</p>
-              <div className="field-ai-actions">
-                <button type="button" onClick={() => { controller.current?.abort(); show(null, "Cancelled. Your CV was not changed."); onFinished?.(); }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <AiProgress
+              title={`Improving the bullets of ${target.label}`}
+              steps={["Reading the bullets", "Rewriting each one", "Checking each one says nothing new"]}
+              sends={`Sends the ${count} bullets of ${target.label}. Contact details are not sent.`}
+              onCancel={() => { controller.current?.abort(); show(null, "Cancelled. Your CV was not changed."); onFinished?.(); }}
+            />
           )}
           {session.stage === "review" && (
             <div className="field-ai-form entry-ai-review">

@@ -27,6 +27,8 @@ export async function openFirstCv(
   page: Page,
   collection?: "Practice copies" | "Review older drafts",
 ) {
+  // A reload keeps the open CV (?cv= in the address); start from the list.
+  if (new URL(page.url()).searchParams.has("cv")) await page.goto("/builder");
   if (collection)
     await page
       .getByRole("navigation", { name: "Document collections" })

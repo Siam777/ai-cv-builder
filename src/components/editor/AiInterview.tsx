@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Sparkles, X } from "lucide-react";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { AiProgress } from "./AiProgress";
 import { EntryAi } from "./EntryAi";
 import { rewriteStatus } from "@/lib/ai-access";
 import type { InterviewStepResult } from "@/lib/ai-contract";
@@ -507,6 +508,12 @@ export function AiInterview({
             Sends this answer to OpenAI to sort it into CV items, using your
             words only. Contact details are not sent.
           </p>
+          {working && (
+            <AiProgress
+              title="Sorting your answer into CV items"
+              steps={["Reading your answer", "Sorting it into CV items", "Keeping only your words"]}
+            />
+          )}
           <div className="field-ai-actions">
             <button type="submit" className="primary" disabled={working || !answer.trim()}>
               {working ? "Sorting your answer…" : "Next"}

@@ -12,6 +12,7 @@ import {
 import { Printer, Sparkles, X } from "lucide-react";
 import { useFieldAi } from "../editor/FieldAiContext";
 import { AiBlocked, AiConsent } from "../editor/AiGate";
+import { AiProgress } from "../editor/AiProgress";
 import { rewriteStatus } from "@/lib/ai-access";
 import type { CoverLetterResult } from "@/lib/ai-contract";
 import { accountRequest, CloudRequestError } from "@/lib/cloud-repository";
@@ -230,6 +231,12 @@ export function CoverLetterModal({
                         emphasise; it is never presented as your experience. Sends the job details, your note and
                         your CV text, not your contact details.
                       </p>
+                      {aiState.stage === "working" && (
+                        <AiProgress
+                          title="Writing your cover letter"
+                          steps={["Reading your CV and the job", "Writing the letter", "Checking every claim against your CV"]}
+                        />
+                      )}
                       {aiState.stage === "error" && (
                         <div className="field-ai-note">
                           <p className="field-ai-error" role="alert">{aiState.message}</p>

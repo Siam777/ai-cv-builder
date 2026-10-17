@@ -94,6 +94,8 @@ test("Write with AI turns notes into ticked bullets, shows withheld suggestions 
   await page.route("**/api/ai/entry-bullets", async (route) => {
     const body = route.request().postDataJSON();
     sent.push(body);
+    // Long enough to see the loader.
+    await new Promise((resolve) => setTimeout(resolve, 700));
     await route.fulfill({
       json: {
         requestId: body.requestId,
@@ -143,20 +145,24 @@ test("Write with AI turns notes into ticked bullets, shows withheld suggestions 
     await expect(notes).toBeFocused();
     await notes.fill("handled customer tickets, trained 3 new staff, used Zendesk");
     await card.getByRole("button", { name: "Write bullets" }).click();
+    await expect(card.getByRole("status").filter({ hasText: "Writing bullets from your notes" })).toBeVisible();
+    await expect(card).toContainText("Checking each bullet against your notes");
 
-    await expect(card).toContainText("1 suggestion was withheld");
-    await expect(card).toContainText("number that is not in your notes");
+    await expect(card).toContainText("2 bullets written from your notes");
+    await expect(card).toContainText("1 more suggestion was left out");
+    await expect(card).toContainText("Added a number that is not in your notes.");
     await expect(card).toContainText("How many tickets did you handle a week?");
     await expect(card).toContainText("From your notes:");
-    const add = card.getByRole("button", { name: "Add ticked" });
-    await expect(add).toBeDisabled();
+    // Written bullets start ticked; the button says how many will be added.
+    await expect(card.getByLabel("Add bullet 1")).toBeChecked();
+    await expect(card.getByRole("button", { name: "Add 2 bullets" })).toBeEnabled();
     expect(sent).toHaveLength(1);
     expect(sent[0].notes).toBe("handled customer tickets, trained 3 new staff, used Zendesk");
     expect(JSON.stringify(sent[0])).not.toContain("alex@example.com");
 
-    await card.getByLabel("Add suggestion 2").check();
+    await card.getByLabel("Add bullet 1").uncheck();
     await card.getByRole("textbox", { name: "Suggestion 2" }).fill("Trained 3 new support staff members.");
-    await add.click();
+    await card.getByRole("button", { name: "Add 1 bullet" }).click();
     await expect(card).toContainText("Added 1 bullet. Undo removes it.");
     await expect
       .poll(() => bulletValues(page, job.id))

@@ -129,8 +129,8 @@ test("Build my CV with AI fills a new account CV step by step from the person's 
     await notes.fill("handled customer tickets with Zendesk");
     await interview.getByRole("button", { name: "Write bullets" }).click();
     await expect(interview).toContainText("How many tickets did you handle a week?");
-    await interview.getByLabel("Add suggestion 1").check();
-    await interview.getByRole("button", { name: "Add ticked" }).click();
+    await expect(interview.getByLabel("Add bullet 1")).toBeChecked();
+    await interview.getByRole("button", { name: "Add 1 bullet" }).click();
     await interview.getByRole("button", { name: "Next: education" }).click();
 
     await expect(interview).toContainText("Step 3 of 5");

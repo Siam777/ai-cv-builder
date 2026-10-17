@@ -19,6 +19,7 @@ import {
 import { Menu, type MenuItem } from "./Menu";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { AiProgress } from "./AiProgress";
 import { BlankFiller, blankState, blanksReady, composeBlanks, type BlankState } from "./BlankFiller";
 import {
   type SkillsResult,
@@ -72,6 +73,38 @@ type AiAction =
   | "examples"
   | "ai-skills";
 type BulletAction = "improve" | "shorten" | "continue" | "selection";
+
+/** Loader copy for each AI action. */
+const PROGRESS: Record<AiAction, { title: string; steps: string[] }> = {
+  improve: {
+    title: "Improving this bullet",
+    steps: ["Reading the bullet and this job", "Rewriting it", "Checking it says nothing new"],
+  },
+  shorten: {
+    title: "Shortening this bullet",
+    steps: ["Reading the bullet", "Shortening it", "Checking it says nothing new"],
+  },
+  continue: {
+    title: "Continuing this bullet",
+    steps: ["Reading what you wrote", "Writing the rest", "Checking it says nothing new"],
+  },
+  selection: {
+    title: "Rewriting the selected words",
+    steps: ["Reading the selection", "Rewriting it", "Checking it says nothing new"],
+  },
+  "ai-draft": {
+    title: "Writing a summary from your CV",
+    steps: ["Reading your jobs and skills", "Writing the summary", "Checking every claim against your CV"],
+  },
+  examples: {
+    title: "Finding examples",
+    steps: ["Reading the job title", "Writing examples with blanks for your details"],
+  },
+  "ai-skills": {
+    title: "Suggesting skills",
+    steps: ["Reading your CV", "Finding skills it shows", "Grouping them"],
+  },
+};
 
 const SHORT_STATUS: Partial<Record<RewriteStatus, string>> = {
   checking: "Checking…",
@@ -1073,18 +1106,11 @@ export function FieldAi({
             </div>
           )}
           {session.stage === "working" && (
-            <div className="field-ai-form">
-              <p role="status">
-                Asking the AI. This can take up to a minute. Nothing changes
-                until you accept.
-              </p>
-              <p className="field-ai-help">{sendsText(session.action)}</p>
-              <div className="field-ai-actions">
-                <button type="button" onClick={cancelAsk}>
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <AiProgress
+              {...PROGRESS[session.action]}
+              sends={sendsText(session.action)}
+              onCancel={cancelAsk}
+            />
           )}
           {session.stage === "choose-draft" && (
             <div className="field-ai-form">

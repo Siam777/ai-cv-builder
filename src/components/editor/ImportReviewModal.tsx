@@ -9,6 +9,7 @@ import { labels } from "@/lib/document";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { Sparkles, Undo2, X } from "lucide-react";
+import { AiProgress } from "./AiProgress";
 
 export interface StagedImportData {
   document: ResumeDocument;
@@ -226,6 +227,12 @@ export function ImportReviewModal({
                     sets dates written in the text. Your wording is never changed. Sends the CV text, not
                     your contact details or photo.
                   </p>
+                  {tidyState.stage === "working" && (
+                    <AiProgress
+                      title="Tidying the imported CV"
+                      steps={["Reading the imported text", "Moving items to the right sections", "Checking your wording is unchanged"]}
+                    />
+                  )}
                   {tidyState.stage === "error" && (
                     <div className="field-ai-note">
                       <p className="field-ai-error" role="alert">{tidyState.message}</p>

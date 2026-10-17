@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, CircleCheck, CircleDashed, Sparkles, X } from "lucide-react";
 import { useFieldAi } from "../editor/FieldAiContext";
 import { AiBlocked, AiConsent } from "../editor/AiGate";
+import { AiProgress } from "../editor/AiProgress";
 import { rewriteStatus } from "@/lib/ai-access";
 import type {
   GapLineResult,
@@ -33,7 +34,7 @@ interface Gap {
 type Stage =
   | { stage: "idle" }
   | { stage: "consent"; next: "match" | "tailor" }
-  | { stage: "working"; what: string }
+  | { stage: "working"; what: string; steps: string[] }
   | { stage: "error"; message: string; plans?: boolean };
 
 /**
@@ -93,7 +94,11 @@ export function AiJobMatch({
   }
 
   async function runMatch() {
-    setState({ stage: "working", what: "Reading the job post and your CV…" });
+    setState({
+      stage: "working",
+      what: "Matching the job post with your CV",
+      steps: ["Reading the job post", "Finding where your CV shows each requirement", "Checking every quote against your CV"],
+    });
     setTailor(null);
     try {
       const snapshot = await services.prepare();
@@ -187,7 +192,11 @@ export function AiJobMatch({
 
   async function runTailor() {
     if (!match) return;
-    setState({ stage: "working", what: "Tailoring your summary and bullets…" });
+    setState({
+      stage: "working",
+      what: "Tailoring your summary and bullets",
+      steps: ["Reading the job post and your CV", "Rewording for this job", "Checking nothing new was added"],
+    });
     try {
       const snapshot = await services.prepare();
       const result = (await accountRequest(
@@ -297,7 +306,12 @@ export function AiJobMatch({
           {!ready && (
             <p className="field-ai-help">Add the job title and paste the job post (at least 50 characters) first.</p>
           )}
-          {state.stage === "working" && <p role="status">{state.what} Nothing changes until you accept.</p>}
+          {state.stage === "working" && (
+            <AiProgress
+              title={state.what}
+              steps={state.steps}
+            />
+          )}
           {state.stage === "error" && (
             <div className="field-ai-note">
               <p className="field-ai-error" role="alert">{state.message}</p>

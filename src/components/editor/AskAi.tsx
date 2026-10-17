@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { AiProgress } from "./AiProgress";
 import { rewriteStatus } from "@/lib/ai-access";
 import type { AskAction, AskResult } from "@/lib/ai-contract";
 import { accountRequest, CloudRequestError } from "@/lib/cloud-repository";
@@ -173,6 +174,12 @@ export function AskAi({ onAction }: { onAction: (action: AskAction) => void }) {
               )}
             </div>
           )}
+          {state.stage === "working" && (
+            <AiProgress
+              title="Reading your CV to answer"
+              steps={["Reading your question and CV", "Writing an answer", "Checking every statement against your CV"]}
+            />
+          )}
           <div className="field-ai-actions">
             <button
               type="submit"
@@ -183,7 +190,7 @@ export function AskAi({ onAction }: { onAction: (action: AskAction) => void }) {
             </button>
           </div>
           <p role="status" className="sr-only">
-            {state.stage === "working" ? "Asking the AI." : turns.length ? "Answer ready." : ""}
+            {state.stage !== "working" && turns.length ? "Answer ready." : ""}
           </p>
         </form>
       )}

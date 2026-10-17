@@ -304,6 +304,95 @@ export function ResumeStudio({
     setStatus("Saved in this browser");
   }
 
+  // The address follows the workspace: /builder lists CVs and
+  // /builder?cv=<id>&step=<section> is one CV open at a step. Opening or
+  // leaving a CV adds a history entry, so Back returns to the list; changing
+  // step replaces it, so Refresh keeps your place.
+  const urlRestored = useRef(false);
+  // The CV being opened from the address; the address waits until it is open.
+  const restoringCv = useRef<string | null>(null);
+  const inEditor = Boolean(doc) && !showLibrary && !startVisible;
+  const urlCv = inEditor ? doc!.id : null;
+  const urlStep = inEditor && sectionId !== "contact" ? sectionId : null;
+  useEffect(() => {
+    if (urlRestored.current || status === "Loading") return;
+    urlRestored.current = true;
+    const query = new URLSearchParams(window.location.search);
+    const id = query.get("cv");
+    if (!id) return;
+    const found = documents.find((item) => item.id === id);
+    if (!found) {
+      query.delete("cv");
+      query.delete("step");
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query.size ? `?${query}` : ""}`,
+      );
+      setNotice(
+        documents.length
+          ? "That CV is not in this workspace. Choose one below."
+          : "That CV is not in this workspace.",
+      );
+      return;
+    }
+    restoringCv.current = found.id;
+    select(found);
+    const step = query.get("step");
+    if (step && found.sections.some((section) => section.id === step))
+      setSectionId(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, documents]);
+  useEffect(() => {
+    if (!urlRestored.current) return;
+    if (restoringCv.current) {
+      if (urlCv !== restoringCv.current) return;
+      restoringCv.current = null;
+    }
+    const query = new URLSearchParams(window.location.search);
+    const previousCv = query.get("cv");
+    if (urlCv) query.set("cv", urlCv);
+    else query.delete("cv");
+    if (urlStep) query.set("step", urlStep);
+    else query.delete("step");
+    const next = `${window.location.pathname}${query.size ? `?${query}` : ""}`;
+    if (next === `${window.location.pathname}${window.location.search}`) return;
+    if (previousCv !== urlCv) window.history.pushState(null, "", next);
+    else window.history.replaceState(null, "", next);
+  }, [urlCv, urlStep]);
+  // Back and Forward: open the CV and step in the address, or the list.
+  const onHistory = useRef<() => void>(() => {});
+  onHistory.current = () => {
+    const query = new URLSearchParams(window.location.search);
+    const id = query.get("cv");
+    const found = id ? documents.find((item) => item.id === id) : undefined;
+    if (!found) {
+      setShowStart(false);
+      setShowLibrary(true);
+      return;
+    }
+    const step = query.get("step");
+    const goToStep = () =>
+      setSectionId(
+        step && found.sections.some((section) => section.id === step) ? step : "contact",
+      );
+    if (current.current?.id === found.id) {
+      setShowStart(false);
+      setShowLibrary(false);
+      goToStep();
+      return;
+    }
+    void action(async () => {
+      select(found);
+      goToStep();
+    });
+  };
+  useEffect(() => {
+    const listener = () => onHistory.current();
+    window.addEventListener("popstate", listener);
+    return () => window.removeEventListener("popstate", listener);
+  }, []);
+
   useEffect(() => {
     let active = true;
     repository.current = createRepository();

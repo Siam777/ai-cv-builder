@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Lightbulb, Sparkles, X } from "lucide-react";
 import { useFieldAi } from "./FieldAiContext";
 import { AiBlocked, AiConsent } from "./AiGate";
+import { AiProgress } from "./AiProgress";
 import { BlankFiller, blankState, blanksReady, composeBlanks, type BlankState } from "./BlankFiller";
 import {
   REWRITE_STATUS_TEXT,
@@ -47,6 +48,19 @@ type Session =
     }
   | { stage: "error"; message: string; flow: Flow; plans?: boolean }
   | { stage: "done"; message: string };
+
+/** Identical withheld reasons, counted, so four alike read as one line. */
+function groupReasons(items: { reason: string }[]) {
+  const counts = new Map<string, number>();
+  for (const { reason } of items) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  return [...counts].map(([reason, count]) => ({ reason, count }));
+}
+
+/** "A suggestion said more than your notes support, so it was withheld." → "Said more than your notes support." */
+function shortReason(reason: string) {
+  const core = reason.replace(/^A suggestion /, "").replace(/, so it was withheld\.$/, ".");
+  return core.charAt(0).toUpperCase() + core.slice(1);
+}
 
 const SENIORITY_LABEL: Record<Seniority, string> = {
   entry: "Entry level",
@@ -186,12 +200,12 @@ export function EntryAi({
             id: bullet.id,
             text: bullet.text,
             evidence: bullet.evidence,
-            picked: false,
+            picked: true,
           })),
         },
         result.bullets.length
-          ? `${result.bullets.length} bullets are ready to review. Tick the ones to add.`
-          : "No bullets this time. Read the questions.",
+          ? `${result.bullets.length} bullets written from your notes. Untick any you do not want, then add them.`
+          : "No bullets could be written from these notes. Read what to add.",
       );
     } catch (error) {
       if (!mounted.current || abort.signal.aborted) return;
@@ -323,8 +337,8 @@ export function EntryAi({
               {session.prompts.length > 0 && (
                 <div className="entry-ai-prompts">
                   <p className="field-ai-help">
-                    Use these examples as prompts. Write what you actually did;
-                    only your notes are used.
+                    Use these as prompts. Add your answers to the notes below;
+                    only what you write is used.
                   </p>
                   <ul>
                     {session.prompts.map((prompt) => (
@@ -372,25 +386,32 @@ export function EntryAi({
             </form>
           )}
           {session.stage === "working" && (
-            <div className="field-ai-form">
-              <p role="status">
-                Asking the AI. This can take up to a minute. Nothing changes
-                until you accept.
-              </p>
-              <p className="field-ai-help">
-                {session.flow === "write"
+            <AiProgress
+              title={
+                session.flow === "write"
+                  ? "Writing bullets from your notes"
+                  : `Finding examples for “${title}”`
+              }
+              steps={
+                session.flow === "write"
+                  ? ["Reading your notes", "Writing bullets", "Checking each bullet against your notes"]
+                  : ["Reading the job title", "Writing examples with blanks for your details"]
+              }
+              sends={
+                session.flow === "write"
                   ? "Sends your notes and this entry. Contact details are not sent."
-                  : `Sends only the job title “${title}”.`}
-              </p>
-              <div className="field-ai-actions">
-                <button type="button" onClick={() => close("Cancelled. Your CV was not changed.")}>
-                  Cancel
-                </button>
-              </div>
-            </div>
+                  : `Sends only the job title “${title}”.`
+              }
+              onCancel={() => close("Cancelled. Your CV was not changed.")}
+            />
           )}
           {session.stage === "review" && (
             <div className="field-ai-form entry-ai-review">
+              <p className="entry-ai-summary">
+                {session.bullets.length
+                  ? `${session.bullets.length} bullet${session.bullets.length === 1 ? "" : "s"} written from your notes. Untick any you do not want, edit if needed, then add.`
+                  : "No bullets could be written from these notes yet."}
+              </p>
               {session.result.message && (
                 <p className="field-ai-help">{session.result.message}</p>
               )}
@@ -408,7 +429,7 @@ export function EntryAi({
               )}
               {session.bullets.length > 0 && (
                 <fieldset>
-                  <legend>Tick the bullets to add. You can edit them first.</legend>
+                  <legend className="sr-only">Bullets to add</legend>
                   <ul className="entry-ai-list">
                     {session.bullets.map((bullet, index) => (
                       <li key={bullet.id}>
@@ -428,7 +449,7 @@ export function EntryAi({
                               })
                             }
                           />
-                          Add suggestion {index + 1}
+                          Add bullet {index + 1}
                         </label>
                         <textarea
                           aria-label={`Suggestion ${index + 1}`}
@@ -458,28 +479,40 @@ export function EntryAi({
                 <div className="entry-ai-withheld">
                   <p>
                     <strong>
-                      {session.result.withheld.length} suggestion
-                      {session.result.withheld.length === 1 ? " was" : "s were"} withheld
-                    </strong>
+                      {session.result.withheld.length} more suggestion
+                      {session.result.withheld.length === 1 ? " was" : "s were"} left out
+                    </strong>{" "}
+                    to keep your CV accurate:
                   </p>
                   <ul>
-                    {session.result.withheld.map((item, index) => (
-                      <li key={index}>{item.reason}</li>
+                    {groupReasons(session.result.withheld).map(({ reason, count }) => (
+                      <li key={reason}>
+                        {shortReason(reason)}
+                        {count > 1 ? ` (${count})` : ""}
+                      </li>
                     ))}
                   </ul>
+                  <p className="field-ai-help">
+                    Add more detail to your notes (what you built, tools, who it was for, results) and try again.
+                  </p>
                 </div>
               )}
               {session.result.questions.length > 0 && (
                 <div className="entry-ai-questions">
                   <p>
-                    <strong>Questions to make it stronger</strong> (add the
-                    answers to your notes and try again):
+                    <strong>Make it stronger:</strong> answer these in your notes, then write again.
                   </p>
                   <ul>
                     {session.result.questions.map((question) => (
                       <li key={question}>{question}</li>
                     ))}
                   </ul>
+                  <button
+                    type="button"
+                    onClick={() => show({ stage: "notes", prompts: session.result.questions })}
+                  >
+                    Answer in my notes
+                  </button>
                 </div>
               )}
               <p className="field-ai-help">
@@ -503,10 +536,14 @@ export function EntryAi({
                     finish(picked.length, Boolean(newTitle));
                   }}
                 >
-                  <Check size={16} aria-hidden /> Add ticked
+                  <Check size={16} aria-hidden />{" "}
+                  {(() => {
+                    const n = session.bullets.filter((b) => b.picked && b.text.trim()).length;
+                    return n ? `Add ${n} bullet${n === 1 ? "" : "s"}` : session.useTitle ? "Add the title" : "Add";
+                  })()}
                 </button>
                 <button type="button" onClick={() => show({ stage: "notes", prompts: [] })}>
-                  Change notes
+                  Edit my notes
                 </button>
                 <button type="button" onClick={() => close("Kept your entry. Nothing changed.")}>
                   <X size={16} aria-hidden /> Keep mine
