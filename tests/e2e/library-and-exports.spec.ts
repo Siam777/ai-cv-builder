@@ -1,9 +1,10 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import { expect, test } from "@playwright/test";
 import { createDocument } from "../../src/lib/document";
 import { readFile } from "node:fs/promises";
 import {
   authenticateForExport,
+  grantPaidPlan,
   openFirstCv,
   startSampleResume,
   verifyTestEmail,
@@ -16,7 +17,7 @@ test("render failure preserves the draft without falling back to print", async (
   await page.route("**/api/exports", route => route.fulfill({ status: 503, json: { error: "RENDER_FAILED", message: "Renderer unavailable. Retry export." } }));
   let downloads = 0;
   page.on("download", () => downloads++);
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page.getByRole("button", { name: "PDF Document (.pdf)" }).click();
   await expect(page.locator(".alert")).toContainText("Renderer unavailable");
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("Alex Morgan");
@@ -25,19 +26,18 @@ test("render failure preserves the draft without falling back to print", async (
 });
 
 test("cover letter copy requires sign-in and Markdown uses reviewed edits", async ({ page }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "✉️ Cover letter" }).click();
-  await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
+  await editorTool(page, "Cover letter");
+  await page.getByRole("button", { name: /Quick draft \(template\)/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   await page.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect(page.locator(".account-panel")).toBeVisible();
   await page.getByRole("button", { name: "Close account settings" }).click();
   await authenticateForExport(page);
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "✉️ Cover letter" }).click();
-  await page.getByRole("button", { name: /Generate Grounded Cover Letter/ }).click();
+  await editorTool(page, "Cover letter");
+  await page.getByRole("button", { name: /Quick draft \(template\)/ }).click();
   await page.locator(".letterhead-editable-body").fill("Reviewed letter with only my supported experience.");
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: /Download.*md/ }).click();
@@ -48,15 +48,15 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   page,
 }) => {
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Browse demo examples" }).click();
+  await page.getByRole("button", { name: "Browse example CVs" }).click();
   await page.locator(".demo-profile-card").first().getByRole("button").click();
   await expect(page.getByRole("dialog")).toContainText("Read-only example");
   await page.getByRole("button", { name: "Close demo gallery" }).click();
   await expect(page.locator(".library-card")).toHaveCount(0);
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(page.locator(".library-card")).toHaveCount(0);
-  await page.getByRole("button", { name: "Browse demo examples" }).click();
+  await page.getByRole("button", { name: "Browse example CVs" }).click();
   await page.locator(".demo-profile-card").first().getByRole("button").click();
   await page.getByRole("button", { name: "Use this design" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
@@ -66,7 +66,7 @@ test("demo preview never saves; using its design creates a blank personal CV", a
   await page.getByLabel("Full name", { exact: true }).fill("My own identity");
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "On this device" })
+    .getByRole("button", { name: "My CVs" })
     .click();
   await expect(page.locator(".library-card")).toHaveCount(1);
   await expect(page.locator(".library-card")).toContainText("My own identity");
@@ -86,7 +86,7 @@ test("legacy records retain content and require explicit classification; practic
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const { provenance: _, ...legacy } = createDocument(true);
   legacy.contact.name = "Preserved legacy identity";
   await page.evaluate(async (document) => {
@@ -106,7 +106,7 @@ test("legacy records retain content and require explicit classification; practic
     });
   }, legacy);
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await expect(page.locator(".library-card")).toHaveCount(0);
   await page.getByRole("button", { name: /Review older drafts 1/ }).click();
   await expect(page.locator(".library-card")).toContainText(
@@ -125,17 +125,15 @@ test("legacy records retain content and require explicit classification; practic
   await expect(
     page.getByRole("article", { name: "Resume preview" }),
   ).toContainText("Northstar");
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Create practice example" }).click();
+  await editorTool(page, "Practice CV (fictional)");
   await page
     .getByRole("button", { name: "Create fictional practice CV" })
     .click();
-  await expect(page.locator(".document-context")).toContainText("Practice");
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Duplicate", exact: true }).click();
+  await expect(page.locator(".cv-kind")).toContainText("Practice");
+  await editorTool(page, "Duplicate");
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "On this device" })
+    .getByRole("button", { name: "My CVs" })
     .click();
   await expect(page.locator(".library-card")).toHaveCount(1);
   await page.getByRole("button", { name: /Practice copies 2/ }).click();
@@ -150,7 +148,7 @@ test("signed-out export preserves edits and resumes chosen format after sign-in"
   await page
     .getByLabel("Full name", { exact: true })
     .fill("Draft kept through sign-in");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page
     .getByRole("button", { name: "Backup (.json)", exact: true })
     .click();
@@ -182,7 +180,7 @@ test("signed-out export preserves edits and resumes chosen format after sign-in"
     headers: { origin: (process.env.E2E_ORIGIN || "http://localhost:3100") },
     data: { action: "signout" },
   });
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
   await expect(page.locator(".account-panel")).toBeVisible();
 });
@@ -230,7 +228,10 @@ test("all export formats enforce sessions, ownership, consent and current revisi
     const otherUser = (await (await other.get("/api/account")).json()).user;
     await verifyTestEmail(other, otherUser.email);
     expect((await anon.get(`/api/billing/mock-success?user_id=${user.id}&plan_id=lifetime`)).status()).toBe(410);
-    expect((await (await page.request.get("/api/billing/subscription")).json()).subscription.entitlements.watermark_free_export).toBe(false);
+    // The legacy simulation URL grants nothing: this new account keeps only the beta's Go period.
+    const { subscription } = await (await page.request.get("/api/billing/subscription")).json();
+    expect(subscription.planId).not.toBe("pro");
+    expect(subscription.stripeSubscriptionId).toBeNull();
     for (const data of requests) {
       expect((await other.post("/api/exports", { headers: { ...headers, "X-Workspace-User": otherUser.id }, data })).status()).toBe(404);
       expect(

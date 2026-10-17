@@ -1,15 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 
 export function PhotoUploader({
   value,
   disabled,
+  templateName,
+  photoSupported,
+  photoHidden,
   onChange,
+  onSwitchDesign,
+  onKeepDesign,
 }: {
   value: string;
   disabled: boolean;
+  templateName: string;
+  photoSupported: boolean;
+  photoHidden: boolean;
   onChange: (value: string) => void;
+  onSwitchDesign?: () => void;
+  onKeepDesign: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const generation = useRef(0);
@@ -88,9 +99,7 @@ export function PhotoUploader({
             className="avatar-thumbnail"
           />
         ) : (
-          <span className="avatar-placeholder" aria-hidden="true">
-            📷
-          </span>
+          <Camera className="avatar-placeholder" size={28} aria-hidden />
         )}
       </div>
       <div className="photo-upload-actions">
@@ -98,8 +107,8 @@ export function PhotoUploader({
           Add a photo <span>(optional)</span>
         </h3>
         <p className="photo-hint">
-          Choose a JPG, PNG or WebP, up to 5 MB. Use a design that supports
-          photos, such as Modern. Word and text exports omit it.
+          Choose a JPG, PNG or WebP, up to 5 MB. Only some designs show a
+          photo. Word and text exports leave it out.
         </p>
         <div className="photo-buttons-row">
           <button
@@ -139,9 +148,37 @@ export function PhotoUploader({
             {error}
           </p>
         )}
-        {value && (
+        {value && !photoSupported && !photoHidden && (
+          <div className="photo-design-warning" role="status">
+            <p>
+              Your current design ({templateName}) doesn&apos;t show photos.
+            </p>
+            <div className="photo-buttons-row">
+              {onSwitchDesign && (
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={disabled}
+                  onClick={onSwitchDesign}
+                >
+                  Switch to a photo design
+                </button>
+              )}
+              <button type="button" disabled={disabled} onClick={onKeepDesign}>
+                Keep design without photo
+              </button>
+            </div>
+          </div>
+        )}
+        {value && photoSupported && !photoHidden && (
           <p role="status" className="helper-text">
-            Photo added. Use Preview resume to check your design.
+            Photo added. It shows on your CV preview.
+          </p>
+        )}
+        {value && photoHidden && (
+          <p role="status" className="helper-text">
+            Photo saved but hidden on your CV. Upload it again or turn on the
+            photo in Design to show it.
           </p>
         )}
       </div>

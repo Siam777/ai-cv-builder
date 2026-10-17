@@ -19,6 +19,22 @@ import {
   type ResumeDocument,
   type Section,
 } from "@/lib/document";
+import { BookOpen, FolderOpen, GraduationCap, Handshake, Lightbulb, Mic, Sparkles, Star, Trash2, Trophy, X, type LucideIcon } from "lucide-react";
+
+const PRESET_ICONS: Record<string, LucideIcon> = {
+  volunteer: Handshake,
+  publications: BookOpen,
+  speaking: Mic,
+  awards: Trophy,
+  patents: Lightbulb,
+  teaching: GraduationCap,
+  leadership: Star,
+};
+
+function PresetIcon({ id }: { id: string }) {
+  const Icon = PRESET_ICONS[id] ?? Sparkles;
+  return <Icon className="preset-icon" size={22} aria-hidden />;
+}
 
 export interface AddSectionModalProps {
   isOpen: boolean;
@@ -128,7 +144,7 @@ export function AddSectionModal({
             aria-label="Close dialog"
             onClick={onClose}
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -186,7 +202,7 @@ export function AddSectionModal({
                       className={`preset-card ${isAlreadyAdded ? "already-added" : ""}`}
                     >
                       <div className="preset-card-header">
-                        <span className="preset-icon">{preset.icon}</span>
+                        <PresetIcon id={preset.id} />
                         <div>
                           <h3 className="preset-title">{preset.label}</h3>
                           <p className="preset-desc">{preset.description}</p>
@@ -226,11 +242,11 @@ export function AddSectionModal({
 
               {libraryItems.length === 0 && reusableFromDocs.length === 0 ? (
                 <div className="empty-library-state">
-                  <span className="empty-icon">📂</span>
+                  <FolderOpen className="empty-icon" size={32} aria-hidden />
                   <h3>No saved sections yet</h3>
                   <p>
                     When editing any custom section, click{" "}
-                    <strong>“💾 Save”</strong> in the section controls to save it
+                    <strong>Save</strong> in the section controls to save it
                     here for reuse across all your resumes.
                   </p>
                 </div>
@@ -264,9 +280,10 @@ export function AddSectionModal({
                           type="button"
                           className="btn-delete-sm"
                           title="Delete from library"
+                          aria-label="Delete from library"
                           onClick={(e) => handleDeleteLibraryItem(e, item.id)}
                         >
-                          ×
+                          <Trash2 size={14} aria-hidden />
                         </button>
                       </div>
                     </div>

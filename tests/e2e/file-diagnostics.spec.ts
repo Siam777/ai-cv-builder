@@ -34,8 +34,11 @@ test("editor compares an authorized PDF and DOCX without changing the CV; upload
       buffer: await response.body(),
     });
   }
-  await page.getByRole("button", { name: "Review writing" }).click();
-  const dialog = page.getByRole("dialog", { name: "Resume content review" });
+  await page.getByRole("button", { name: /^Check/ }).click();
+  // The panel is docked on wide screens and a sheet on phones; the id is stable.
+  const dialog = page.locator("#side-panel");
+  await expect(dialog).toHaveAccessibleName("Check my CV");
+  await dialog.getByRole("button", { name: /^Advanced/ }).click();
   await dialog
     .getByRole("button", { name: "File diagnostics", exact: true })
     .click();
@@ -75,11 +78,11 @@ test("editor compares an authorized PDF and DOCX without changing the CV; upload
     .scrollIntoViewIfNeeded();
   expect(
     await dialog
-      .locator(".ats-content")
+      .locator(".check-panel")
       .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
   await page.screenshot({ path: "test-results/file-diagnostics-mobile.png" });
-  await dialog.getByRole("button", { name: "Done" }).click();
+  await dialog.getByRole("button", { name: "Close Check my CV" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     doc.contact.name,
   );

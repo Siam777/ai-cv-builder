@@ -7,8 +7,12 @@ import {
   requireSameOrigin,
 } from "@/lib/server/http";
 import { auth, authorized, origin } from "@/lib/server/auth";
-import { emailDeliveryMode } from "@/lib/server/auth-email";
+import {
+  emailDeliveryMode,
+  exportVerificationSatisfied,
+} from "@/lib/server/auth-email";
 import { googleProvider } from "@/lib/server/google-config";
+import { getAiConsent, setAiConsent } from "@/lib/server/ai-consent";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   return handle(async () => {
@@ -22,7 +26,9 @@ export async function GET(request: Request) {
         ? {
             id: value.user.id,
             email: value.user.email,
+            name: value.user.name,
             emailVerified: value.user.emailVerified,
+            canExport: exportVerificationSatisfied(value.user.emailVerified),
           }
         : null,
       emailDelivery: emailDeliveryMode(),
@@ -32,7 +38,20 @@ export async function GET(request: Request) {
         (account) => account.providerId === "credential",
       ),
       canDeleteAccount: true,
+      aiWritingHelp: value ? (await getAiConsent(value.user.id)).enabled : false,
     });
+  });
+}
+/** Account settings outside sign-in: the AI writing help switch (one-time AI consent). */
+export async function PATCH(request: Request) {
+  return handle(async () => {
+    requireSameOrigin(request, origin());
+    const { user } = await authorized(request);
+    const body = z
+      .strictObject({ aiWritingHelp: z.boolean() })
+      .parse(await readJson(request, 1024));
+    const consent = await setAiConsent(user.id, body.aiWritingHelp);
+    return json({ aiWritingHelp: consent.enabled });
   });
 }
 export async function DELETE(request: Request) {

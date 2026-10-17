@@ -1,0 +1,20 @@
+/* The single global stylesheet entry. @import keeps the cascade order fixed in
+   development and production builds; separate imports in layout.tsx did not.
+   templates.css and resume-fonts.css are also read by the HTML exporter. */
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/dialogs.css";
+@import "./styles/app-shell.css";
+@import "./styles/library.css";
+@import "./styles/editor.css";
+@import "./styles/design-panel.css";
+@import "./styles/account.css";
+@import "./styles/ai.css";
+@import "./styles/check.css";
+@import "./styles/billing.css";
+@import "./styles/grader.css";
+@import "./styles/score.css";
+@import "./styles/editor-shell.css";
+@import "./styles/print.css";
+@import "./templates.css";
+@import "./resume-fonts.css";

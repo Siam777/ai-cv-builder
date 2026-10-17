@@ -129,7 +129,7 @@ test("print uses the authenticated server-rendered document", async ({
   await page
     .getByLabel("Full name", { exact: true })
     .fill("Current print revision");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const response = page.waitForResponse(
     (r) => r.url().endsWith("/api/exports") && r.request().method() === "POST",
   );
@@ -156,7 +156,7 @@ for (const template of templates)
     fixture.presentation.font = template.id === "classic" ? "serif" : "sans";
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await page.getByLabel("Import JSON backup").setInputFiles({
       name: "fixture.json",
@@ -165,7 +165,7 @@ for (const template of templates)
     });
     await page.getByRole("button", { name: "Restore as new" }).click();
     await authenticateForExport(page);
-    await page.getByRole("button", { name: "Design & templates" }).click();
+    await page.getByRole("button", { name: "Design", exact: true }).click();
     const expectedShort = layoutBlocks(fixture)
       .map((b) => b.text)
       .join("");
@@ -235,14 +235,14 @@ test("design switching persists without changing facts; hidden mobile editor pag
   fixture.sections.reverse();
   fixture.sections[0].visible = false;
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByLabel("Import JSON backup").setInputFiles({
     name: "facts.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(fixture)),
   });
   await page.getByRole("button", { name: "Restore as new" }).click();
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   for (const template of templates) {
     await page
       .getByRole("button", { name: `${template.name} template`, exact: true })
@@ -265,10 +265,10 @@ test("design switching persists without changing facts; hidden mobile editor pag
     );
   }
   await page.getByLabel("Accent color").selectOption("rust");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page, "Practice copies");
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   const lastTemplate = templates.at(-1)!;
   await expect(
     page.getByRole("button", {
@@ -278,8 +278,8 @@ test("design switching persists without changing facts; hidden mobile editor pag
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Resume font")).toHaveValue("humanist");
   await expect(page.getByLabel("Accent color")).toHaveValue("rust");
-  await page.getByRole("button", { name: "Close design dialog" }).click();
-  await page.locator("summary").click();
+  await page.getByRole("button", { name: "Close Design" }).click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const downloading = page.waitForEvent("download");
   await page
@@ -318,7 +318,7 @@ test("RTL reading direction adjusts layout and preview styles", async ({
   await expect(page.locator(".paginated-resume")).not.toHaveClass(/rtl/);
 
   // Open Design & templates panel
-  await page.getByRole("button", { name: "Design & templates" }).click();
+  await page.getByRole("button", { name: "Design", exact: true }).click();
   await expect(page.getByLabel("Reading direction")).toHaveValue("ltr");
 
   // Switch to RTL

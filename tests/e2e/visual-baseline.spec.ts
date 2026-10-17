@@ -1,9 +1,9 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import { test, expect } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
-import { verifyTestEmail } from "./helpers";
+import { grantPaidPlan, verifyTestEmail } from "./helpers";
 
 // A current-state baseline, not a pixel snapshot or accessibility certification.
 // Only synthetic data and the isolated local test server are used.
@@ -12,6 +12,8 @@ for (const width of [360, 768, 1440]) {
     page,
   }) => {
     test.setTimeout(180_000);
+    // Paid plan, so the cover letter and coaching states are captured.
+    await grantPaidPlan(page);
     await page.setViewportSize({ width, height: 1000 });
     page.setDefaultTimeout(10_000);
     const directory = `test-results/visual-baseline/${width}`;
@@ -91,7 +93,7 @@ for (const width of [360, 768, 1440]) {
 
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await page.goto("/auth/complete");
     await expect(
@@ -102,10 +104,10 @@ for (const width of [360, 768, 1440]) {
     await capture("verification-without-session", true);
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("library-empty", true);
-    await page.getByRole("button", { name: "Browse demo examples" }).click();
+    await page.getByRole("button", { name: "Browse example CVs" }).click();
     await capture("demo-gallery");
     await page
       .locator(".demo-profile-card")
@@ -147,9 +149,12 @@ for (const width of [360, 768, 1440]) {
         .getByRole("button", { name: "Edit details", exact: true })
         .click();
     }
-    await openAndCapture("Design & templates", "design-gallery");
+    await page.getByRole("button", { name: "Design", exact: true }).click();
+    await expect(page.locator("#side-panel")).toHaveAccessibleName("Design");
+    await capture("design-gallery");
+    await page.getByRole("button", { name: "Close Design" }).click();
     const upgrade = page.getByRole("button", {
-      name: "⭐ Upgrade",
+      name: "Upgrade",
       exact: true,
     });
     if (await upgrade.isVisible()) {
@@ -160,21 +165,25 @@ for (const width of [360, 768, 1440]) {
       await capture("pricing-dialog");
       await page.getByRole("button", { name: "Close pricing dialog" }).click();
     }
-    await openEditorTools(page);
+    await editorTool(page, "Check");
     await page
-      .getByRole("button", { name: "📊 Role Benchmark & Gaps", exact: true })
+      .getByRole("tab", { name: "Compare with a role" })
       .click();
     await capture("analyzer-confirmation");
     await page
       .getByRole("button", { name: "Review selected checklist" })
       .click();
     await capture("analyzer-role");
-    await page.getByRole("button", { name: /Writing findings/ }).click();
+    await page.getByRole("tab", { name: /To fix/ }).click();
     await capture("analyzer-findings");
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page.getByRole("button", { name: "Document text view" }).click();
     await capture("analyzer-text");
-    await page.getByRole("button", { name: "Done", exact: true }).click();
-    await openAndCapture("Create practice example", "practice-generator");
+    await page.getByRole("button", { name: "Close Check my CV" }).click();
+    await editorTool(page, "Practice CV (fictional)");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await capture("practice-generator");
+    await closeDialog();
     await openAndCapture(/Add section/, "add-section");
     await page.keyboard.press("?");
     await expect(
@@ -182,15 +191,13 @@ for (const width of [360, 768, 1440]) {
     ).toBeVisible();
     await capture("keyboard-shortcuts");
     await closeDialog();
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "⏱️ History", exact: true }).click();
+    await editorTool(page, "History");
     await capture("history-empty");
     await page.getByRole("button", { name: "+ Save Checkpoint" }).click();
     await expect(page.locator(".snapshots-list")).toBeVisible();
     await capture("history-saved");
     await closeDialog();
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+    await editorTool(page, "Match a job");
     await capture("tailor-input");
     await page.getByLabel("Target Job Title").fill("Product Designer");
     await page.getByLabel("Use this target role, seniority and language").check();
@@ -206,42 +213,30 @@ for (const width of [360, 768, 1440]) {
       .click();
     await expect(page.getByRole("region", {name:"Requirement coverage"})).toBeVisible();
     await capture("tailor-results");
-    await closeDialog();
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "✉️ Cover letter" }).click();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
+    await editorTool(page, "Cover letter");
     await capture("letter-input");
     await page
-      .getByRole("button", { name: /Generate Grounded Cover Letter/ })
+      .getByRole("button", { name: /Quick draft \(template\)/ })
       .click();
     await expect(
       page.getByRole("button", { name: "Adjust Inputs" }),
     ).toBeVisible();
     await capture("letter-review");
-    await page.getByRole("button", { name: "Done", exact: true }).click();
-    await openEditorTools(page);
-    await page
-      .getByRole("button", { name: "AI bullet assistant", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
+    await editorTool(page, "Writing help");
     await capture("ai-signin-gate", true);
-    await page.getByRole("button", { name: "Close AI assistant" }).click();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
     await page.locator(".export-menu summary").click();
     await capture("export-menu");
     await page.getByRole("button", { name: "Plain text (.txt)" }).click();
     await expect(
-      page.getByRole("region", { name: "Account and storage" }),
+      page.getByRole("region", { name: "Account settings" }),
     ).toBeVisible();
     await capture("export-signin", true);
     await page.getByRole("button", { name: "Close account settings" }).click();
-    const libraryShortcut = page.getByRole("button", {
-      name: "My library",
-      exact: true,
-    });
-    if (await libraryShortcut.isVisible()) await libraryShortcut.click();
-    else
-      await page
-        .getByRole("navigation", { name: "Main navigation" })
-        .getByRole("button", { name: "On this device", exact: true })
-        .click();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: /^My CVs/ }).click();
     await capture("library-populated", true);
 
     await page.goto("/profile");
@@ -287,7 +282,7 @@ for (const width of [360, 768, 1440]) {
     await page.goto("/upgrade");
     await capture("pricing", true);
     await page
-      .getByRole("button", { name: "Upgrade to Job Hunter Pass ↗" })
+      .getByRole("button", { name: "Choose Go" })
       .click();
     await expect(page.locator(".upgrade-alert")).toContainText(
       /configured|unavailable/i,

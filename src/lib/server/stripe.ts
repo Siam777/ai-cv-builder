@@ -9,11 +9,12 @@ export const stripe = new Stripe(stripeKey, {
   typescript: true,
 });
 
-export const STRIPE_PRICE_IDS: Record<string, string> = {
-  job_hunter_weekly: process.env.STRIPE_PRICE_WEEKLY || "price_mock_weekly",
-  job_hunter_monthly: process.env.STRIPE_PRICE_MONTHLY || "price_mock_monthly",
-  lifetime: process.env.STRIPE_PRICE_LIFETIME || "price_mock_lifetime",
-};
+/** Stripe monthly price IDs for the paid tiers. */
+export function stripePriceId(planId: PlanId) {
+  if (planId === "go") return process.env.STRIPE_PRICE_GO?.trim() || "";
+  if (planId === "pro") return process.env.STRIPE_PRICE_PRO?.trim() || "";
+  return "";
+}
 
 /**
  * Creates a Stripe Checkout Session only when billing is configured.
@@ -34,17 +35,16 @@ export async function createBillingCheckoutSession(params: {
   if (!plan) throw new Error("Invalid plan specified.");
 
   const secretKey = process.env.STRIPE_SECRET_KEY || "";
+  const priceId = stripePriceId(planId);
   const isRealStripe =
-    Boolean(secretKey) &&
-    (secretKey.startsWith("sk_live_") ||
-      (secretKey.startsWith("sk_test_") && Boolean(process.env.STRIPE_PRICE_MONTHLY)));
+    (secretKey.startsWith("sk_live_") || secretKey.startsWith("sk_test_")) &&
+    Boolean(priceId);
 
   if (!isRealStripe) {
     throw new HttpError(503, "BILLING_NOT_CONFIGURED", "Checkout is not available on this installation. No payment or subscription change was made.");
   }
 
-  const priceId = STRIPE_PRICE_IDS[planId];
-  const mode = plan.cadence === "one-time" ? "payment" : "subscription";
+  const mode = "subscription";
 
   const session = await stripe.checkout.sessions.create({
     customer_email: userEmail,

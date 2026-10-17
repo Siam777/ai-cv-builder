@@ -6,6 +6,7 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import type { ResumeDocument } from "@/lib/document";
 import { ROLE_BENCHMARKS } from "@/lib/linter/role-analyzer";
 import { generateAiResume } from "@/lib/vault/ai-cv-generator";
+import { Check, Plus, X } from "lucide-react";
 
 export interface AiCvGeneratorModalProps {
   currentDoc?: ResumeDocument | null;
@@ -94,7 +95,7 @@ export function AiCvGeneratorModal({
         <header className="modal-header">
           <div>
             <p className="library-kind">Fictional practice content</p>
-            <h2>Create a practice CV</h2>
+            <h2>Practice CV (fictional)</h2>
           </div>
           <button
             type="button"
@@ -103,7 +104,7 @@ export function AiCvGeneratorModal({
             aria-label="Close dialog"
             disabled={isGenerating}
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -111,10 +112,10 @@ export function AiCvGeneratorModal({
           {isGenerating ? (
             <div className="ai-gen-progress-stage" style={{ textAlign: "center", padding: "40px 20px" }}>
               <div className="ai-gen-spinner" />
-              <h3 style={{ marginTop: "20px", fontSize: "18px", fontWeight: 600 }}>
-                Generating Tailored Resume…
+              <h3 style={{ marginTop: "20px", fontSize: "var(--text-lg)", fontWeight: 600 }}>
+                Creating practice CV…
               </h3>
-              <p style={{ color: "var(--muted)", fontSize: "14px", marginTop: "6px" }}>
+              <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginTop: "6px" }}>
                 {genStep}
               </p>
             </div>
@@ -145,9 +146,9 @@ export function AiCvGeneratorModal({
                       width: "100%",
                       padding: "8px 10px",
                       borderRadius: "6px",
-                      border: "1px solid var(--border)",
-                      background: "var(--surface)",
-                      color: "var(--foreground)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                      color: "var(--color-text)",
                       fontWeight: 600,
                     }}
                   >
@@ -162,7 +163,7 @@ export function AiCvGeneratorModal({
 
               {/* Seniority Selector */}
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "12px", textTransform: "uppercase" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "var(--text-xs)" }}>
                   Target Seniority Level
                 </label>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -188,7 +189,7 @@ export function AiCvGeneratorModal({
 
               {/* Skills Selector */}
               <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "12px", textTransform: "uppercase" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "var(--text-xs)" }}>
                   Core Technologies & Skills for {currentBenchmark.title}
                 </label>
                 <div className="skills-pill-cloud" style={{ marginBottom: "10px" }}>
@@ -202,13 +203,17 @@ export function AiCvGeneratorModal({
                         className={`skill-pill ${active ? "matched" : ""}`}
                         style={{
                           cursor: "pointer",
-                          background: active ? "#ecfdf5" : "#f1f5f9",
-                          color: active ? "#065f46" : "#475569",
-                          border: active ? "1px solid #a7f3d0" : "1px solid #cbd5e1",
+                          background: active ? "var(--color-brand-soft)" : "var(--gray-100)",
+                          color: active ? "var(--color-brand)" : "var(--gray-600)",
+                          border: active ? "1px solid var(--green-200)" : "1px solid var(--gray-300)",
                           fontWeight: active ? 600 : 400,
                         }}
                       >
-                        {active ? "✓ " : "+ "}
+                        {active ? (
+                          <Check size={12} aria-hidden />
+                        ) : (
+                          <Plus size={12} aria-hidden />
+                        )}{" "}
                         {skill}
                       </button>
                     );
@@ -227,7 +232,7 @@ export function AiCvGeneratorModal({
                         handleAddCustomSkill();
                       }
                     }}
-                    style={{ flex: 1, padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                    style={{ flex: 1, padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--color-border)" }}
                   />
                   <button type="button" onClick={handleAddCustomSkill} className="secondary">
                     + Add
@@ -237,7 +242,7 @@ export function AiCvGeneratorModal({
 
               {/* Industry / Domain */}
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "12px", textTransform: "uppercase" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "var(--text-xs)" }}>
                   Primary Domain / Industry
                 </label>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -270,7 +275,7 @@ export function AiCvGeneratorModal({
               className="primary"
               disabled={busy || isGenerating}
               onClick={handleGenerate}
-              style={{ background: "#059669", borderColor: "#059669" }}
+              style={{ background: "var(--color-brand)", borderColor: "var(--color-brand)" }}
             >
               Create fictional practice CV
             </button>

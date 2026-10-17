@@ -3,12 +3,18 @@
 import { useState } from "react";
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { PLANS, type PlanId } from "@/lib/billing-plans";
+import type { PaidPlanId, PlanId } from "@/lib/billing-plans";
 import type { AccountUser } from "@/lib/cloud-contract";
+import { X } from "lucide-react";
+import { PlanCards } from "./PlanCards";
 
 export interface PricingModalProps {
   cloudUser: AccountUser | null;
   currentPlanId?: PlanId;
+  /** The current plan is the beta's free Go period. */
+  beta?: boolean;
+  /** Days of free Go for new accounts (0 when the beta trial is off). */
+  betaDays?: number;
   onOpenAccount: () => void;
   onClose: () => void;
 }
@@ -16,6 +22,8 @@ export interface PricingModalProps {
 export function PricingModal({
   cloudUser,
   currentPlanId = "free",
+  beta = false,
+  betaDays = 0,
   onOpenAccount,
   onClose,
 }: PricingModalProps) {
@@ -24,7 +32,7 @@ export function PricingModal({
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const [error, setError] = useState("");
 
-  async function handleCheckout(planId: PlanId) {
+  async function handleCheckout(planId: PaidPlanId) {
     if (!cloudUser) {
       onOpenAccount();
       onClose();
@@ -71,8 +79,8 @@ export function PricingModal({
       <div className="modal-card pricing-modal">
         <header className="modal-header">
           <div>
-            <p className="eyebrow">PROPOSED PLANS & CONFIGURED LIMITS</p>
-            <h2>Review plans and current limits</h2>
+            <p className="eyebrow">Monthly plans · cancel any time</p>
+            <h2>Choose a plan</h2>
           </div>
           <button
             type="button"
@@ -80,155 +88,39 @@ export function PricingModal({
             onClick={onClose}
             aria-label="Close pricing dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
         <div className="pricing-content">
-          <p className="helper-text">
-            These are proposed paid plans. Payment services and some paid
-            features still need integration and live validation. Device editing
-            includes multiple drafts and twelve current designs. CV downloads
-            require sign-in and verified email.
-          </p>
+          {betaDays > 0 && (
+            <p className="helper-text">
+              Beta: every new account gets Go free for its first {betaDays}{" "}
+              days, no card needed. After that it moves to Free unless you
+              choose a plan.
+            </p>
+          )}
           {error && (
             <div className="alert" role="alert">
               {error}
             </div>
           )}
-
-          <div className="pricing-grid">
-            {/* Free Tier */}
-            <div
-              className={`pricing-card ${currentPlanId === "free" ? "current" : ""}`}
-            >
-              <div className="card-top">
-                <span className="plan-badge">DEVICE EDITING</span>
-                <h3>Free / Local</h3>
-                <div className="plan-price">
-                  <span className="price-val">$0</span>
-                </div>
-                <p className="plan-sub">
-                  Perfect for building a baseline resume locally.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li>✓ Multiple independent device drafts</li>
-                <li>✓ Unlimited browser editing & autosave</li>
-                <li>✓ Standard PDF print export (with watermark)</li>
-                <li>✓ Plain-text & JSON backup export</li>
-                <li className="dimmed">✓ Local rule-based job tailoring</li>
-                <li className="dimmed">✗ Watermark-free PDF exports</li>
-              </ul>
-              <button type="button" disabled className="plan-button outline">
-                {currentPlanId === "free" ? "Current Plan" : "Included"}
-              </button>
-            </div>
-
-            {/* Job Hunter Monthly - Popular */}
-            <div
-              className={`pricing-card featured ${currentPlanId === "job_hunter_monthly" ? "current" : ""}`}
-            >
-              <div className="popular-ribbon">MONTHLY PLAN</div>
-              <div className="card-top">
-                <span className="plan-badge featured-badge">
-                  JOB HUNTER PASS
-                </span>
-                <h3>Monthly Pass</h3>
-                <div className="plan-price">
-                  <span className="price-val">$19</span>
-                  <span className="price-period">/ month</span>
-                </div>
-                <p className="plan-sub">
-                  For active candidates targeting multiple job applications.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li>
-                  Configured cap:{" "}
-                  <strong>{PLANS.job_hunter_monthly.maxVariants}</strong>{" "}
-                  account variants
-                </li>
-                <li>
-                  Configured cap:{" "}
-                  <strong>
-                    {PLANS.job_hunter_monthly.maxTailoredPerMonth}
-                  </strong>{" "}
-                  tailoring uses/month
-                </li>
-                <li>
-                  ✓ <strong>Clean, watermark-free</strong> PDF & DOCX export
-                </li>
-                <li>All twelve editor designs</li>
-                <li>✓ Master Career Vault & Google XYZ Impact Coach</li>
-                <li>Cancellation flow requires live validation</li>
-              </ul>
-              <button
-                type="button"
-                className="plan-button primary"
-                disabled={
-                  loadingPlan !== null || currentPlanId === "job_hunter_monthly"
-                }
-                onClick={() => handleCheckout("job_hunter_monthly")}
-              >
-                {loadingPlan === "job_hunter_monthly"
-                  ? "Redirecting…"
-                  : currentPlanId === "job_hunter_monthly"
-                    ? "Active Plan"
-                    : "Upgrade to Job Hunter Pass ↗"}
-              </button>
-            </div>
-
-            {/* Lifetime Pass */}
-            <div
-              className={`pricing-card ${currentPlanId === "lifetime" ? "current" : ""}`}
-            >
-              <div className="card-top">
-                <span className="plan-badge">ONE-TIME PLAN</span>
-                <h3>Power Pass</h3>
-                <div className="plan-price">
-                  <span className="price-val">$79</span>
-                  <span className="price-period">one-time</span>
-                </div>
-                <p className="plan-sub">
-                  For senior professionals maintaining long-term career records.
-                </p>
-              </div>
-              <ul className="plan-features">
-                <li>One-time plan configuration</li>
-                <li>
-                  Configured cap:{" "}
-                  <strong>{PLANS.lifetime.maxTailoredPerMonth}</strong>{" "}
-                  tailoring uses/month
-                </li>
-                <li>All twelve editor designs</li>
-                <li>✓ Watermark-free PDF/DOCX while entitlement is active</li>
-                <li>Provider features await live validation</li>
-              </ul>
-              <button
-                type="button"
-                className="plan-button primary dark"
-                disabled={loadingPlan !== null || currentPlanId === "lifetime"}
-                onClick={() => handleCheckout("lifetime")}
-              >
-                {loadingPlan === "lifetime"
-                  ? "Redirecting…"
-                  : currentPlanId === "lifetime"
-                    ? "Active Plan"
-                    : "Review Power Pass ↗"}
-              </button>
-            </div>
-          </div>
+          <PlanCards
+            currentPlanId={currentPlanId}
+            beta={beta}
+            loadingPlan={loadingPlan}
+            onChoose={(id) => void handleCheckout(id)}
+          />
         </div>
 
         <div className="button-row">
           <p className="secure-badge">
-            Checkout requires configured payment services
+            Payments are handled by Stripe when configured
           </p>
           <a
             href="/upgrade"
             style={{
-              fontSize: "11px",
+              fontSize: "var(--text-xs)",
               color: "var(--green)",
               fontWeight: 600,
               textDecoration: "underline",

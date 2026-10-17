@@ -17,6 +17,15 @@ export const sectionTypes = [
   "custom",
 ] as const;
 export type SectionType = (typeof sectionTypes)[number];
+/**
+ * Sections whose items are achievements written as sentences. Other sections
+ * (skills, languages, certificates, education, custom) list short items,
+ * often a single word, so sentence checks do not apply to them.
+ */
+export function isAchievementSection(type: SectionType) {
+  return type === "experience" || type === "projects";
+}
+
 export const labels: Record<SectionType, string> = {
   summary: "Profile",
   experience: "Experience",

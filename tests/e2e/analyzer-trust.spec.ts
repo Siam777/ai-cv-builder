@@ -10,10 +10,12 @@ test("unsupported roles stay general and checklist changes require renewed confi
   const doc = createDocument(true);
   doc.contact.headline = "Civil Engineer";
   await startSampleResume(page, doc);
-  await page.getByRole("button", { name: "Review writing" }).click();
-  const dialog = page.getByRole("dialog", { name: "Resume content review" });
+  await page.getByRole("button", { name: /^Check/ }).click();
+  // The panel is docked on wide screens and a sheet on phones; the id is stable.
+  const dialog = page.locator("#side-panel");
+  await expect(dialog).toHaveAccessibleName("Check my CV");
   await dialog
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   await expect(dialog.getByLabel("Role checklist")).toHaveValue("general");
   await expect(dialog.locator(".role-section-head")).toHaveCount(0);
@@ -28,20 +30,21 @@ test("unsupported roles stay general and checklist changes require renewed confi
     .click();
   await expect(dialog).toContainText("Software Engineer · Term observations");
   await expect(dialog.locator(".add-skill-action-btn")).toHaveCount(0);
+  await dialog.getByRole("button", { name: /^Advanced/ }).click();
   await dialog.getByRole("button", { name: "Document text view" }).click();
   await expect(dialog).toContainText("Not checked");
   await expect(dialog).toContainText("not text extracted from a PDF");
   await page.setViewportSize({ width: 360, height: 800 });
   await dialog
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   expect(
     await dialog
-      .locator(".ats-content")
+      .locator(".check-panel")
       .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
   await page.screenshot({ path: "test-results/analyzer-mobile.png" });
-  await dialog.getByRole("button", { name: "Done" }).click();
+  await dialog.getByRole("button", { name: "Close Check my CV" }).click();
   await expect(page.getByLabel("Professional headline")).toHaveValue(
     "Civil Engineer",
   );

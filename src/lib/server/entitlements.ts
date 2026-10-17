@@ -1,5 +1,11 @@
 import { database } from "./database";
-import { PLANS, type PlanConfig, type PlanId } from "../billing-plans";
+import {
+  PLANS,
+  betaTrialDays,
+  normalizePlanId,
+  type PlanConfig,
+  type PlanId,
+} from "../billing-plans";
 
 export type { PlanConfig, PlanId };
 export { PLANS };
@@ -9,99 +15,134 @@ export type EntitlementFeature =
   | "unlimited_variants"
   | "career_vault_storage"
   | "job_tailoring_engine"
-  | "all_templates";
+  | "all_templates"
+  | "ai_summary_drafts"
+  | "cover_letters"
+  | "job_coaching";
 
 export interface UserSubscriptionDetails {
   planId: PlanId;
   plan: PlanConfig;
   status: "active" | "trialing" | "past_due" | "canceled" | "none";
+  /** True while the plan comes from the beta's free Go period. */
+  beta: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  /** Unix seconds when the current period (or beta) ends. */
   currentPeriodEnd: number | null;
   cancelAtPeriodEnd: boolean;
   entitlements: Record<EntitlementFeature, boolean>;
 }
 
+function entitlementsFor(plan: PlanConfig, paid: boolean) {
+  return {
+    watermark_free_export: !plan.hasWatermark,
+    unlimited_variants: plan.maxVariants > 1,
+    career_vault_storage: paid,
+    job_tailoring_engine: plan.maxTailoredPerMonth > 0,
+    all_templates: plan.allTemplates,
+    ai_summary_drafts: plan.aiSummaryDrafts,
+    cover_letters: plan.coverLetters,
+    job_coaching: plan.jobCoaching,
+  };
+}
+
+function freeDetails(
+  extra: Partial<UserSubscriptionDetails> = {},
+): UserSubscriptionDetails {
+  return {
+    planId: "free",
+    plan: PLANS.free,
+    status: "none",
+    beta: false,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    entitlements: entitlementsFor(PLANS.free, false),
+    ...extra,
+  };
+}
+
 /**
- * Retrieves the active subscription for a given user.
- * Falls back to Free tier if user has no subscription or subscription is expired/canceled.
+ * Beta: a signed-in account gets Go free for its first `BETA_GO_TRIAL_DAYS`
+ * days (30 by default, 0 turns it off). No card or Stripe record is involved.
+ */
+async function betaTrial(userId: string, nowMs: number) {
+  const days = betaTrialDays();
+  if (!days) return null;
+  const row = (
+    await database().client.execute({
+      sql: 'SELECT "createdAt" AS created FROM "user" WHERE id = ?',
+      args: [userId],
+    })
+  ).rows[0];
+  if (!row) return null;
+  const endsMs = Number(row.created) + days * 86_400_000;
+  if (!Number.isFinite(endsMs) || endsMs <= nowMs) return null;
+  return freeDetails({
+    planId: "go",
+    plan: PLANS.go,
+    status: "trialing",
+    beta: true,
+    currentPeriodEnd: Math.floor(endsMs / 1000),
+    entitlements: entitlementsFor(PLANS.go, true),
+  });
+}
+
+/**
+ * Retrieves the plan a user has now: an active paid subscription, else the
+ * beta's free Go period, else Free.
  */
 export async function getUserSubscription(
   userId: string | null,
 ): Promise<UserSubscriptionDetails> {
-  if (!userId) {
-    return {
-      planId: "free",
-      plan: PLANS.free,
-      status: "none",
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      entitlements: {
-        watermark_free_export: false,
-        unlimited_variants: false,
-        career_vault_storage: false,
-        job_tailoring_engine: false,
-        all_templates: false,
-      },
-    };
-  }
-
+  if (!userId) return freeDetails();
+  const nowMs = Date.now();
   const { client } = database();
   const result = await client.execute({
     sql: "SELECT * FROM subscriptions WHERE user_id = ?",
     args: [userId],
   });
-
-  if (!result.rows.length) {
-    return {
-      planId: "free",
-      plan: PLANS.free,
-      status: "none",
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      entitlements: {
-        watermark_free_export: false,
-        unlimited_variants: false,
-        career_vault_storage: false,
-        job_tailoring_engine: false,
-        all_templates: false,
-      },
-    };
-  }
-
   const row = result.rows[0];
-  const planId = (row.plan_id as PlanId) || "free";
-  const plan = PLANS[planId] || PLANS.free;
-  const status = (row.status as string) || "canceled";
-  const nowMs = Date.now();
-  const currentPeriodEnd = row.current_period_end ? Number(row.current_period_end) : null;
-
-  const isActive =
-    (status === "active" || status === "trialing" || planId === "lifetime") &&
-    (!currentPeriodEnd || currentPeriodEnd * 1000 > nowMs);
-
-  const effectivePlan = isActive ? plan : PLANS.free;
-
-  return {
-    planId: isActive ? planId : "free",
-    plan: effectivePlan,
-    status: isActive ? (status as any) : "canceled",
-    stripeCustomerId: String(row.stripe_customer_id || ""),
-    stripeSubscriptionId: row.stripe_subscription_id ? String(row.stripe_subscription_id) : null,
-    currentPeriodEnd,
-    cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
-    entitlements: {
-      watermark_free_export: !effectivePlan.hasWatermark,
-      unlimited_variants: effectivePlan.maxVariants > 1,
-      career_vault_storage: isActive,
-      job_tailoring_engine: isActive,
-      all_templates: effectivePlan.allTemplates,
-    },
-  };
+  if (row) {
+    const planId = normalizePlanId(row.plan_id);
+    const status = (row.status as string) || "canceled";
+    const currentPeriodEnd = row.current_period_end
+      ? Number(row.current_period_end)
+      : null;
+    const isActive =
+      planId !== "free" &&
+      (status === "active" || status === "trialing") &&
+      (!currentPeriodEnd || currentPeriodEnd * 1000 > nowMs);
+    if (isActive)
+      return {
+        planId,
+        plan: PLANS[planId],
+        status: status as "active" | "trialing",
+        beta: false,
+        stripeCustomerId: String(row.stripe_customer_id || ""),
+        stripeSubscriptionId: row.stripe_subscription_id
+          ? String(row.stripe_subscription_id)
+          : null,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
+        entitlements: entitlementsFor(PLANS[planId], true),
+      };
+    const trial = await betaTrial(userId, nowMs);
+    if (trial)
+      return { ...trial, stripeCustomerId: String(row.stripe_customer_id || "") };
+    return freeDetails({
+      status: "canceled",
+      stripeCustomerId: String(row.stripe_customer_id || ""),
+      stripeSubscriptionId: row.stripe_subscription_id
+        ? String(row.stripe_subscription_id)
+        : null,
+      currentPeriodEnd,
+      cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
+    });
+  }
+  return (await betaTrial(userId, nowMs)) ?? freeDetails();
 }
 
 /**

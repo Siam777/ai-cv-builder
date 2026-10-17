@@ -15,7 +15,7 @@ ResumeStudio (Container & Coordination)
 │           ├── SummarySectionEditor
 │           ├── ExperienceSectionEditor
 │           │   └── BulletList (Keyboard-driven list editor)
-│           │       └── InlineAiMagicBar (Contextual diff popover)
+│           │       └── FieldAi (Sparkle menu and inline accept/reject view)
 │           └── CustomSectionEditor
 └── PreviewStage (Render container, zoom controls, pagination)
     └── ResumePreview (Multi-page DOM renderer with data-block-id)
@@ -104,7 +104,7 @@ When an input in the editor gains focus:
 
 ---
 
-## Inline AI Magic Bar specification
+## Inline sparkle menu (FieldAi) specification
 
 ### Positioning and trigger
 
@@ -121,5 +121,5 @@ Display the proposed replacement directly underneath the active input in an inli
 - Deletions highlighted in red with strikethrough: `<del class="bg-red-500/20 text-red-700 line-through">assisted with</del>`
 - Additions highlighted in green: `<ins class="bg-emerald-500/20 text-emerald-700 no-underline font-medium">Engineered</ins>`
 - Keystroke actions:
-  - `Tab` or `Enter`: Accepts proposal, replaces text in document, increments revision, closes popover.
+  - `Enter` on the focused Accept button: Accepts proposal, replaces text in document, increments revision, closes the view. `Tab` keeps its normal focus order.
   - `Esc`: Dismisses proposal immediately without modifying document.

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { createClient } from "@libsql/client";
 import { createDocument } from "../../src/lib/document";
-import { authenticateForExport, startSampleResume, testEmail } from "./helpers";
+import { authenticateForExport, startSampleResume, testEmail, openAccount, accountTab } from "./helpers";
 
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 const configured = process.env.E2E_GOOGLE === "1";
@@ -83,7 +83,7 @@ async function google(page: Page, button: Locator, profile: Profile) {
   await expect.poll(() => child.isClosed()).toBe(true);
 }
 async function account(page: Page) {
-  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await openAccount(page);
   await expect(page.locator(".account-panel")).toBeVisible();
 }
 async function localDocuments(page: Page) {
@@ -166,7 +166,7 @@ test.describe("configured Google with a synthetic provider transport", () => {
       await page
         .getByLabel("Full name", { exact: true })
         .fill("Google draft — Zoë");
-      await page.locator("summary").click();
+      await page.locator(".export-menu summary").click();
       await page
         .getByRole("button", { name: "Backup (.json)", exact: true })
         .click();
@@ -208,6 +208,7 @@ test.describe("configured Google with a synthetic provider transport", () => {
         "Alex Morgan",
       );
       await account(page);
+      await accountTab(page, "Sign-in & security");
       await capture(page, `${width}-google-account`);
       await expect(
         page.getByRole("button", { name: "Set a password by email" }),
@@ -346,6 +347,7 @@ test.describe("configured Google with a synthetic provider transport", () => {
     ).toBe(200);
     await page.reload();
     await account(page);
+    await accountTab(page, "Sign-in & security");
     await google(
       page,
       page.getByRole("button", { name: "Link Google", exact: true }),
@@ -395,6 +397,7 @@ test.describe("configured Google with a synthetic provider transport", () => {
       { email },
     );
     let session = await (await page.request.get("/api/account")).json();
+    await accountTab(page, "Sign-in & security");
     await page.getByRole("button", { name: "Set a password by email" }).click();
     const recovery = await testEmail(email, "recovery");
     const token = new URL(recovery.url).pathname.split("/").at(-1)!;
@@ -451,11 +454,13 @@ test.describe("configured Google with a synthetic provider transport", () => {
     });
     expect(stale.status()).toBe(403);
     expect((await stale.json()).error).toBe("RECENT_SIGN_IN_REQUIRED");
+    await accountTab(page, "Sign-in & security");
     await google(
       page,
       page.getByRole("button", { name: "Sign in again with Google" }),
       { email: session.user.email },
     );
+    await accountTab(page, "Data & privacy");
     await page
       .getByRole("button", {
         name: "Delete account and cloud resumes",
@@ -486,11 +491,11 @@ test.describe("configured Google with a synthetic provider transport", () => {
       { email: originalEmail },
     );
     await page
-      .getByRole("button", { name: "Open account workspace", exact: true })
+      .getByRole("button", { name: "Open my account CVs", exact: true })
       .click();
     await page.getByRole("button", { name: "Close account settings" }).click();
     await page
-      .getByRole("button", { name: "Create my resume", exact: true })
+      .getByRole("button", { name: "Start from scratch", exact: true })
       .click();
     await page.context().route("**/api/resumes", (route) =>
       route.request().method() === "POST"
@@ -547,8 +552,8 @@ test.describe("configured Google with a synthetic provider transport", () => {
     await page
       .getByRole("button", { name: "Keep draft on this device", exact: true })
       .click();
-    await expect(page.locator(".document-context")).toContainText(
-      "On this device",
+    await expect(page.locator(".save-status")).toHaveText(
+      "Saved in this browser",
     );
     expect((await localDocuments(page))[0].contact.name).toBe(
       "Kept original Google draft",
@@ -633,8 +638,8 @@ test.describe("configured Google with a synthetic provider transport", () => {
       "Navigation keeps this edit",
     );
     await expect(
-      page.getByRole("navigation", { name: "Account navigation" }),
-    ).toContainText("Help");
+      page.getByRole("tablist", { name: "Account sections" }),
+    ).toContainText("Billing");
     expect(user.id).toBeTruthy();
   });
 });

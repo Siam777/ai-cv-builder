@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createDocument, type ResumeDocument } from "../../src/lib/document";
-import { authenticateForExport } from "./helpers";
+import { authenticateForExport, openAccount } from "./helpers";
 
 async function deviceDocuments(page: Page, write?: ResumeDocument[]) {
   return page.evaluate(
@@ -35,15 +35,16 @@ async function deviceDocuments(page: Page, write?: ResumeDocument[]) {
     write,
   );
 }
-async function library(page: Page, width = 1440, account = false) {
-  await (
-    width <= 900
-      ? page.getByRole("button", { name: "My library", exact: true })
-      : page.locator(".header-nav").getByRole("button", {
-          name: account ? "My CVs" : "On this device",
-          exact: true,
-        })
-  ).click();
+async function library(page: Page, width = 1440) {
+  // Narrow headers keep "My CVs" in the account menu.
+  if (width <= 900) {
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: /^My CVs/ }).click();
+  } else
+    await page
+      .locator(".header-nav")
+      .getByRole("button", { name: "My CVs", exact: true })
+      .click();
   await expect(page.getByRole("main", { name: "CV library" })).toBeVisible();
 }
 function personal(name: string) {
@@ -54,7 +55,7 @@ function personal(name: string) {
 }
 
 for (const width of [360, 768, 1440]) {
-  test(`dashboard and first draft at ${width}px: guide focus, persistence and mobile review`, async ({
+  test(`dashboard and first draft at ${width}px: steps, persistence and mobile review`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -80,7 +81,7 @@ for (const width of [360, 768, 1440]) {
         ),
         clippedControls: Array.from(
           document.querySelectorAll<HTMLElement>(
-            ".library-card-actions button, .guide-steps button, .mobile-tabs button",
+            ".library-card-actions button, .step-footer button, .mobile-tabs button",
           ),
         )
           .filter((element) => {
@@ -105,43 +106,45 @@ for (const width of [360, 768, 1440]) {
     }
     await page.goto("/builder");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("empty");
     await page
-      .getByRole("button", { name: "Create my resume", exact: true })
+      .getByRole("button", { name: "Start from scratch", exact: true })
       .click();
-    await expect(
-      page.getByRole("heading", { name: "Untitled resume", exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Hide start guide" }),
-    ).toHaveAttribute("aria-expanded", "true");
-    await capture("start-guide");
-    await page.getByRole("button", { name: "Add personal details" }).click();
-    await expect(page.getByLabel("Full name", { exact: true })).toBeFocused();
+    await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
+      "Untitled resume",
+    );
+    // The badge counts findings to fix, not sections not started yet.
+    await expect(page.getByRole("button", { name: /^Check/ })).toHaveAccessibleName(
+      /^Check \d+ to fix$/,
+    );
+    await capture("start");
+    if (width > 520) {
+      // The strength card points to the first missing item.
+      await page.getByRole("button", { name: /^Suggested: Add your name/ }).click();
+      await expect(page.getByLabel("Full name", { exact: true })).toBeFocused();
+    }
     await page
       .getByLabel("Full name", { exact: true })
       .fill("Synthetic candidate · Zoë");
     await page
-      .getByLabel("Resume name", { exact: true })
+      .getByLabel("CV name", { exact: true })
       .fill("Graduate — platform engineer");
-    await page
-      .getByRole("button", { name: "Start with Education", exact: true })
-      .click();
+    // Back and Next walk through the steps and move focus to the new step.
+    await page.getByRole("button", { name: "Next: Profile", exact: true }).click();
     await expect(
       page.getByRole("region", { name: "Resume editor" }),
     ).toBeFocused();
     await expect(
       page.getByRole("region", { name: "Resume editor" }),
-    ).toContainText("Education");
-    await page.getByRole("button", { name: "Add personal details" }).click();
-    await page.getByRole("button", { name: "Hide start guide" }).click();
+    ).toContainText("Profile");
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Show start guide" }),
-    ).toHaveAttribute("aria-expanded", "false");
+      page.getByRole("region", { name: "Resume editor" }),
+    ).toContainText("Personal details");
     await expect(page.locator(".save-status")).toHaveText(
-      "Saved on this device",
+      "Saved in this browser",
     );
     await capture("editor");
     if (width <= 900) {
@@ -152,26 +155,20 @@ for (const width of [360, 768, 1440]) {
         "data-pagination-ready",
         "true",
       );
-      await expect(page.locator(".mobile-save-feedback")).toHaveText(
-        "Saved on this device",
+      await expect(page.locator(".save-status")).toHaveText(
+        "Saved in this browser",
       );
       await capture("preview");
-      await page
-        .getByRole("button", { name: "Review resume", exact: true })
-        .click();
-    } else {
-      await page
-        .getByRole("button", { name: "Review writing", exact: true })
-        .click();
     }
-    await expect(
-      page.getByRole("dialog", { name: "Resume content review" }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: /^Check/ }).click();
+    await expect(page.locator("#side-panel")).toHaveAccessibleName(
+      "Check my CV",
+    );
     await capture("review");
-    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await page.getByRole("button", { name: "Close Check my CV" }).click();
     await library(page, width);
     await expect(
-      page.getByRole("heading", { name: "Your CVs, clearly organized." }),
+      page.getByRole("heading", { name: "My CVs", level: 1 }),
     ).toBeVisible();
     await expect(page.locator(".library-preview .page-content")).toContainText(
       "Synthetic candidate · Zoë",
@@ -195,7 +192,7 @@ for (const width of [360, 768, 1440]) {
     await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
       "Synthetic candidate · Zoë",
     );
-    await expect(page.getByLabel("Resume name", { exact: true })).toHaveValue(
+    await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
       "Graduate — platform engineer",
     );
   });
@@ -205,7 +202,7 @@ test("dashboard sorting, duplicate independence, delete cancellation and collect
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const alpha = personal("Alpha");
   alpha.updatedAt = "2026-10-09T10:00:00.000Z";
   const zeta = personal("Zeta");
@@ -234,7 +231,7 @@ test("dashboard sorting, duplicate independence, delete cancellation and collect
     .getByRole("article", { name: "Alpha", exact: true })
     .getByRole("button", { name: "Duplicate CV" })
     .click();
-  await expect(page.getByLabel("Resume name")).toHaveValue("Alpha — copy");
+  await expect(page.getByLabel("CV name")).toHaveValue("Alpha — copy");
   await page.getByLabel("Full name", { exact: true }).fill("Independent copy");
   await library(page);
   expect(
@@ -267,7 +264,7 @@ test("a stale dashboard cannot delete a newer revision; duplication reads the la
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const source = personal("Concurrent draft");
   await deviceDocuments(page, [source]);
   await page.reload();
@@ -297,32 +294,29 @@ test("account dashboard duplicate/delete affect account CVs and preserve indepen
   page,
 }) => {
   await page.goto("/builder");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   const device = personal("Device original");
   await deviceDocuments(page, [device]);
   const deviceBefore = await deviceDocuments(page);
   const user = await authenticateForExport(page);
-  await page
-    .locator(".header-right")
-    .getByRole("button", { name: "Account", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Open account workspace" }).click();
+  await openAccount(page);
+  await page.getByRole("button", { name: "Open my account CVs" }).click();
   await page.getByRole("button", { name: "Close account settings" }).click();
   await page
-    .getByRole("button", { name: "Create my resume", exact: true })
+    .getByRole("button", { name: "Start from scratch", exact: true })
     .click();
-  await page.getByLabel("Resume name").fill("Account original");
-  await library(page, 1440, true);
+  await page.getByLabel("CV name").fill("Account original");
+  await library(page);
   const requestOptions = { headers: { "X-Workspace-User": user.id } };
   const before = (await (
     await page.request.get("/api/resumes", requestOptions)
   ).json()) as ResumeDocument[];
   expect(before).toHaveLength(1);
   await page.getByRole("button", { name: "Duplicate CV", exact: true }).click();
-  await expect(page.getByLabel("Resume name")).toHaveValue(
+  await expect(page.getByLabel("CV name")).toHaveValue(
     "Account original — copy",
   );
-  await library(page, 1440, true);
+  await library(page);
   await page
     .getByRole("article", { name: "Account original — copy", exact: true })
     .getByRole("button", { name: "Delete CV" })

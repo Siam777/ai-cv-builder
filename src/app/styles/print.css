@@ -1,0 +1,25 @@
+@media print {
+  html,
+  body {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .studio,
+  .editor-layout,
+  .preview-panel,
+  .paper-stage {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    container-type: normal !important;
+  }
+}

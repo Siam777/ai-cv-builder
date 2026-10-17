@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useModalFocus } from "@/lib/use-modal-focus";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import type { ResumeDocument } from "@/lib/document";
+import { createDocument, type ResumeDocument } from "@/lib/document";
 import { layoutBlocks, type LayoutBlock } from "@/lib/layout";
 import {
   accents,
@@ -18,14 +16,37 @@ import {
   presentationStyle,
   ResumeBlock,
 } from "./resume-preview";
+import { Check, Info } from "lucide-react";
 
 export interface DesignPanelProps {
   doc: ResumeDocument;
   onChange: (change: Partial<Presentation>) => void;
   disabled?: boolean;
-  onClose?: () => void;
-  onOpenDemoGallery?: () => void;
+  initialFilter?: TemplateFilter;
 }
+
+export type TemplateFilter = "all" | "photo" | "ats" | "one-column" | "two-column";
+
+type Template = (typeof templates)[number];
+
+/** Feature tags on a design card, e.g. "Photo · Two columns". */
+function templateTags(t: Template) {
+  return [
+    t.photoSupported && "Photo",
+    t.category === "ats" && "ATS-friendly",
+    t.columns === 2 && "Two columns",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+const FILTERS: { id: TemplateFilter; label: string; matches: (t: Template) => boolean }[] = [
+  { id: "all", label: "All", matches: () => true },
+  { id: "photo", label: "Supports photo", matches: (t) => t.photoSupported },
+  { id: "ats", label: "ATS-friendly", matches: (t) => t.category === "ats" },
+  { id: "one-column", label: "One column", matches: (t) => t.columns === 1 },
+  { id: "two-column", label: "Two columns", matches: (t) => t.columns === 2 },
+];
 
 const ACCENT_PALETTE: { id: Presentation["accent"]; name: string; hex: string }[] = [
   { id: "forest", name: "Forest", hex: "#285641" },
@@ -103,82 +124,27 @@ export function DesignPanel({
   doc,
   onChange,
   disabled = false,
-  onClose,
-  onOpenDemoGallery,
+  initialFilter = "all",
 }: DesignPanelProps) {
-  useBodyScrollLock(true);
-  const thumbnailBlocks = useMemo(() => layoutBlocks(doc).slice(0, 18), [doc]);
+  // A new CV would give near-blank thumbnails, so show sample content until
+  // the CV has at least one entry.
+  const sample = doc.sections.every((section) => !section.entries.length);
+  const thumbnailBlocks = useMemo(
+    () => layoutBlocks(sample ? { ...createDocument(true), presentation: doc.presentation } : doc).slice(0, 18),
+    [doc, sample],
+  );
   const p = doc.presentation;
-  const modalCardRef = useModalFocus(() => onClose?.());
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "ats" | "modern" | "executive" | "creative">("all");
+  const [categoryFilter, setCategoryFilter] = useState<TemplateFilter>(initialFilter);
 
   const activeTemplateObj = templates.find((t) => t.id === p.template) || templates[0];
 
   const filteredTemplates = useMemo(() => {
-    if (categoryFilter === "all") return templates;
-    return templates.filter((t) => t.category === categoryFilter);
+    const filter = FILTERS.find((f) => f.id === categoryFilter) ?? FILTERS[0];
+    return templates.filter(filter.matches);
   }, [categoryFilter]);
 
   return (
-    <div
-      className="modal-backdrop design-modal-backdrop no-print"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-      role="presentation"
-    >
-      <div
-        id="design-panel"
-        ref={modalCardRef}
-        tabIndex={-1}
-        className="modal-card design-modal design-modal-spacious"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="design-modal-title"
-      >
-        {/* Modal Header */}
-        <div className="design-modal-header">
-          <div className="design-modal-header-info">
-            <span className="eyebrow">CUSTOMIZE YOUR RESUME</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <h2 id="design-modal-title" style={{ margin: 0 }}>Design & Templates</h2>
-              {onOpenDemoGallery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenDemoGallery();
-                  }}
-                  style={{
-                    background: "#eff6ff",
-                    border: "1px solid #bfdbfe",
-                    color: "#1e3a8a",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                  }}
-                  title="Switch to another realistic demo resume profile"
-                >
-                  📂 Switch Demo CV ▾
-                </button>
-              )}
-            </div>
-            <p style={{ marginTop: "4px" }}>
-              Choose from twelve layouts, then adjust the typography and spacing for your experience.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close design dialog"
-            title="Close dialog (Esc)"
-          >
-            ×
-          </button>
-        </div>
-
+    <div className="design-panel" id="design-panel">
         {/* Modal Body: Spacious Full-Width Studio (No Squished Live Preview) */}
         <div className="design-modal-body design-modal-full-width">
           <div className="design-modal-scroll-pane">
@@ -189,57 +155,24 @@ export function DesignPanel({
               <section className="design-section">
                 <div className="design-section-header">
                   <div>
-                    <h3>Choose Template Family</h3>
+                    <h3>Choose a design</h3>
                     <p className="design-section-sub">
-                      Changing the design preserves your career details. Review the exported file for reading order and layout.
+                      Changing the design keeps everything you wrote.
+                      {sample && " Thumbnails show sample content until you add your experience."}
                     </p>
                   </div>
-                  <div className="template-category-tabs" role="tablist" aria-label="Template categories">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "all"}
-                      className={`cat-tab-btn ${categoryFilter === "all" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("all")}
-                    >
-                      All ({templates.length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "ats"}
-                      className={`cat-tab-btn ${categoryFilter === "ats" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("ats")}
-                    >
-                      ATS Classic
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "modern"}
-                      className={`cat-tab-btn ${categoryFilter === "modern" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("modern")}
-                    >
-                      Modern & Tech
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "executive"}
-                      className={`cat-tab-btn ${categoryFilter === "executive" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("executive")}
-                    >
-                      Executive
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryFilter === "creative"}
-                      className={`cat-tab-btn ${categoryFilter === "creative" ? "active" : ""}`}
-                      onClick={() => setCategoryFilter("creative")}
-                    >
-                      Creative & Visual
-                    </button>
+                  <div className="template-category-tabs" role="group" aria-label="Filter designs">
+                    {FILTERS.map((filter) => (
+                      <button
+                        type="button"
+                        key={filter.id}
+                        aria-pressed={categoryFilter === filter.id}
+                        className={`cat-tab-btn ${categoryFilter === filter.id ? "active" : ""}`}
+                        onClick={() => setCategoryFilter(filter.id)}
+                      >
+                        {filter.label} ({templates.filter(filter.matches).length})
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -259,7 +192,9 @@ export function DesignPanel({
                         <div className="template-card-preview">
                           <TemplateThumbnail settings={settings} blocks={thumbnailBlocks} />
                           {isSelected ? (
-                            <span className="template-active-badge">✓ Active</span>
+                            <span className="template-active-badge">
+                              <Check size={12} aria-hidden /> Active
+                            </span>
                           ) : (
                             <span className="template-ats-badge">{template.badge}</span>
                           )}
@@ -272,6 +207,9 @@ export function DesignPanel({
                             </span>
                           </div>
                           <span className="template-style-pill">{template.badge}</span>
+                          {templateTags(template) && (
+                            <span className="template-tags">{templateTags(template)}</span>
+                          )}
                         </div>
                         <p className="template-desc">{template.description}</p>
                       </button>
@@ -303,7 +241,7 @@ export function DesignPanel({
                             className="swatch-bubble"
                             style={{ backgroundColor: acc.hex }}
                           >
-                            {isSelected && <span className="swatch-check-mark">✓</span>}
+                            {isSelected && <Check className="swatch-check-mark" size={14} aria-hidden />}
                           </span>
                           <span className="swatch-label">{acc.name}</span>
                         </button>
@@ -349,7 +287,7 @@ export function DesignPanel({
                         >
                           <div className="typography-card-header">
                             <strong className="font-name">{f.name}</strong>
-                            {isSelected && <span className="font-check">✓</span>}
+                            {isSelected && <Check className="font-check" size={14} aria-hidden />}
                           </div>
                           <span className="font-sublabel">{f.label}</span>
                           <p className="font-sample-preview" style={{ fontFamily: f.family }}>
@@ -499,7 +437,7 @@ export function DesignPanel({
                         className={`segmented-btn ${p.direction !== "rtl" ? "active" : ""}`}
                         onClick={() => onChange({ direction: "ltr" })}
                       >
-                        <strong>➔ LTR</strong>
+                        <strong>LTR</strong>
                         <small>Left to right</small>
                       </button>
                       <button
@@ -507,8 +445,8 @@ export function DesignPanel({
                         className={`segmented-btn ${p.direction === "rtl" ? "active" : ""}`}
                         onClick={() => onChange({ direction: "rtl" })}
                       >
-                        <strong>⬅ RTL</strong>
-                        <small>Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© / ×¢×‘×¨×™×ª</small>
+                        <strong>RTL</strong>
+                        <small lang="ar">العربية / עברית</small>
                       </button>
                     </div>
                     <select
@@ -567,36 +505,23 @@ export function DesignPanel({
               </section>
 
               <div className="design-notice-card">
-                <span className="notice-icon">✦</span>
+                <Info className="notice-icon" size={18} aria-hidden />
                 <p>
-                  <strong>Live Preview Active:</strong> The main editor stage updates immediately behind this dialog.
-                  All formatting changes preserve your exact accomplishments and bullet points.
+                  Each design card shows your own CV. Changing the design keeps
+                  your wording; close this panel to see the full preview.
                 </p>
               </div>
             </fieldset>
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="design-modal-footer">
-          <div className="active-config-summary">
-            <span className="summary-dot" style={{ backgroundColor: accents[p.accent] }} />
-            <span>
-              <strong>{activeTemplateObj.name}</strong> · {accents[p.accent]} accent ·{" "}
-              {fonts[p.font].name} ({p.fontSize} pt) · {densities[p.density].name} density · {p.pageSize}
-            </span>
-          </div>
-          <div className="footer-button-group">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={onClose}
-            >
-              Done & Return to Editor
-            </button>
-          </div>
+        <div className="design-panel-summary">
+          <span className="summary-dot" style={{ backgroundColor: accents[p.accent] }} />
+          <span>
+            <strong>{activeTemplateObj.name}</strong> · {fonts[p.font].name} ({p.fontSize} pt) ·{" "}
+            {densities[p.density].name} spacing · {p.pageSize}
+          </span>
         </div>
-      </div>
     </div>
   );
 }

@@ -1,29 +1,54 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { PLANS } from "../src/lib/billing-plans";
+import { PLANS, betaTrialDays, normalizePlanId } from "../src/lib/billing-plans";
 
-test("PLANS configuration provides valid tiers and feature matrices", () => {
-  assert.ok(PLANS.free);
-  assert.ok(PLANS.job_hunter_weekly);
-  assert.ok(PLANS.job_hunter_monthly);
-  assert.ok(PLANS.lifetime);
+test("three monthly tiers: Free, Go at $9.99 and Pro at $29.99", () => {
+  assert.deepEqual(Object.keys(PLANS), ["free", "go", "pro"]);
+  assert.equal(PLANS.free.priceCents, 0);
+  assert.equal(PLANS.go.priceCents, 999);
+  assert.equal(PLANS.pro.priceCents, 2999);
+  assert.equal(PLANS.go.cadence, "month");
+  assert.equal(PLANS.pro.cadence, "month");
 
   assert.equal(PLANS.free.hasWatermark, true);
-  assert.equal(PLANS.free.allTemplates, false);
-  assert.equal(PLANS.free.maxVariants, 1);
   assert.equal(PLANS.free.maxTailoredPerMonth, 0);
+  assert.equal(PLANS.free.aiRequestsPerDay, 5);
+  assert.equal(PLANS.free.aiSummaryDrafts, false);
+  assert.equal(PLANS.free.coverLetters, false);
 
-  assert.equal(PLANS.job_hunter_monthly.hasWatermark, false);
-  assert.equal(PLANS.job_hunter_monthly.allTemplates, true);
-  assert.equal(PLANS.job_hunter_monthly.maxTailoredPerMonth, 50);
+  assert.equal(PLANS.go.hasWatermark, false);
+  assert.equal(PLANS.go.aiRequestsPerDay, 50);
+  assert.equal(PLANS.go.maxTailoredPerMonth, 20);
+  assert.equal(PLANS.go.aiSummaryDrafts, true);
+  assert.equal(PLANS.go.coverLetters, true);
+  assert.equal(PLANS.go.jobCoaching, false);
 
-  assert.equal(PLANS.lifetime.hasWatermark, false);
-  assert.equal(PLANS.lifetime.maxVariants, 500);
+  assert.equal(PLANS.pro.aiRequestsPerDay, 200);
+  assert.equal(PLANS.pro.maxTailoredPerMonth, Infinity);
+  assert.equal(PLANS.pro.jobCoaching, true);
+});
+
+test("old plan IDs map to the new tiers", () => {
+  assert.equal(normalizePlanId("job_hunter_weekly"), "go");
+  assert.equal(normalizePlanId("job_hunter_monthly"), "go");
+  assert.equal(normalizePlanId("lifetime"), "pro");
+  assert.equal(normalizePlanId("pro"), "pro");
+  assert.equal(normalizePlanId("unknown"), "free");
+  assert.equal(normalizePlanId(undefined), "free");
+});
+
+test("the beta trial length can be changed or switched off", () => {
+  assert.equal(betaTrialDays({}), 30);
+  assert.equal(betaTrialDays({ BETA_GO_TRIAL_DAYS: "0" }), 0);
+  assert.equal(betaTrialDays({ BETA_GO_TRIAL_DAYS: "14" }), 14);
+  assert.equal(betaTrialDays({ BETA_GO_TRIAL_DAYS: "soon" }), 30);
 });
 
 test("Subscription lifecycle, entitlement evaluation, and usage tracking", async () => {
   process.env.TURSO_DATABASE_URL = "file::memory:";
+  // The beta trial is tested separately below.
+  process.env.BETA_GO_TRIAL_DAYS = "0";
   const { database } = await import("../src/lib/server/database");
   const {
     getUserSubscription,
@@ -56,7 +81,7 @@ test("Subscription lifecycle, entitlement evaluation, and usage tracking", async
     let sub = await getUserSubscription(testUserId);
     assert.equal(sub.planId, "free");
     assert.equal(sub.entitlements.watermark_free_export, false);
-    assert.equal(sub.entitlements.all_templates, false);
+    assert.equal(sub.beta, false);
 
     let checkExport = await checkEntitlement(testUserId, "watermark_free_export");
     assert.equal(checkExport, false);
@@ -64,21 +89,23 @@ test("Subscription lifecycle, entitlement evaluation, and usage tracking", async
     let checkTailor = await checkEntitlement(testUserId, "job_tailoring_engine");
     assert.equal(checkTailor, false);
 
-    // 2. Activate Job Hunter Monthly
+    // 2. Activate Go
     const futureSec = Math.floor(Date.now() / 1000) + 30 * 86400;
     await upsertSubscription({
       userId: testUserId,
       stripeCustomerId: "cus_12345",
       stripeSubscriptionId: "sub_12345",
-      planId: "job_hunter_monthly",
+      planId: "go",
       status: "active",
       currentPeriodEnd: futureSec,
       cancelAtPeriodEnd: false,
     });
 
     sub = await getUserSubscription(testUserId);
-    assert.equal(sub.planId, "job_hunter_monthly");
+    assert.equal(sub.planId, "go");
     assert.equal(sub.status, "active");
+    assert.equal(sub.entitlements.ai_summary_drafts, true);
+    assert.equal(sub.entitlements.job_coaching, false);
     assert.equal(sub.entitlements.watermark_free_export, true);
     assert.equal(sub.entitlements.all_templates, true);
 
@@ -102,15 +129,16 @@ test("Subscription lifecycle, entitlement evaluation, and usage tracking", async
     await upsertSubscription({
       userId: testUserId,
       stripeCustomerId: "cus_12345",
-      stripeSubscriptionId: "sub_lifetime_999",
-      planId: "lifetime",
+      stripeSubscriptionId: "sub_pro_999",
+      planId: "pro",
       status: "active",
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
     });
 
     sub = await getUserSubscription(testUserId);
-    assert.equal(sub.planId, "lifetime");
+    assert.equal(sub.planId, "pro");
+    assert.equal(sub.entitlements.job_coaching, true);
     assert.equal(sub.entitlements.watermark_free_export, true);
     assert.equal(sub.entitlements.all_templates, true);
 
@@ -118,8 +146,8 @@ test("Subscription lifecycle, entitlement evaluation, and usage tracking", async
     await upsertSubscription({
       userId: testUserId,
       stripeCustomerId: "cus_12345",
-      stripeSubscriptionId: "sub_lifetime_999",
-      planId: "job_hunter_monthly",
+      stripeSubscriptionId: "sub_pro_999",
+      planId: "go",
       status: "canceled",
       currentPeriodEnd: Math.floor(Date.now() / 1000) - 3600, // expired 1 hr ago
       cancelAtPeriodEnd: false,
@@ -128,8 +156,34 @@ test("Subscription lifecycle, entitlement evaluation, and usage tracking", async
     sub = await getUserSubscription(testUserId);
     assert.equal(sub.planId, "free");
     assert.equal(sub.entitlements.watermark_free_export, false);
+
+    // 5. Beta: a new account gets Go free for 30 days, then Free.
+    process.env.BETA_GO_TRIAL_DAYS = "30";
+    const created = Date.now() - 5 * 86_400_000;
+    await client.execute({
+      sql: "INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+      args: ["user_beta", "Beta", "beta@example.test", 1, created, created],
+    });
+    sub = await getUserSubscription("user_beta");
+    assert.equal(sub.planId, "go");
+    assert.equal(sub.status, "trialing");
+    assert.equal(sub.beta, true);
+    assert.equal(sub.entitlements.watermark_free_export, true);
+    assert.equal(sub.currentPeriodEnd, Math.floor((created + 30 * 86_400_000) / 1000));
+    await client.execute({
+      sql: "UPDATE user SET createdAt = ? WHERE id = ?",
+      args: [Date.now() - 31 * 86_400_000, "user_beta"],
+    });
+    sub = await getUserSubscription("user_beta");
+    assert.equal(sub.planId, "free");
+    assert.equal(sub.beta, false);
+    // With the beta off, an expired paid plan is Free.
+    process.env.BETA_GO_TRIAL_DAYS = "0";
+    sub = await getUserSubscription(testUserId);
+    assert.equal(sub.planId, "free");
   } finally {
     client.close();
     delete process.env.TURSO_DATABASE_URL;
+    delete process.env.BETA_GO_TRIAL_DAYS;
   }
 });

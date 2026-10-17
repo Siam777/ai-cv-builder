@@ -3,7 +3,7 @@ import type { AccountUser } from "@/lib/cloud-contract";
 
 export type SaveState =
   | "Loading"
-  | "Saved on this device"
+  | "Saved in this browser"
   | "Unsaved changes"
   | "Saving…"
   | "Save failed";

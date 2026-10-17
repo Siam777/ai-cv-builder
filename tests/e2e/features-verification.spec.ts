@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool, grantPaidPlan } from "./helpers";
 import {
   startSampleResume,
   openFirstCv,
@@ -11,44 +11,38 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     page,
   }) => {
     test.setTimeout(60000);
+    // The Cover Letter Studio is part of Go and Pro.
+    await grantPaidPlan(page);
     await page.goto("/builder");
 
     await startSampleResume(page);
 
-    // 1. Verify Toolbar Buttons
-    await openEditorTools(page);
+    // 1. Verify the toolbar: Design, Check, AI Assistant and Download
+    for (const name of ["Design", "AI Assistant", "CV options"])
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Check/ })).toBeVisible();
+    await page.getByRole("button", { name: "AI Assistant", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Create practice example" }),
+      page.getByRole("tab", { name: "Cover letter", exact: true }),
     ).toBeVisible();
-    await openEditorTools(page);
-    await expect(
-      page.getByRole("button", { name: "📊 Role Benchmark & Gaps" }),
-    ).toBeVisible();
-    await openEditorTools(page);
-    await expect(
-      page.getByRole("button", { name: "✉️ Cover letter" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Design & templates" }),
-    ).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // 2. Open Role Benchmark & Gaps Audit Panel
-    await openEditorTools(page);
-    await page
-      .getByRole("button", { name: "📊 Role Benchmark & Gaps" })
-      .click();
-    const atsModal = page.getByRole("dialog", {
-      name: "Resume content review",
+    await editorTool(page, "Check");
+    const atsModal = page.getByRole("complementary", {
+      name: "Check my CV",
     });
     await expect(atsModal).toBeVisible();
 
     await atsModal
-      .getByRole("button", { name: "Role checklist", exact: true })
+      .getByRole("tab", { name: "Compare with a role" })
       .click();
     // Role comparisons remain an explicit choice after content findings.
     await expect(
-      atsModal.getByRole("button", { name: /Role checklist/i }),
-    ).toHaveClass(/active/);
+      atsModal.getByRole("tab", { name: "Compare with a role" }),
+    ).toHaveAttribute("aria-selected", "true");
 
     // Switch to Solutions Architect
     await page
@@ -81,12 +75,11 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     await expect(page.getByText(/Role numeric patterns/i)).toBeVisible();
 
     // Close dialog
-    await atsModal.getByRole("button", { name: "Done" }).click();
+    await atsModal.getByRole("button", { name: "Close Check my CV" }).click();
     await expect(atsModal).not.toBeVisible();
 
     // 3. Open AI Quick-Start Generator
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "Create practice example" }).click();
+    await editorTool(page, "Practice CV (fictional)");
     await expect(
       page.getByRole("dialog", { name: "Create fictional practice CV" }),
     ).toBeVisible();
@@ -103,14 +96,11 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
     ).not.toBeVisible({ timeout: 10000 });
 
     // 4. Open Tailored Cover Letter Studio
-    await openEditorTools(page);
-    await page.getByRole("button", { name: "✉️ Cover letter" }).click();
-    const clModal = page.getByRole("dialog", {
-      name: "Tailored Cover Letter Generator",
-    });
+    await editorTool(page, "Cover letter");
+    const clModal = page.getByRole("region", { name: "Cover letter" });
     await expect(clModal).toBeVisible();
     await clModal
-      .getByRole("button", { name: /Generate Grounded Cover Letter/i })
+      .getByRole("button", { name: /Quick draft \(template\)/i })
       .click();
     await expect(clModal.locator(".cover-letter-sheet")).toBeVisible();
     await expect(clModal.locator(".letterhead-editable-body")).toBeVisible();
@@ -118,38 +108,37 @@ test.describe("Full Feature Verification: Role Analyzer, AI CV Generator, Cover 
       clModal.getByRole("button", { name: "Copy to clipboard" }),
     ).toBeVisible();
     await expect(
-      clModal.getByRole("button", { name: "🖨️ Print / Save as PDF" }),
+      clModal.getByRole("button", { name: "Print / Save as PDF" }),
     ).toBeVisible();
 
     // Close Cover Letter Studio
-    await clModal.getByRole("button", { name: "Done" }).click();
-    await expect(clModal).not.toBeVisible();
+    await page.getByRole("button", { name: "Close AI Assistant" }).click();
+    await expect(clModal).toHaveCount(0);
 
     // 5. Open Design & Templates Modal (Confirm No Squished Live Preview & 8 Templates)
-    await page.getByRole("button", { name: "Design & templates" }).click();
+    await page.getByRole("button", { name: "Design", exact: true }).click();
     await expect(
-      page.getByRole("dialog", { name: "Design & Templates" }),
+      page.getByRole("complementary", { name: "Design" }),
     ).toBeVisible();
     await expect(page.locator(".design-modal-body")).toBeVisible();
     // Modal should NOT contain the redundant live document preview
     await expect(page.locator(".modal-live-preview")).not.toBeVisible();
-    // Check template filter tabs
-    await expect(page.getByRole("tab", { name: "ATS Classic" })).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: "Modern & Tech" }),
-    ).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Executive" })).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: "Creative & Visual" }),
-    ).toBeVisible();
+    // Check design filters
+    const filters = page.getByRole("group", { name: "Filter designs" });
+    for (const name of [/^All \(12\)/, /^Supports photo/, /^ATS-friendly/, /^One column/, /^Two columns/])
+      await expect(filters.getByRole("button", { name })).toBeVisible();
+    await filters.getByRole("button", { name: /^Two columns/ }).click();
+    await expect(page.getByRole("button", { name: "Creative template" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Classic template" })).toHaveCount(0);
+    await filters.getByRole("button", { name: /^All/ }).click();
 
     // Click Tech Startup template
     await page.getByRole("button", { name: /Tech Startup/i }).click();
 
-    // Close design modal
-    await page.getByRole("button", { name: "Done & Return to Editor" }).click();
+    // Close the design panel
+    await page.getByRole("button", { name: "Close Design" }).click();
     await expect(
-      page.getByRole("dialog", { name: "Design & Templates" }),
+      page.getByRole("complementary", { name: "Design" }),
     ).not.toBeVisible();
   });
 });

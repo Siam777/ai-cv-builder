@@ -9,31 +9,17 @@ Inspect existing account models ([schema.ts](file:///D:/utility-projects/ai-cv-b
 
 ## Commercial pricing tiers
 
-Implement the 3-tier commercial model:
-1. **Free / Local Tier ($0)**:
-   - Unlimited local editing.
-   - 1 active resume variant.
-   - Classic template access.
-   - Browser print export with subtle watermark footer (*"Created with AI CV Builder"*).
-   - Plain text and JSON export.
-2. **Job Hunter Pass ($19 / month or $9 / week)**:
-   - Target audience: Active job seekers in a 2–8 week search cycle.
-   - Unlimited tailored resume variants.
-   - Cloud synchronization across devices.
-   - All 4 template families (Classic, Modern, Compact, Creative).
-   - Full Master Career Vault access.
-   - 1-Click Job Tailoring Engine (50 tailored applications/month).
-   - Full ATS Readiness and Keyword Coverage diagnostic reports.
-   - Watermark-free PDF and DOCX exports.
-3. **Lifetime / Power Pass ($79 one-time)**:
-   - Target audience: Senior engineers and managers maintaining long-term career records.
-   - Permanent Master Career Vault access and unlimited tailoring.
-   - Priority AI processing queue.
+Three monthly tiers (`src/lib/billing-plans.ts` is the source of truth; old IDs `job_hunter_weekly`/`job_hunter_monthly` map to `go`, `lifetime` to `pro`):
+1. **Free ($0)**: full editor and all 12 designs, Check my CV and built-in writing helpers, 5 AI rewrites a day, PDF download with a small watermark.
+2. **Go ($9.99 / month)**: everything in Free, no watermark, 50 AI rewrites a day, AI summary drafts, 20 tailored CV copies a month, cover letters.
+3. **Pro ($29.99 / month)**: everything in Go, 200 AI rewrites a day, unlimited tailored copies, AI job coaching per requirement.
+
+Beta: every signed-in account gets Go free for its first `BETA_GO_TRIAL_DAYS` days (30 by default, 0 switches it off), computed in `getUserSubscription` with no Stripe record. `AI_DAILY_USER_LIMIT`, when set, caps every plan; `AI_DAILY_GLOBAL_LIMIT` caps the installation. Use `node scripts/grant-plan.mjs --email … --plan pro` to give an existing account a plan for testing without Stripe.
 
 ## Stripe integration and checkout flow
 
 1. **Checkout Session Creation**:
-   - Provide `/api/billing/checkout` endpoint accepting `planId` and billing frequency.
+   - Provide `/api/billing/checkout` endpoint accepting `planId` (`go` or `pro`); prices come from `STRIPE_PRICE_GO` and `STRIPE_PRICE_PRO`.
    - Authenticate the request and attach the user's canonical ID to Stripe `client_reference_id` and metadata.
    - Redirect to Stripe Hosted Checkout with success and cancel callback URLs.
 2. **Customer Portal**:
@@ -52,9 +38,10 @@ Enforce entitlements strictly on the server:
 1. **PDF / DOCX Export Gating**:
    - Verify entitlement during PDF generation. If the user is on the Free tier, append the professional watermark to the footer.
    - Disallow client-side tampering: Watermark removal must be validated server-side.
-2. **AI Tailoring Quotas**:
-   - Check monthly quota consumption before triggering OpenAI job extraction and matching.
-   - Return clean 402/403 status with actionable upgrade payload when quota is exhausted.
+2. **AI quotas and plan features**:
+   - Count every AI request against the plan's `aiRequestsPerDay` before calling the provider (429 `AI_LIMIT`).
+   - AI summary drafts need Go or Pro and AI job coaching needs Pro; refuse with 402 `PLAN_REQUIRED` before any provider call.
+   - Tailored copies are created in the browser, so their lock is presentation-only (see PLAN.md).
 3. **Master Career Vault & Variant Limits**:
    - Allow free users to maintain 1 primary resume variant.
    - Prompt upgrade when creating secondary targeted variants or saving more than 10 bullets per entry into the vault.
@@ -64,5 +51,5 @@ Enforce entitlements strictly on the server:
 Validate billing code with thorough automated and mock tests:
 - Test webhook signature validation: Reject unauthenticated or tampered payloads.
 - Test idempotent replay: Sending the same webhook event twice must not corrupt user entitlements or duplicate records.
-- Test tier transition: Downgrade from Job Hunter Pass locks premium features without deleting candidate data.
+- Test tier transition: Downgrade from Go or Pro locks premium features without deleting candidate data, and the beta period ends after its days.
 - Test watermark presence: Verify watermark is present on free exports and absent on active subscriber exports.
