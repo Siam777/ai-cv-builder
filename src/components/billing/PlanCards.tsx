@@ -81,8 +81,18 @@ type Row = { label: string; value: (plan: PlanConfig) => string | boolean };
 const ROWS: Row[] = [
   { label: "Editor, Check my CV and all 12 designs", value: () => true },
   { label: "Built-in writing helpers", value: () => true },
-  { label: "AI rewrites a day", value: (p) => String(p.aiRequestsPerDay) },
+  { label: "AI requests a day (all AI actions)", value: (p) => String(p.aiRequestsPerDay) },
+  { label: "Bullets from your notes, examples, wording fixes", value: (p) => p.aiEntryBullets },
+  {
+    label: "Build my CV with AI (interviews)",
+    value: (p) => (p.aiInterviews === Infinity ? "Unlimited" : String(p.aiInterviews)),
+  },
   { label: "AI summary drafts", value: (p) => p.aiSummaryDrafts },
+  { label: "Suggest skills with AI", value: (p) => p.aiSkills },
+  { label: "Ask the AI", value: (p) => p.aiAsk },
+  { label: "Match a job post with AI", value: (p) => p.aiJobMatch },
+  { label: "Improve all bullets", value: (p) => p.aiImproveAll },
+  { label: "Tidy imported CVs with AI", value: (p) => p.aiImportTidy },
   { label: "Watermark-free downloads", value: (p) => !p.hasWatermark },
   {
     label: "Tailored CV copies a month",
@@ -94,6 +104,8 @@ const ROWS: Row[] = [
           : false,
   },
   { label: "Cover letters", value: (p) => p.coverLetters },
+  { label: "Write a cover letter with AI", value: (p) => p.aiCoverLetter },
+  { label: "Tailor with AI", value: (p) => p.aiTailor },
   { label: "AI job coaching", value: (p) => p.jobCoaching },
 ];
 

@@ -61,15 +61,70 @@ export default function Privacy() {
         </p>
         <h2>AI suggestions</h2>
         <p>
-          AI writing help works on account CVs and is off until you turn it on
-          (asked once, kept on your account, and switchable in Account
-          settings, Data &amp; privacy). While it is on, each AI action sends only
-          what it needs: a bullet rewrite sends the selected entry&apos;s bullets
-          and instruction; Write with AI sends your notes and that entry&apos;s
-          title, organization and bullets; examples for a job title send only
-          the job title. Contact details are removed and never sent. Suggestions are
-          reviewed before acceptance. Provider retention depends on the deployed
-          provider's account settings; no zero-retention guarantee is made.
+          AI writing help needs an account and is off until you turn it on. You
+          are asked once; the choice is kept on your account and can be switched
+          off in Account settings, Data &amp; privacy. While it is on, each AI
+          action sends only what it needs to OpenAI. Contact details (email,
+          phone, website) and photos are never sent, and are removed from notes
+          and questions you type. Nothing is added to your CV until you accept
+          it, and Undo reverses what you accept.
+        </p>
+        <ul>
+          <li>
+            <strong>Bullet help</strong> (Improve wording, Shorten, Continue
+            writing, Rewrite selection, Improve all bullets, Fix with AI): that
+            job&apos;s bullets and the instruction.
+          </li>
+          <li>
+            <strong>Write with AI on a job or project</strong>: your notes, any
+            duties you paste, and that entry&apos;s title, organization and
+            bullets.
+          </li>
+          <li>
+            <strong>Examples for a job title</strong>: only the job title and the
+            level you choose. The examples are kept for 30 days and reused for
+            anyone who asks for the same title and level; they are not linked to
+            your account and contain nothing from your CV.
+          </li>
+          <li>
+            <strong>Summary, Suggest skills and Ask the AI</strong>: your
+            headline, job titles, organizations, bullets, education, projects and skills,
+            plus your question for Ask the AI and the last few questions and
+            answers on screen.
+          </li>
+          <li>
+            <strong>Build my CV with AI (interview)</strong>: each answer you
+            give, one step at a time. Your name is not sent. The account keeps a
+            record that an interview was started (Free includes one), and that
+            record is in your account-data download.
+          </li>
+          <li>
+            <strong>Match with AI and Tailor with AI</strong>: the job title,
+            company and job post, plus your CV text as above. A line you write
+            about a requirement is sent to suggest where it goes.
+          </li>
+          <li>
+            <strong>Write a cover letter with AI</strong>: the job details, your
+            optional note on why you want the job, and your CV text as above.
+          </li>
+          <li>
+            <strong>Tidy with AI</strong> after an import: the imported CV&apos;s
+            sections and entries before they are saved, without contact details
+            or photo. It may only move, split and date items; your wording is not
+            changed.
+          </li>
+        </ul>
+        <p>
+          AI results are returned to your editor and are not stored on the
+          server, except bullet suggestions waiting for your decision (with the
+          bullets they cite), which stay in your account until you decide or
+          delete the CV or account and are included in account-data export. The
+          server counts AI requests per day for plan limits and logs only
+          metadata such as timings and error codes, never your text. Independent
+          checks look for unsupported claims and invented numbers, but they can
+          make mistakes, so read every suggestion before you accept it. Provider
+          retention depends on the deployed provider&apos;s account settings; no
+          zero-retention guarantee is made.
         </p>
         <p>
           Where configured, criterion coaching also asks for consent to send one

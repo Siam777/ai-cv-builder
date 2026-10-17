@@ -97,11 +97,11 @@ export default function UpgradePage() {
     },
     {
       q: "Can I keep using the editor for free?",
-      a: "Yes. Free includes the full editor, all 12 designs, Check my CV, built-in writing helpers and 5 AI rewrites a day. Downloads need an account; Free PDFs carry a small watermark.",
+      a: "Yes. Free includes the full editor, all 12 designs, Check my CV, built-in writing helpers, 5 AI requests a day (bullets from your notes, examples for your job title, wording fixes) and one AI interview. Downloads need an account; Free PDFs carry a small watermark.",
     },
     {
-      q: "What counts as an AI rewrite?",
-      a: "Each AI request, such as improving a bullet or drafting a summary. Nothing is changed until you accept it, and AI only uses what your CV already says.",
+      q: "What counts as an AI request?",
+      a: "Each time you ask the AI for something: improving a bullet, writing bullets from your notes, drafting a summary, matching a job post or asking a question. Showing the same examples again still counts. Nothing is changed until you accept it, and AI only uses what you tell it or what your CV already says.",
     },
     {
       q: "How do I cancel?",

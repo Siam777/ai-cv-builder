@@ -52,3 +52,11 @@ Validate all editor UX changes with automated tests:
 - Component test bidirectional sync: Clicking preview element triggers scroll and focus in editor.
 - Performance test typing responsiveness: Rapid typing in a bullet must not cause lag or dropped frames on the preview stage.
 - End-to-end tests: Verify undo/redo restores bullet state, inline AI diff acceptance updates the document revision, and autosave transitions cleanly between `saving`, `saved`, and `error` states.
+
+## AI review patterns in this app (2026-10)
+
+- Unavailable AI is shown with its reason and the one step that fixes it (`AiBlocked`: sign in, copy to account) and a one-time consent card (`AiConsent`); do not hide AI actions or re-ask consent per request.
+- Built-in helpers and AI are labelled apart in the sparkle menu ("AI writing help" and "Quick (no AI)").
+- Multi-item AI results (Write with AI bullets, Improve all, interview steps, skills) use one review list with unticked items, quoted evidence, withheld reasons and questions, and a single accept that is one Undo step.
+- Examples with blanks use fill-in-the-blanks editing (`BlankFiller`): an inline field per blank, remove a blank, a progress line, and "Edit the whole sentence"; adding stays disabled until no blank is left.
+- AI flows that walk several steps (the interview) replace the step form while the preview fills in live; every step can be skipped.

@@ -135,7 +135,7 @@ test("AI persistence enforces ownership, retry receipts, revision checks, quotas
         { ...failed, requestId: randomUUID() },
         generator,
       ),
-      /used today.s 3 AI rewrites/,
+      /used today.s 3 AI requests/,
     );
     await removeResume("alice", doc.id, latest.revision);
     assert.equal(

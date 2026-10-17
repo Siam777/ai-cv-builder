@@ -259,7 +259,7 @@ export async function requestRewrite(
       throw new HttpError(
         429,
         "AI_LIMIT",
-        `You have used today's ${dailyLimit(plan.aiRequestsPerDay)} AI rewrites on the ${plan.name} plan. Try again tomorrow, or choose a plan with more.`,
+        `You have used today's ${dailyLimit(plan.aiRequestsPerDay)} AI requests on the ${plan.name} plan. Try again tomorrow, or choose a plan with more.`,
       );
     if (
       Number(global?.count ?? 0) >=
@@ -496,7 +496,7 @@ async function reserveDailyRequest(owner: string, perDay: number, planName: stri
       throw new HttpError(
         429,
         "AI_LIMIT",
-        `You have used today's ${dailyLimit(perDay)} AI rewrites on the ${planName} plan. Try again tomorrow, or choose a plan with more.`,
+        `You have used today's ${dailyLimit(perDay)} AI requests on the ${planName} plan. Try again tomorrow, or choose a plan with more.`,
       );
     if (Number(global?.count ?? 0) >= limit(process.env.AI_DAILY_GLOBAL_LIMIT, 200))
       throw new HttpError(

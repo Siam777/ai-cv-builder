@@ -56,7 +56,7 @@ test("plans decide AI summary drafts and daily AI requests", async () => {
     );
     assert.equal(draft.text, "Product designer with research experience.");
 
-    // Free: 5 AI rewrites a day.
+    // Free: 5 AI requests a day.
     const bullet = freeDoc.sections.flatMap((s) => s.entries).flatMap((e) => e.bullets)[0];
     const rewrite = async () => ({
       text: "Worked with the design team.",
