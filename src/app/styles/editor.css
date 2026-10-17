@@ -1247,3 +1247,59 @@ body {
   min-height: 44px;
   field-sizing: content;
 }
+
+/* Bullets read like lines of text: the box grows with its words, no resize
+   handle or empty space, and the card alone shows focus (a soft green ring). */
+.studio .bullet-field {
+  padding: 8px 10px 8px 8px;
+}
+.studio .bullet-field:focus-within {
+  border-color: var(--green-500);
+  box-shadow: 0 0 0 3px rgba(39, 97, 76, 0.16);
+}
+.studio .bullet-main-row {
+  align-items: flex-start;
+  gap: 6px;
+}
+.studio .bullet-drag-handle {
+  padding: 0 4px;
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.studio .bullet-textarea,
+.studio .bullet-textarea.list-item {
+  min-height: calc(1.6em + 4px);
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+}
+/* Browsers without field-sizing keep the rows attribute and can scroll. */
+@supports not (field-sizing: content) {
+  .studio .bullet-textarea {
+    overflow: auto;
+    resize: vertical;
+  }
+}
+.studio .bullet-textarea:focus,
+.studio .bullet-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.studio .bullet-textarea::placeholder {
+  color: var(--gray-500);
+}
+.studio .bullet-remove-btn {
+  align-self: flex-start;
+  padding: 4px;
+  opacity: 0.55;
+}
+.studio .bullet-field:hover .bullet-remove-btn,
+.studio .bullet-field:focus-within .bullet-remove-btn {
+  opacity: 1;
+}
