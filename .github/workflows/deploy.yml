@@ -61,7 +61,20 @@ jobs:
           script: |
             set -e
             echo "=== [1/5] Pulling Latest Commits ==="
+            # Ensure parent repos directory exists
+            mkdir -p /opt/elfasys/repos
+
+            # If directory exists but is not a git repo, or doesn't exist yet:
+            if [ ! -d "/opt/elfasys/repos/ai-cv-builder/.git" ]; then
+              echo "Cloning repository into /opt/elfasys/repos/ai-cv-builder..."
+              rm -rf /opt/elfasys/repos/ai-cv-builder
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git /opt/elfasys/repos/ai-cv-builder
+            fi
+
             cd /opt/elfasys/repos/ai-cv-builder
+
+            # Ensure origin remote is authenticated with GITHUB_TOKEN for pulling
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             git fetch origin
             git checkout ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
