@@ -10,6 +10,7 @@ export const templates = [
     badge: "Traditional · 1 Column",
     category: "ats",
     photoSupported: false,
+    columns: 1,
   },
   {
     id: "modern",
@@ -20,6 +21,7 @@ export const templates = [
     badge: "Contemporary · Clean Header",
     category: "modern",
     photoSupported: true,
+    columns: 1,
   },
   {
     id: "compact",
@@ -30,6 +32,7 @@ export const templates = [
     badge: "High Density · Space Saver",
     category: "ats",
     photoSupported: false,
+    columns: 1,
   },
   {
     id: "creative",
@@ -40,6 +43,7 @@ export const templates = [
     badge: "Editorial · Contact Sidebar",
     category: "creative",
     photoSupported: true,
+    columns: 2,
   },
   {
     id: "tech",
@@ -50,6 +54,7 @@ export const templates = [
     badge: "Clean · Tech Stack Focus",
     category: "modern",
     photoSupported: false,
+    columns: 1,
   },
   {
     id: "executive",
@@ -59,7 +64,8 @@ export const templates = [
     tagline: "Leadership & Senior Roles",
     badge: "Prestigious · Executive",
     category: "executive",
-    photoSupported: false,
+    photoSupported: true,
+    columns: 1,
   },
   {
     id: "timeline",
@@ -70,6 +76,7 @@ export const templates = [
     badge: "Milestones · Timeline Rail",
     category: "modern",
     photoSupported: true,
+    columns: 1,
   },
   {
     id: "minimalist",
@@ -80,6 +87,7 @@ export const templates = [
     badge: "Quiet · Minimalist",
     category: "creative",
     photoSupported: true,
+    columns: 1,
   },
   {
     id: "elegant",
@@ -89,7 +97,8 @@ export const templates = [
     tagline: "Finance & Consulting",
     badge: "Refined · Single Column",
     category: "executive",
-    photoSupported: false,
+    photoSupported: true,
+    columns: 1,
   },
   {
     id: "portfolio",
@@ -100,6 +109,7 @@ export const templates = [
     badge: "Creative · Section Panels",
     category: "creative",
     photoSupported: true,
+    columns: 1,
   },
   {
     id: "bold",
@@ -109,7 +119,8 @@ export const templates = [
     tagline: "Sales & Marketing",
     badge: "Expressive · Clear Structure",
     category: "modern",
-    photoSupported: false,
+    photoSupported: true,
+    columns: 1,
   },
   {
     id: "academic",
@@ -120,6 +131,7 @@ export const templates = [
     badge: "Scholarly · Long CV",
     category: "ats",
     photoSupported: false,
+    columns: 1,
   },
 ] as const;
 export const accents = {

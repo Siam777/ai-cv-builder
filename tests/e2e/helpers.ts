@@ -9,7 +9,7 @@ export async function startSampleResume(
   fixture: ResumeDocument = createDocument(true),
 ) {
   fixture.provenance = { purpose: "personal", origin: "import" };
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByLabel("Import JSON backup").setInputFiles({
     name: "fixture.json",
     mimeType: "application/json",
@@ -27,6 +27,19 @@ export async function openFirstCv(
   page: Page,
   collection?: "Practice copies" | "Review older drafts",
 ) {
+  // A reload reopens the CV in the address (?cv=). Once loading ends it is
+  // either open, which is the CV wanted, or the list is shown. A collection
+  // needs the list: go there in the same workspace (a page load could switch).
+  if (new URL(page.url()).searchParams.has("cv")) {
+    await expect(page.locator(".save-status").first()).not.toHaveText("Loading");
+    if (new URL(page.url()).searchParams.has("cv")) {
+      if (!collection) return;
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("button", { name: "My CVs" })
+        .click();
+    }
+  }
   if (collection)
     await page
       .getByRole("navigation", { name: "Document collections" })
@@ -101,10 +114,106 @@ export async function verifyTestEmail(
   ).toBe(true);
 }
 
-// Reveal secondary editor actions through their user-facing disclosure.
-export async function openEditorTools(page: Page) {
-  const trigger = page.getByRole("button", { name: "More tools", exact: true });
-  if (await trigger.isVisible() && await trigger.getAttribute("aria-expanded") !== "true") {
-    await trigger.click();
+const CV_MENU = [
+  "New",
+  "Duplicate",
+  "Import JSON",
+  "History",
+  "Mark as my CV",
+  "Demo examples",
+  "Practice CV (fictional)",
+  "Delete this CV",
+];
+// The AI Assistant is one panel with four tabs.
+const AI_TABS: Record<string, string> = {
+  "Writing help": "Help me finish",
+  "Match a job": "Match a job",
+  "Cover letter": "Cover letter",
+  "Ask the AI": "Ask the AI",
+};
+
+// Run an editor toolbar action, opening its menu first when it lives in one.
+export async function editorTool(page: Page, name: string) {
+  if (name === "Check") {
+    await page.getByRole("button", { name: /^Check/ }).click();
+    return;
   }
+  if (name in AI_TABS) {
+    const toggle = page.getByRole("button", {
+      name: "AI Assistant",
+      exact: true,
+    });
+    if ((await toggle.getAttribute("aria-pressed")) !== "true")
+      await toggle.click();
+    await page
+      .getByRole("tab", { name: AI_TABS[name], exact: true })
+      .click();
+    return;
+  }
+  const menu = CV_MENU.includes(name) ? "CV options" : null;
+  if (!menu) {
+    await page.getByRole("button", { name, exact: true }).click();
+    return;
+  }
+  await page.getByRole("button", { name: menu, exact: true }).click();
+  await page
+    .getByRole("menuitem", {
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    })
+    .first()
+    .click();
+}
+
+// How many CVs share the open CV's collection (the open one plus the switch list).
+export async function cvCount(page: Page) {
+  await page.getByRole("button", { name: "CV options", exact: true }).click();
+  const count = await page.locator(".menu-item.cv-switch").count();
+  await page.keyboard.press("Escape");
+  return count + 1;
+}
+
+// Open account settings (or sign-in) from the account menu.
+export async function openAccount(page: Page) {
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page
+    .getByRole("menuitem", { name: /^(Account settings|Sign in)/ })
+    .click();
+}
+
+// Switch the account settings panel to one of its tabs.
+export async function accountTab(
+  page: Page,
+  name: "Profile" | "Sign-in & security" | "Data & privacy" | "Billing",
+) {
+  await page
+    .getByRole("tablist", { name: "Account sections" })
+    .getByRole("tab", { name, exact: true })
+    .click();
+}
+
+// Give a real test account Pro in the isolated e2e database, so server-side
+// plan checks (such as AI job coaching) pass.
+export async function grantProAccount(userId: string) {
+  const { createClient } = await import("@libsql/client");
+  const client = createClient({ url: "file:./data/e2e.db" });
+  const now = new Date().toISOString();
+  await client.execute({
+    sql: `INSERT INTO subscriptions (id, user_id, stripe_customer_id, stripe_subscription_id, plan_id, status, current_period_end, cancel_at_period_end, created_at, updated_at)
+          VALUES (?, ?, ?, NULL, 'pro', 'active', NULL, 0, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET plan_id = 'pro', status = 'active'`,
+    args: [`sub_${randomUUID()}`, userId, `cus_e2e_${userId}`, now, now],
+  });
+  client.close();
+}
+
+// Show the free plan's locked states by default, and a paid plan on request.
+export async function grantPaidPlan(page: Page) {
+  await page.route("**/api/billing/subscription", (route) =>
+    route.fulfill({
+      json: {
+        subscription: { planId: "pro", status: "active" },
+        user: null,
+      },
+    }),
+  );
 }

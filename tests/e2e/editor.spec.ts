@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool, cvCount, grantPaidPlan } from "./helpers";
 import { getDemoResume } from "../../src/lib/demo-resumes";
 import {
   startSampleResume,
@@ -18,34 +18,38 @@ test("creation, save/reload, independent variants, undo, imports and exports", a
     page.getByRole("article", { name: "Resume preview" }),
   ).toContainText("Alex Morgan");
   await page.getByLabel("Full name", { exact: true }).fill("নাদিয়া Morgan");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "নাদিয়া Morgan",
   );
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Duplicate", exact: true }).click();
+  await editorTool(page, "Duplicate");
   await page.getByLabel("Full name", { exact: true }).fill("Variant Name");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "নাদিয়া Morgan",
   );
   await page.getByLabel("Full name", { exact: true }).fill("Variant Name");
+  await page.getByRole("button", { name: "CV options", exact: true }).click();
   await page
-    .getByLabel("Resume", { exact: true })
-    .selectOption({ label: "Alex Morgan · Product designer" });
+    .getByRole("menuitem", { name: /^Alex Morgan · Product designer/ })
+    .click();
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "নাদিয়া Morgan",
   );
-  await page.getByRole("button", { name: /03 Experience/ }).click();
+  await page
+    .getByRole("complementary", { name: "Resume sections" })
+    .getByRole("button", { name: /^Experience/ })
+    .click();
+  await page.locator(".section-settings > summary").click();
   await page.getByLabel("Show in resume").uncheck();
   await expect(page.getByRole("article")).not.toContainText("Northstar");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("article")).toContainText("Northstar");
   await page.getByLabel("Page size").selectOption("Letter");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const backupDownload = page.waitForEvent("download");
   await page
@@ -62,7 +66,7 @@ test("creation, save/reload, independent variants, undo, imports and exports", a
   await expect(page.getByRole("article")).toContainText("নাদিয়া Morgan");
   await page.getByLabel("Import JSON backup").setInputFiles(path!);
   await page.getByRole("button", { name: "Restore as new" }).click();
-  await expect(page.locator("#resume-select option")).toHaveCount(3);
+  await expect.poll(() => cvCount(page)).toBe(3);
   await expect(page.getByLabel("Page size")).toHaveValue("Letter");
   await page.screenshot({
     path: "test-results/studio-desktop.png",
@@ -106,7 +110,7 @@ test("concurrent tab edits cannot overwrite saved content", async ({
     "Alex Morgan",
   );
   await page.getByLabel("Full name", { exact: true }).fill("First writer");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await other.getByLabel("Full name", { exact: true }).fill("Stale writer");
   await expect(other.locator(".alert")).toContainText("another tab");
   await page.reload();
@@ -121,7 +125,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
 }) => {
   test.setTimeout(60000);
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Create my resume" }).click();
+  await page.getByRole("button", { name: "Start from scratch", exact: true }).click();
   await page.getByLabel("Full name", { exact: true }).fill("Zoë Example");
   for (const name of [
     "Profile",
@@ -137,11 +141,11 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
       .getByRole("button", { name: new RegExp(name) })
       .click();
     await page
-      .getByRole("button", { name: /^\+ Add (entry|experience)$/ })
+      .getByRole("button", { name: /^Add your first / })
       .click();
     if (name === "Profile")
       await page
-        .getByLabel("Professional summary")
+        .getByLabel("Professional summary", { exact: true })
         .fill("A careful introduction.");
     else {
       await page
@@ -159,6 +163,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
         .fill(`Details for ${name}.`);
     }
   }
+  await page.locator(".section-settings > summary").click();
   await page.getByLabel("Section heading").fill("Spoken languages");
   await page
     .getByRole("button", { name: "Move section up", exact: true })
@@ -172,7 +177,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
   );
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByRole("article")).toContainText("Languages evidence");
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   await authenticateForExport(page);
   const textDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
@@ -199,7 +204,7 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
     .getByRole("button", { name: /Experience/ })
     .click();
   await page.getByLabel("Description", { exact: true }).fill(longText);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.pdf({
     path: "test-results/resume-long-a4.pdf",
     preferCSSPageSize: true,
@@ -216,11 +221,11 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
 test("reviewed job evidence creates an isolated fact-preserving variant and supports undo", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
+  await editorTool(page, "Match a job");
   await page.getByLabel("Target Job Title").fill("Senior Product Designer");
   await page.getByLabel("Company Name").fill("Acme Corp");
   await page
@@ -252,17 +257,19 @@ test("reviewed job evidence creates an isolated fact-preserving variant and supp
     .check();
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#resume-select option")).toHaveCount(2);
-  await expect(page.getByLabel("Resume", { exact: true })).toContainText(
-    "Tailored",
+  // The new variant opens; the original stays in the CV menu.
+  await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
+    /Tailored/,
   );
   await page
     .getByRole("button", { name: "Undo reviewed variant creation" })
     .click();
-  await expect(page.locator("#resume-select option")).toHaveCount(1);
-  await expect(page.getByLabel("Resume", { exact: true })).not.toContainText(
-    "Tailored",
+  await expect(page.getByLabel("CV name", { exact: true })).not.toHaveValue(
+    /Tailored/,
   );
+  await page.getByRole("button", { name: "CV options", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /Tailored/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 });
 
 test("ATS readiness inspector audits content, displays metrics, and previews plain-text stream", async ({
@@ -270,32 +277,28 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Check that ATS pill is visible in header
-  const atsPill = page.getByRole("button", { name: "Review writing" });
+  const atsPill = page.getByRole("button", { name: /^Check/ });
   await expect(atsPill).toBeVisible();
   await atsPill.click();
 
   // Audit modal opens
   await expect(
-    page.getByRole("dialog", { name: "Resume content review" }),
+    page.getByRole("complementary", { name: "Check my CV" }),
   ).toBeVisible();
-  // The review opens on the explained score; findings are one tab away.
-  await expect(page.locator(".score-report")).toBeVisible();
-  await page.getByRole("button", { name: /Writing findings/ }).click();
-  await expect(page.locator(".big-score")).toBeVisible();
-  await expect(page.locator(".ats-metrics-breakdown")).toContainText(
-    "Not checked",
+  // Completeness is labelled as such, never as a hiring score.
+  await expect(page.locator(".check-summary")).toContainText(
+    "Not a hiring score",
   );
-  await expect(page.locator(".big-score")).not.toContainText("%");
-  await expect(page.locator(".ats-metrics-breakdown")).toContainText(
-    "Vague openings",
+  await expect(page.locator(".check-checklist")).toContainText(
+    "Results in bullets",
   );
 
   // Applied role banner calibrates to candidate's applied role (Product Designer)
   await page
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   await expect(page.locator(".applied-role-banner")).toBeVisible();
   await expect(page.locator(".applied-role-name")).toContainText(
@@ -304,6 +307,7 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
   await expect(page.locator(".role-chip-btn.applied-chip")).toBeVisible();
 
   // Switch to plain text robot view
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await page.getByRole("button", { name: "Document text view" }).click();
   await expect(page.locator(".plaintext-terminal")).toContainText(
     "ALEX MORGAN",
@@ -311,7 +315,7 @@ test("ATS readiness inspector audits content, displays metrics, and previews pla
   await expect(page.locator(".plaintext-terminal")).toContainText("EXPERIENCE");
 
   // Close modal
-  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("button", { name: "Close Check my CV" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -322,15 +326,14 @@ test("CV Analyzer calibrates strictly to CV applied role (Digital Growth & Marke
   await startSampleResume(page, getDemoResume("sharya-singh")!);
 
   // Open Role Benchmark & Gaps
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "Role Benchmark & Gaps" }).click();
+  await editorTool(page, "Check");
   await expect(
-    page.getByRole("dialog", { name: "Resume content review" }),
+    page.getByRole("complementary", { name: "Check my CV" }),
   ).toBeVisible();
 
   // Applied CV role banner must explicitly display candidate's applied role
   await page
-    .getByRole("button", { name: "Role checklist", exact: true })
+    .getByRole("tab", { name: "Compare with a role" })
     .click();
   const appliedBanner = page.locator(".applied-role-banner");
   await expect(appliedBanner).toBeVisible();
@@ -363,7 +366,7 @@ test("CV Analyzer calibrates strictly to CV applied role (Digital Growth & Marke
   });
 
   // Close modal
-  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("button", { name: "Close Check my CV" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -372,7 +375,7 @@ test("Pricing modal displays commercial tiers, entitlement benefits, and initiat
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click Upgrade pill in header
   const upgradeBtn = page.getByRole("button", { name: /Upgrade/ });
@@ -382,23 +385,20 @@ test("Pricing modal displays commercial tiers, entitlement benefits, and initiat
   // Pricing dialog should open
   const dialog = page.getByRole("dialog", { name: "Subscription Pricing" });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Free / Local");
-  await expect(dialog).toContainText("Monthly Pass");
-  await expect(dialog).toContainText("Power Pass");
+  for (const [name, price] of [["Free", "$0"], ["Go", "$9.99"], ["Pro", "$29.99"]])
+    await expect(dialog.getByRole("group", { name: `${name} plan` })).toContainText(price);
 
-  // Clicking an upgrade button while in local mode redirects to account sign in
-  await page
-    .getByRole("button", { name: /Upgrade to Job Hunter Pass/ })
-    .click();
+  // Choosing a plan while signed out opens sign-in
+  await page.getByRole("button", { name: "Choose Go" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(
-    page.getByRole("region", { name: "Account and storage" }),
+    page.getByRole("region", { name: "Account settings" }),
   ).toBeVisible();
 
   // Close account modal
   await page.getByRole("button", { name: "Close account settings" }).click();
   await expect(
-    page.getByRole("region", { name: "Account and storage" }),
+    page.getByRole("region", { name: "Account settings" }),
   ).toHaveCount(0);
 });
 
@@ -448,10 +448,12 @@ test("Public ATS Grader lead magnet audits resume, displays matches, and transfe
   // Should navigate to /builder and load Alex Morgan in the editor
   await expect(page).toHaveURL("/builder");
   await expect(
-    page.getByRole("heading", { name: "Your CVs, clearly organized." }),
+    page.getByRole("heading", { name: "My CVs", level: 1 }),
   ).toBeVisible();
   await openFirstCv(page, "Practice copies");
-  await expect(page.locator("#resume-select")).toContainText("Alex Morgan");
+  await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
+    /Alex Morgan/,
+  );
 });
 
 test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid export files", async ({
@@ -459,11 +461,11 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   await authenticateForExport(page);
   // Test Direct PDF download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const pdfDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "PDF Document (.pdf)" }).click();
   const pdfDownload = await pdfDownloadPromise;
@@ -471,35 +473,35 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
   expect(pdfDownload.suggestedFilename()).not.toMatch(/^[0-9a-f-]{36}$/i); // Must not be raw UUID without extension
 
   // Test HTML download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const htmlDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Standalone HTML (.html)" }).click();
   const htmlDownload = await htmlDownloadPromise;
   expect(htmlDownload.suggestedFilename()).toMatch(/\.html$/i);
 
   // Test DOCX download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const docxDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Word Document (.docx)" }).click();
   const docxDownload = await docxDownloadPromise;
   expect(docxDownload.suggestedFilename()).toMatch(/\.docx$/i);
 
   // Test Markdown download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const mdDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Markdown (.md)" }).click();
   const mdDownload = await mdDownloadPromise;
   expect(mdDownload.suggestedFilename()).toMatch(/\.md$/i);
 
   // Test Plain Text download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const txtDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
   const txtDownload = await txtDownloadPromise;
   expect(txtDownload.suggestedFilename()).toMatch(/\.txt$/i);
 
   // Test Backup JSON download
-  await page.locator("summary").click();
+  await page.locator(".export-menu summary").click();
   const jsonDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Backup (.json)" }).click();
   const jsonDownload = await jsonDownloadPromise;
@@ -509,22 +511,19 @@ test("Expanded exporters (HTML, DOCX, Markdown, PDF, TXT, JSON) generate valid e
 test("Automated Cover Letter Generator creates grounded letter with 1-click export", async ({
   page,
 }) => {
+  // Cover letters are part of Go and Pro.
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click Cover Letter button in toolbar
-  await openEditorTools(page);
-  const coverLetterBtn = page.getByRole("button", { name: "✉️ Cover letter" });
-  await expect(coverLetterBtn).toBeVisible();
-  await coverLetterBtn.click();
+  await editorTool(page, "Cover letter");
 
-  // Dialog should open
-  const modal = page.getByRole("dialog", {
-    name: "Tailored Cover Letter Generator",
-  });
+  // The cover letter tool opens in the AI Assistant panel.
+  const modal = page.getByRole("region", { name: "Cover letter" });
   await expect(modal).toBeVisible();
-  await expect(modal).toContainText("Tailored Cover Letter Generator");
+  await expect(modal).toContainText("Draft a cover letter");
 
   // Fill in target role and company
   await modal
@@ -534,7 +533,7 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
 
   // Click Generate
   await modal
-    .getByRole("button", { name: /Generate Grounded Cover Letter/ })
+    .getByRole("button", { name: /Quick draft \(template\)/ })
     .click();
 
   // Verify generated preview
@@ -555,9 +554,9 @@ test("Automated Cover Letter Generator creates grounded letter with 1-click expo
   const txtDownload = await txtDownloadPromise;
   expect(txtDownload.suggestedFilename()).toMatch(/\.txt$/i);
 
-  // Close modal
-  await modal.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Close the panel
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
+  await expect(modal).toHaveCount(0);
 });
 
 test("Preview zoom controls adjust scale and support fit to width", async ({
@@ -565,7 +564,7 @@ test("Preview zoom controls adjust scale and support fit to width", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Verify zoom controls bar
   const zoomBar = page.locator(".preview-zoom-bar");
@@ -593,13 +592,10 @@ test("Version history modal creates checkpoints and forks variants", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click History button
-  await openEditorTools(page);
-  const historyBtn = page.getByRole("button", { name: /History/ });
-  await expect(historyBtn).toBeVisible();
-  await historyBtn.click();
+  await editorTool(page, "History");
 
   // Dialog opens
   const historyDialog = page.getByRole("dialog", {
@@ -627,15 +623,16 @@ test("Version history modal creates checkpoints and forks variants", async ({
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Selector should now include the forked variant
-  await expect(page.locator("#resume-select")).toContainText("Restored from");
+  // The forked variant opens as its own CV
+  await expect(page.getByLabel("CV name", { exact: true })).toHaveValue(
+    /Restored from/,
+  );
 });
 
-test("Cold-start dropzone ingests and parses LinkedIn Positions.csv", async ({
+test("start screen upload ingests and parses LinkedIn Positions.csv", async ({
   page,
 }) => {
   await page.goto("/builder");
-  await page.getByRole("button", { name: "Import my CV" }).click();
   const linkedInPositionsCsv = `Company Name,Title,Location,Started On,Finished On,Description\n"Vercel, Inc.","Principal Engineer","Remote","Jan 2022",,"• Architected Next.js performance optimizations\n• Shipped edge runtime features"`;
 
   await page.getByLabel("Upload existing resume").setInputFiles({
@@ -661,7 +658,7 @@ test("Custom sections: add preset section, edit entry, save to library, preview,
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Click "+ Add section" in sidebar
   const addSecBtn = page.getByRole("button", { name: /Add section/ });
@@ -690,7 +687,8 @@ test("Custom sections: add preset section, edit entry, save to library, preview,
   // Starter example should be populated
   await expect(page.locator("input[value*='Keynote Speaker']")).toBeVisible();
 
-  // Click Save to Library
+  // Click Save to Library (in the collapsed section settings)
+  await page.locator(".section-settings > summary").click();
   const saveLibraryBtn = page.getByRole("button", {
     name: "Save section to library",
   });
@@ -729,7 +727,7 @@ test("Skills taxonomy: autocomplete search, tag chips, category filters, and liv
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // Navigate to Skills section
   await page
@@ -800,90 +798,16 @@ test("Skills taxonomy: autocomplete search, tag chips, category filters, and liv
   ).not.toContainText("PostgreSQL");
 });
 
-test("Contextual AI Assistant: summary drafting, impact interview, and skill discovery", async ({
-  page,
-}) => {
-  await page.goto("/builder");
-  await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
-
-  // Open AI assistant
-  await openEditorTools(page);
-  await page
-    .getByRole("button", { name: "AI bullet assistant", exact: true })
-    .click();
-  await expect(
-    page.getByRole("region", { name: "AI bullet assistant" }),
-  ).toBeVisible();
-
-  // Switch to Summary Drafter tab
-  await page.getByRole("tab", { name: "Write a summary" }).click();
-  await expect(page.locator(".ai-summary-drafter")).toBeVisible();
-  await expect(page.locator(".ai-summary-card")).toHaveCount(3);
-  await expect(page.locator(".ai-summary-card").first()).toContainText(
-    "Results from your CV",
-  );
-
-  // Click Review this draft on the first card
-  await page
-    .locator(".ai-summary-card")
-    .first()
-    .getByRole("button", { name: "Review this draft" })
-    .click();
-  await page
-    .getByLabel("I checked this summary against my own experience.")
-    .check();
-  await page.getByRole("button", { name: "Use this summary" }).click();
-  await expect(page.locator(".account-message")).toContainText(
-    "Summary added to Profile",
-  );
-
-  // Switch to Impact Interview tab
-  await page.getByRole("tab", { name: "Add a real result" }).click();
-  await expect(page.locator(".ai-interview-container")).toBeVisible();
-
-  // If there are interview questions, test answering one
-  const questionCards = page.locator(".ai-interview-card");
-  if ((await questionCards.count()) > 0) {
-    const firstQ = questionCards.first();
-    await firstQ
-      .getByLabel("Your documented result")
-      .fill("The team reused the report for its weekly review.");
-    await firstQ
-      .getByRole("button", { name: "Preview updated bullet" })
-      .click();
-    await expect(firstQ.locator(".ai-interview-diff")).toBeVisible();
-    await firstQ
-      .getByLabel("This result is accurate and belongs to this work.")
-      .check();
-    await firstQ.getByRole("button", { name: "Use this bullet" }).click();
-  }
-
-  // Switch to Skill Discovery tab
-  await page.getByRole("tab", { name: "Find skills" }).click();
-  await expect(page.locator(".ai-skills-discovery")).toBeVisible();
-
-  // Close AI assistant modal
-  await page.getByRole("button", { name: "Close AI assistant" }).click();
-  await expect(
-    page.getByRole("region", { name: "AI bullet assistant" }),
-  ).toHaveCount(0);
-
-  // Resume preview should reflect the applied summary
-  await expect(
-    page.getByRole("article", { name: "Resume preview" }),
-  ).toContainText("Experience:");
-});
-
 test("Studio Accessibility: global keyboard shortcuts (?, Esc, Ctrl+Z) and shortcuts cheat sheet", async ({
   page,
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
-  // Open shortcuts modal via header pill button
-  await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+  // Open shortcuts from the account menu
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: /^Keyboard shortcuts/ }).click();
   await expect(
     page.getByRole("dialog", { name: "Keyboard Navigation & Actions" }),
   ).toBeVisible();

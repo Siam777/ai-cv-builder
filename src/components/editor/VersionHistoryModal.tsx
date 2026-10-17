@@ -13,6 +13,7 @@ import {
   restoreSnapshotAsVariant,
   type ResumeSnapshot,
 } from "@/lib/snapshots";
+import { Trash2, X } from "lucide-react";
 
 export interface VersionHistoryModalProps {
   doc: ResumeDocument;
@@ -81,7 +82,7 @@ export function VersionHistoryModal({
       <div className="modal-card tailor-modal" style={{ maxWidth: "780px" }}>
         <header className="modal-header">
           <div>
-            <p className="eyebrow">CAREER VAULT · VERSION HISTORY & CHECKPOINTS</p>
+            <p className="eyebrow">Version history</p>
             <h2>Version History & Snapshots</h2>
           </div>
           <button
@@ -90,7 +91,7 @@ export function VersionHistoryModal({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </header>
 
@@ -100,7 +101,7 @@ export function VersionHistoryModal({
               type="text"
               value={newSnapshotLabel}
               placeholder="Name this checkpoint (e.g. Before Google Tailoring, Draft v2)..."
-              style={{ flex: 1, padding: "8px 12px", fontSize: "0.9rem" }}
+              style={{ flex: 1, padding: "8px 12px", fontSize: "var(--text-sm)" }}
               onChange={(e) => setNewSnapshotLabel(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -122,8 +123,8 @@ export function VersionHistoryModal({
           <div className="snapshots-timeline-container">
             {snapshots.length === 0 ? (
               <div className="empty-snapshots" style={{ textAlign: "center", padding: "30px 15px", color: "var(--muted)" }}>
-                <p style={{ fontSize: "1.1rem", marginBottom: "6px" }}>No checkpoints saved for this resume yet.</p>
-                <p style={{ fontSize: "0.85rem" }}>
+                <p style={{ fontSize: "var(--text-md)", marginBottom: "6px" }}>No checkpoints saved for this resume yet.</p>
+                <p style={{ fontSize: "var(--text-xs)" }}>
                   Save a checkpoint above to preserve milestones, track bullet rewrites, or fork targeted variants.
                 </p>
               </div>
@@ -147,7 +148,7 @@ export function VersionHistoryModal({
                         padding: "12px 16px",
                         border: "1px solid var(--line)",
                         borderRadius: "8px",
-                        backgroundColor: isCurrent ? "#f6faf4" : "var(--surface)",
+                        backgroundColor: isCurrent ? "var(--color-brand-soft)" : "var(--color-surface)",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -156,18 +157,18 @@ export function VersionHistoryModal({
                     >
                       <div className="snapshot-meta" style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
-                          <strong style={{ fontSize: "0.95rem" }}>{snap.name}</strong>
+                          <strong style={{ fontSize: "var(--text-sm)" }}>{snap.name}</strong>
                           {isCurrent && (
-                            <span style={{ fontSize: "0.75rem", background: "var(--green)", color: "white", padding: "1px 6px", borderRadius: "4px" }}>
+                            <span style={{ fontSize: "var(--text-xs)", background: "var(--color-brand)", color: "var(--color-on-brand)", padding: "1px 6px", borderRadius: "4px" }}>
                               Current Active
                             </span>
                           )}
                         </div>
-                        <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)" }}>
+                        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--muted)" }}>
                           Saved {dateStr} · Revision {snap.revision}
                         </p>
                         {!isCurrent && (
-                          <div style={{ fontSize: "0.8rem", color: "#556650", marginTop: "4px" }}>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>
                             {diff.bulletCountDelta !== 0 && (
                               <span>{diff.bulletCountDelta > 0 ? `+${diff.bulletCountDelta}` : diff.bulletCountDelta} bullets · </span>
                             )}
@@ -183,7 +184,7 @@ export function VersionHistoryModal({
                           <button
                             type="button"
                             className="primary"
-                            style={{ fontSize: "0.8rem", padding: "6px 10px" }}
+                            style={{ fontSize: "var(--text-xs)", padding: "6px 10px" }}
                             onClick={() => handleRestore(snap)}
                             disabled={busy}
                           >
@@ -192,7 +193,7 @@ export function VersionHistoryModal({
                         )}
                         <button
                           type="button"
-                          style={{ fontSize: "0.8rem", padding: "6px 10px" }}
+                          style={{ fontSize: "var(--text-xs)", padding: "6px 10px" }}
                           onClick={() => handleFork(snap)}
                           disabled={busy}
                         >
@@ -200,12 +201,13 @@ export function VersionHistoryModal({
                         </button>
                         <button
                           type="button"
-                          style={{ fontSize: "0.8rem", padding: "6px 8px", color: "#a33" }}
+                          style={{ fontSize: "var(--text-xs)", padding: "6px 8px", color: "var(--color-danger)" }}
                           onClick={() => handleDelete(snap.id)}
                           disabled={busy}
                           title="Delete snapshot"
+                          aria-label="Delete snapshot"
                         >
-                          ✕
+                          <Trash2 size={14} aria-hidden />
                         </button>
                       </div>
                     </li>

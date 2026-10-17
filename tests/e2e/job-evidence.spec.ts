@@ -2,10 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { createDocument, type ResumeDocument } from "../../src/lib/document";
 import {
-  openEditorTools,
   startSampleResume,
   openFirstCv,
   authenticateForExport,
+  editorTool,
+  cvCount,
+  grantPaidPlan,
 } from "./helpers";
 
 async function savedDocuments(page: Page): Promise<ResumeDocument[]> {
@@ -32,8 +34,7 @@ async function openReview(
   posting = "Required: Experience with prototyping",
   language = "english",
 ) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await editorTool(page, "Match a job");
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page.getByLabel("Analysis language").selectOption(language);
   await page.getByLabel("Job Description", { exact: true }).fill(posting);
@@ -58,6 +59,7 @@ test("mobile review exposes sources, OR and partial evidence; priority edits res
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 820 });
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   const original = (await savedDocuments(page))[0];
@@ -106,7 +108,7 @@ test("mobile review exposes sources, OR and partial evidence; priority edits res
     path: "test-results/job-evidence/mobile-review.png",
     fullPage: true,
   });
-  const overflow = await page.getByRole("dialog").evaluate((dialog) => ({
+  const overflow = await page.getByRole("region", { name: "Job Tailoring Engine" }).evaluate((dialog) => ({
     scroll: dialog.scrollWidth,
     width: dialog.clientWidth,
     content: dialog.querySelector(".tailor-content")!.scrollWidth,
@@ -120,8 +122,8 @@ test("mobile review exposes sources, OR and partial evidence; priority edits res
       button.click();
       button.click();
     });
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#resume-select option")).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toHaveCount(0);
+  await expect.poll(() => cvCount(page)).toBe(2);
   const docs = await savedDocuments(page);
   expect(docs.find((doc) => doc.id === original.id)).toEqual(original);
   const variant = docs.find((doc) => doc.id !== original.id)!;
@@ -148,6 +150,7 @@ test("mobile review exposes sources, OR and partial evidence; priority edits res
 test("review rejects a source changed in another tab without saving a variant and keeps retry data", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   await openReview(page);
@@ -159,10 +162,10 @@ test("review rejects a source changed in another tab without saving a variant an
     .getByLabel("Full name", { exact: true })
     .fill("A later source revision");
   await expect(other.locator(".save-status")).toHaveText(
-    "Saved on this device",
+    "Saved in this browser",
   );
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
-  await expect(page.getByRole("dialog")).toContainText(
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toContainText(
     "Saving was not confirmed",
   );
   await expect(
@@ -177,6 +180,7 @@ test("review rejects a source changed in another tab without saving a variant an
 test("manual language and unscorable input never invent zero scores or an applicable proposal", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   const original = await savedDocuments(page);
@@ -197,26 +201,27 @@ test("manual language and unscorable input never invent zero scores or an applic
     .fill("A welcoming team that values good collaboration.");
   await page.getByLabel("Use this target role, seniority and language").check();
   await page.getByRole("button", { name: "Analyze & Match Evidence" }).click();
-  await expect(page.getByRole("dialog")).toContainText(
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toContainText(
     "no explicit criteria were recognized",
   );
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
   expect(await savedDocuments(page)).toEqual(original);
 });
 
 test("undo cannot delete later edits to a reviewed variant", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   await startSampleResume(page);
   await openReview(page);
   await accept(page);
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toHaveCount(0);
   await page
     .getByLabel("Full name", { exact: true })
     .fill("My newer variant edits");
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page
     .getByRole("button", { name: "Undo reviewed variant creation" })
     .click();
@@ -233,6 +238,7 @@ test("undo cannot delete later edits to a reviewed variant", async ({
 test("a lost account-save response retries the same variant once, preserves the source and supports cloud undo", async ({
   page,
 }) => {
+  await grantPaidPlan(page);
   await page.goto("/builder");
   const owner = await authenticateForExport(page);
   const source = createDocument(true);
@@ -258,7 +264,7 @@ test("a lost account-save response retries the same variant once, preserves the 
     await route.abort("failed"); // The server committed, but its response never reaches the editor.
   });
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
-  await expect(page.getByRole("dialog")).toContainText(
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toContainText(
     "Saving was not confirmed",
   );
   const saved = await (
@@ -268,14 +274,14 @@ test("a lost account-save response retries the same variant once, preserves the 
   ).json();
   expect(saved).toHaveLength(2);
   await page.getByRole("button", { name: "Create reviewed variant" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#resume-select option")).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Job Tailoring Engine" })).toHaveCount(0);
+  await expect.poll(() => cvCount(page)).toBe(2);
   expect(submittedIds).toHaveLength(1);
   await page.unroute("**/api/resumes");
   await page
     .getByRole("button", { name: "Undo reviewed variant creation" })
     .click();
-  await expect(page.locator("#resume-select option")).toHaveCount(1);
+  await expect.poll(() => cvCount(page)).toBe(1);
   const after = await (
     await page.request.get("/api/resumes", {
       headers: { "X-Workspace-User": owner.id },

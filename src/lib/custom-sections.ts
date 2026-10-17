@@ -10,7 +10,6 @@ export interface CustomSectionPreset {
   id: string;
   label: string;
   description: string;
-  icon: string;
   exampleTitle: string;
   exampleOrg: string;
   exampleLocation: string;
@@ -26,7 +25,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "volunteer",
     label: "Volunteer Experience",
     description: "Community involvement, non-profit contributions, and pro-bono initiatives",
-    icon: "🤝",
     exampleTitle: "Volunteer Engineering Lead",
     exampleOrg: "Code for Good / Local Community Foundation",
     exampleLocation: "San Francisco, CA",
@@ -40,7 +38,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "publications",
     label: "Publications & Research",
     description: "Peer-reviewed papers, conference proceedings, technical whitepapers, or book chapters",
-    icon: "📚",
     exampleTitle: "Co-Author, Scaling Distributed Cache Invalidation",
     exampleOrg: "ACM Transactions / IEEE Cloud Computing",
     exampleLocation: "New York, NY",
@@ -54,7 +51,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "speaking",
     label: "Speaking & Conferences",
     description: "Keynotes, conference talks, podcast appearances, and technical workshop presentations",
-    icon: "🎙️",
     exampleTitle: "Keynote Speaker: Zero-Downtime Microservices",
     exampleOrg: "DevOps Days / Cloud Native Summit",
     exampleLocation: "Austin, TX",
@@ -68,7 +64,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "awards",
     label: "Awards & Honors",
     description: "Industry honors, hackathon victories, scholarships, and corporate recognition",
-    icon: "🏆",
     exampleTitle: "1st Place Winner, Global FinTech Hackathon",
     exampleOrg: "FinTech Innovation Lab",
     exampleLocation: "London, UK",
@@ -82,7 +77,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "patents",
     label: "Patents & Inventions",
     description: "Issued or pending patents, intellectual property, and proprietary algorithms",
-    icon: "💡",
     exampleTitle: "Patent US11849201B2: Adaptive Query Routing in Heterogeneous Databases",
     exampleOrg: "US Patent and Trademark Office",
     exampleLocation: "Washington, DC",
@@ -96,7 +90,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "teaching",
     label: "Teaching & Mentorship",
     description: "Course instruction, corporate tech training, university TA roles, or developer mentorship",
-    icon: "🎓",
     exampleTitle: "Adjunct Instructor, Cloud Systems Architecture",
     exampleOrg: "City University Department of Computer Science",
     exampleLocation: "Boston, MA",
@@ -110,7 +103,6 @@ export const CUSTOM_SECTION_PRESETS: CustomSectionPreset[] = [
     id: "leadership",
     label: "Leadership & Activities",
     description: "Advisory boards, employee resource groups (ERGs), or professional societies",
-    icon: "🌟",
     exampleTitle: "Chapter President & Regional Lead",
     exampleOrg: "Association for Computing Machinery (ACM)",
     exampleLocation: "Seattle, WA",

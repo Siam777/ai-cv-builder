@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { createDocument } from "../../src/lib/document";
 import { reviewJobEvidence } from "../../src/lib/vault/job-evidence";
 import { reviewSaveInput } from "../../src/lib/job-review-history";
-import { authenticateForExport, openFirstCv, openEditorTools } from "./helpers";
+import { authenticateForExport, openFirstCv, editorTool } from "./helpers";
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 async function setup(page: Page) {
   await page.goto("/builder");
@@ -22,8 +22,7 @@ async function setup(page: Page) {
   return { owner, doc };
 }
 async function open(page: Page) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await editorTool(page, "Match a job");
 }
 async function analyze(page: Page) {
   await open(page);
@@ -94,7 +93,7 @@ test("account history requires consent, survives reload, preserves priority over
   await expect(
     page.getByRole("button", { name: "Analyze & Match Evidence" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
   await page.getByLabel("Full name", { exact: true }).fill("Later CV snapshot");
   await expect(page.locator(".save-status")).toHaveText(
     "Saved to your account",
@@ -110,7 +109,7 @@ test("account history requires consent, survives reload, preserves priority over
     path: "test-results/job-history/mobile-stale-review.png",
     fullPage: true,
   });
-  const width = await page.getByRole("dialog").evaluate((element) => ({
+  const width = await page.getByRole("region", { name: "Job Tailoring Engine" }).evaluate((element) => ({
     scroll: element.scrollWidth,
     client: element.clientWidth,
   }));
@@ -224,7 +223,7 @@ test("failed history loading is not empty history and a delayed initial list can
   await page.unroute(url);
   await history.getByRole("button", { name: "Refresh saved reviews" }).click();
   await expect(history).toContainText("No saved job reviews");
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
 
   let release!: () => void;
   const delayed = new Promise<void>((resolve) => {

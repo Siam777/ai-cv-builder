@@ -12,7 +12,12 @@ export async function POST(
     const { user } = await authorized(request);
     const body = decisionSchema.parse(await readJson(request, 1024));
     return json(
-      await decideProposal(user.id, (await context.params).id, body.decision),
+      await decideProposal(
+        user.id,
+        (await context.params).id,
+        body.decision,
+        body.bulletIds,
+      ),
     );
   });
 }

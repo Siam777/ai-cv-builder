@@ -9,11 +9,20 @@ import {
   generateCoverLetter,
   type GeneratedCoverLetter,
 } from "@/lib/vault/cover-letter";
+import { Printer, Sparkles, X } from "lucide-react";
+import { useFieldAi } from "../editor/FieldAiContext";
+import { AiBlocked, AiConsent } from "../editor/AiGate";
+import { AiProgress } from "../editor/AiProgress";
+import { rewriteStatus } from "@/lib/ai-access";
+import type { CoverLetterResult } from "@/lib/ai-contract";
+import { accountRequest, CloudRequestError } from "@/lib/cloud-repository";
 
 export interface CoverLetterModalProps {
   doc: ResumeDocument;
   busy: boolean;
   onClose: () => void;
+  /** Render inside the AI Assistant panel instead of as a dialog. */
+  embedded?: boolean;
   onExport: (
     format: "txt" | "md" | "copy" | "print",
     text: string,
@@ -25,16 +34,87 @@ export function CoverLetterModal({
   doc,
   busy,
   onClose,
+  embedded = false,
   onExport,
 }: CoverLetterModalProps) {
-  useBodyScrollLock(true);
-  const dialogRef = useModalFocus(onClose);
+  useBodyScrollLock(!embedded);
+  const dialogRef = useModalFocus(onClose, !embedded);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [letter, setLetter] = useState<GeneratedCoverLetter | null>(null);
   const [editedText, setEditedText] = useState("");
+  // Write with AI (Go and Pro): the person's reason for applying, and the request state.
+  const ai = useFieldAi();
+  const [note, setNote] = useState("");
+  const [aiState, setAiState] = useState<
+    | { stage: "idle" }
+    | { stage: "consent" }
+    | { stage: "working" }
+    | { stage: "error"; message: string; plans?: boolean }
+  >({ stage: "idle" });
+  const [aiNote, setAiNote] = useState("");
+  const aiStatus = ai ? rewriteStatus(ai.owner, ai.availability, ai.signedIn) : null;
+
+  async function writeWithAi() {
+    if (!ai) return;
+    setAiState({ stage: "working" });
+    try {
+      const snapshot = await ai.prepare();
+      const result = (await accountRequest(
+        "/api/ai/cover-letter",
+        {
+          method: "POST",
+          signal: AbortSignal.timeout(65000),
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            documentId: snapshot.id,
+            revision: snapshot.revision,
+            job: {
+              title: (jobTitle || "the role").slice(0, 120),
+              ...(company.trim() ? { company: company.trim().slice(0, 120) } : {}),
+              ...(jobDescription.trim() ? { post: jobDescription.trim().slice(0, 12000) } : {}),
+            },
+            ...(recipientName.trim() ? { recipient: recipientName.trim().slice(0, 120) } : {}),
+            ...(note.trim() ? { note: note.trim().slice(0, 500) } : {}),
+          }),
+        },
+        ai.owner ?? undefined,
+      )) as CoverLetterResult;
+      if (!result.paragraphs.length) {
+        setAiState({ stage: "error", message: result.message });
+        return;
+      }
+      const generated = generateCoverLetter(doc, {
+        title: jobTitle || "Target Role",
+        company: company || "Target Company",
+        recipientName: recipientName || "Hiring Team",
+        description: jobDescription,
+      });
+      setLetter(generated);
+      setEditedText(`Dear ${recipientName.trim() || "Hiring Team"},\n\n${result.paragraphs.join("\n\n")}`);
+      setAiNote(
+        `Written by AI from your CV${note.trim() ? " and your note" : ""}. Check every claim before you send it.${
+          result.withheld
+            ? ` ${result.withheld} paragraph${result.withheld === 1 ? " was" : "s were"} withheld because your CV does not support ${result.withheld === 1 ? "it" : "them"}.`
+            : ""
+        }`,
+      );
+      setAiState({ stage: "idle" });
+    } catch (error) {
+      if (error instanceof CloudRequestError && error.code === "AI_CONSENT_REQUIRED")
+        return setAiState({ stage: "consent" });
+      setAiState({
+        stage: "error",
+        message:
+          error instanceof CloudRequestError && error.code === "NETWORK_ERROR"
+            ? "The assistant could not finish in time or lost its connection. Your CV was kept."
+            : (error as Error).message,
+        plans: error instanceof CloudRequestError && (error.code === "AI_LIMIT" || error.code === "PLAN_REQUIRED"),
+      });
+    }
+  }
 
   const accentColor = accents[doc.presentation.accent] || "#285641";
 
@@ -47,6 +127,7 @@ export function CoverLetterModal({
     });
     setLetter(generated);
     setEditedText(generated.fullText);
+    setAiNote("");
   }
 
   function exportLetter(format: "txt" | "md" | "copy" | "print") {
@@ -61,40 +142,8 @@ export function CoverLetterModal({
     day: "numeric",
   });
 
-  return (
-    <div
-      className="modal-backdrop no-print"
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Tailored Cover Letter Generator"
-    >
-      <div
-        className="modal-card tailor-modal"
-        style={{
-          maxWidth: letter ? "1100px" : "760px",
-          width: "95vw",
-          transition: "max-width 0.2s",
-        }}
-      >
-        <header className="modal-header">
-          <div>
-            <p className="eyebrow">
-              CAREER VAULT · EVIDENCE-GROUNDED COVER LETTER
-            </p>
-            <h2>Tailored Cover Letter Generator</h2>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
-            ✕
-          </button>
-        </header>
-
+  const content = (
+    <>
         <div className="tailor-content">
           {!letter ? (
             <div className="tailor-input-stage">
@@ -144,6 +193,62 @@ export function CoverLetterModal({
                   onChange={(e) => setJobDescription(e.target.value)}
                 />
               </label>
+              {ai && (
+                <section className="cover-letter-ai" aria-labelledby="cover-letter-ai-heading">
+                  <h4 id="cover-letter-ai-heading">
+                    <Sparkles size={16} aria-hidden /> Write with AI
+                  </h4>
+                  {!ai.coverLetterAi ? (
+                    <div className="field-ai-note">
+                      <p>Writing a cover letter with AI is part of Go and Pro. The quick draft below works without AI.</p>
+                      <button type="button" className="primary" onClick={ai.onSeePlans}>
+                        See plans
+                      </button>
+                    </div>
+                  ) : aiStatus !== "ready" ? (
+                    <AiBlocked status={aiStatus!} services={ai} />
+                  ) : aiState.stage === "consent" ? (
+                    <AiConsent
+                      services={ai}
+                      sends="Sends the job details, your note, and your headline, jobs, bullets, education and skills to OpenAI. Contact details are not sent."
+                      onAgreed={() => void writeWithAi()}
+                      onCancel={() => setAiState({ stage: "idle" })}
+                    />
+                  ) : (
+                    <>
+                      <label>
+                        Why do you want this job? (optional, in your words)
+                        <textarea
+                          rows={3}
+                          maxLength={500}
+                          value={note}
+                          placeholder="e.g. I use their app every week and want to work on scheduling tools."
+                          onChange={(e) => setNote(e.target.value)}
+                        />
+                      </label>
+                      <p className="field-ai-help">
+                        AI writes 3–4 short paragraphs from your CV and this note. The job post says what to
+                        emphasise; it is never presented as your experience. Sends the job details, your note and
+                        your CV text, not your contact details.
+                      </p>
+                      {aiState.stage === "working" && (
+                        <AiProgress
+                          title="Writing your cover letter"
+                          steps={["Reading your CV and the job", "Writing the letter", "Checking every claim against your CV"]}
+                        />
+                      )}
+                      {aiState.stage === "error" && (
+                        <div className="field-ai-note">
+                          <p className="field-ai-error" role="alert">{aiState.message}</p>
+                          {aiState.plans && (
+                            <button type="button" onClick={ai.onSeePlans}>See plans</button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
             </div>
           ) : (
             <div className="tailor-results-stage">
@@ -152,19 +257,18 @@ export function CoverLetterModal({
                 style={{ padding: "0.85rem 1rem", marginBottom: "1rem" }}
               >
                 <div className="score-summary">
-                  <h3 style={{ margin: 0, fontSize: "1.05rem" }}>
+                  <h3 style={{ margin: 0, fontSize: "var(--text-md)" }}>
                     Letter for {jobTitle || "Role"} at {company || "Company"}
                   </h3>
                   <p
                     style={{
                       margin: "0.25rem 0 0",
-                      fontSize: "0.85rem",
+                      fontSize: "var(--text-xs)",
                       color: "var(--muted)",
                     }}
                   >
-                    Uses {letter.matchedEvidenceCount} selected resume bullets.
-                    Review the facts and edit the narrative below before
-                    exporting.
+                    {aiNote ||
+                      `Uses ${letter.matchedEvidenceCount} selected resume bullets. Review the facts and edit the narrative below before exporting.`}
                   </p>
                 </div>
               </div>
@@ -230,17 +334,32 @@ export function CoverLetterModal({
         <div className="button-row">
           {!letter ? (
             <>
+              {ai?.coverLetterAi && aiStatus === "ready" && (
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={busy || aiState.stage === "working"}
+                  onClick={() =>
+                    ai.aiConsent ? void writeWithAi() : setAiState({ stage: "consent" })
+                  }
+                >
+                  <Sparkles size={16} aria-hidden />{" "}
+                  {aiState.stage === "working" ? "Writing your letter…" : "Write with AI"}
+                </button>
+              )}
               <button
                 type="button"
-                className="primary"
+                className={ai?.coverLetterAi && aiStatus === "ready" ? undefined : "primary"}
                 disabled={busy}
                 onClick={handleGenerate}
               >
-                Generate Grounded Cover Letter <span>↗</span>
+                Quick draft (template)
               </button>
-              <button type="button" onClick={onClose} disabled={busy}>
-                Cancel
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={busy}>
+                  Cancel
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -258,7 +377,7 @@ export function CoverLetterModal({
                 disabled={busy}
                 title="Print or Save as PDF"
               >
-                🖨️ Print / Save as PDF
+                <Printer size={16} aria-hidden /> Print / Save as PDF
               </button>
               <button
                 type="button"
@@ -281,12 +400,61 @@ export function CoverLetterModal({
               >
                 Adjust Inputs
               </button>
-              <button type="button" onClick={onClose} disabled={busy}>
-                Done
-              </button>
+              {!embedded && (
+                <button type="button" onClick={onClose} disabled={busy}>
+                  Done
+                </button>
+              )}
             </>
           )}
         </div>
+    </>
+  );
+
+  if (embedded)
+    return (
+      <section
+        className="embedded-tool tailor-modal cover-letter-embedded"
+        aria-label="Cover letter"
+      >
+        <h3 className="embedded-tool-title">Cover letter</h3>
+        {content}
+      </section>
+    );
+  return (
+    <div
+      className="modal-backdrop no-print"
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tailored Cover Letter Generator"
+    >
+      <div
+        className="modal-card tailor-modal"
+        style={{
+          maxWidth: letter ? "1100px" : "760px",
+          width: "95vw",
+          transition: "max-width 0.2s",
+        }}
+      >
+        <header className="modal-header">
+          <div>
+            <p className="eyebrow">
+              CAREER VAULT · EVIDENCE-GROUNDED COVER LETTER
+            </p>
+            <h2>Tailored Cover Letter Generator</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            <X size={18} aria-hidden />
+          </button>
+        </header>
+        {content}
       </div>
     </div>
   );

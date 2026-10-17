@@ -23,7 +23,7 @@ Use a validated structured proposal such as:
 
 This illustrates a contract, not proof that the example assertion is supported. Define allowlisted operations with schemas, length bounds, target-ID checks, ownership checks, and operation-count limits. Resolve IDs against the current document on the server. Do not accept arbitrary JSON paths, HTML, SQL, or executable model output. Keep template selection and content edits as distinct operation types.
 
-For inline contextual magic bars, deliver the proposal payload with pre-computed text diff tokens so the UI can render in-place visual additions/deletions immediately with `Tab` (accept) or `Esc` (dismiss).
+For the per-field sparkle menu, deliver the proposal payload with pre-computed text diff tokens so the UI can render in-place visual additions/deletions immediately with Accept (focused when it appears) or `Esc` (keep the original).
 
 Validate syntax and targets first, then factual support. If a proposal includes an unsupported metric, title, credential, or skill, return a question or remove the unsupported claim before presenting an applicable proposal. A second model review can help but is not a guarantee. Keep acceptance explicit and reversible.
 

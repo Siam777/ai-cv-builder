@@ -1,0 +1,124 @@
+/* Design tokens. Area stylesheets use only these names for colour, type,
+   radius and shadow. Primitives hold raw values; components use the semantic
+   names below them, so a dark theme only needs to remap the semantic layer. */
+:root {
+  /* Primitives: neutrals (cool slate) */
+  --gray-0: #ffffff;
+  --gray-25: #fbfcfd;
+  --gray-50: #f8fafc;
+  --gray-75: #f2f5f8;
+  --gray-100: #f1f5f9;
+  --gray-150: #e9eef3;
+  --gray-200: #e2e8f0;
+  --gray-250: #d9e2eb;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-550: #526473;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-850: #162737;
+  --gray-900: #0f172a;
+
+  /* Primitives: brand green */
+  --green-25: #f6faf7;
+  --green-50: #eef6f1;
+  --green-100: #dcefe3;
+  --green-200: #b9dcc7;
+  --green-300: #8cc2a3;
+  --green-400: #5a9b7b;
+  --green-500: #3a7d60;
+  --green-600: #27614c;
+  --green-700: #1f5040;
+  --green-800: #183f33;
+  --green-900: #112c24;
+
+  /* Primitives: accent and status hues */
+  --blue-50: #eef3fd;
+  --blue-100: #dbe5fb;
+  --blue-600: #2254d1;
+  --blue-700: #234b73;
+  --red-50: #fdf2f2;
+  --red-100: #fee2e2;
+  --red-300: #f2a8a3;
+  --red-600: #b91c1c;
+  --red-700: #b3261e;
+  --red-800: #8a3a2f;
+  --amber-50: #fff8e8;
+  --amber-100: #fde9c8;
+  --amber-300: #e3c48a;
+  --amber-600: #b8751e;
+  --amber-700: #8a5712;
+  --amber-800: #5c4310;
+
+  /* Semantic colours */
+  --color-bg: var(--gray-75);
+  --color-surface: var(--gray-0);
+  --color-surface-muted: var(--gray-50);
+  --color-surface-sunken: var(--gray-100);
+  --color-border: var(--gray-250);
+  --color-border-strong: var(--gray-300);
+  --color-text: var(--gray-850);
+  --color-text-muted: var(--gray-550);
+  --color-text-subtle: var(--gray-500);
+  --color-brand: var(--green-600);
+  --color-brand-hover: var(--green-700);
+  --color-brand-soft: var(--green-50);
+  --color-on-brand: var(--gray-0);
+  --color-link: var(--green-600);
+  --color-focus: var(--blue-600);
+  --color-success: var(--green-600);
+  --color-success-soft: var(--green-50);
+  --color-warning: var(--amber-700);
+  --color-warning-soft: var(--amber-50);
+  --color-danger: var(--red-700);
+  --color-danger-soft: var(--red-50);
+  --color-info: var(--blue-600);
+  --color-info-soft: var(--blue-50);
+  --color-overlay: rgba(15, 23, 42, 0.55);
+
+  /* Typography */
+  --font-sans: var(--font-interface), Arial, Helvetica, sans-serif;
+  --font-serif: var(--font-display), Georgia, "Times New Roman", serif;
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 36px;
+
+  /* Spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --page-gutter: 4%;
+
+  /* Shape and depth */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-full: 999px;
+  --shadow-1: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 16px 40px rgba(15, 23, 42, 0.16);
+  --focus-ring: var(--color-focus);
+
+  /* Legacy names still used by older rules. */
+  --ink: var(--color-text);
+  --muted: var(--color-text-muted);
+  --green: var(--color-brand);
+  --line: var(--color-border);
+  --canvas: var(--color-bg);
+  --serif: var(--font-serif);
+}
+
+/* Narrow screens use a fixed 16px side gutter. */
+@media (max-width: 600px) {
+  :root {
+    --page-gutter: 16px;
+  }
+}

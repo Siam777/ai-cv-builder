@@ -2,6 +2,7 @@
 
 import { useModalFocus } from "@/lib/use-modal-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { X } from "lucide-react";
 
 export interface KeyboardShortcutsModalProps {
   onClose: () => void;
@@ -31,7 +32,7 @@ export function KeyboardShortcutsModal({
       >
         <div className="modal-header">
           <div>
-            <p className="eyebrow">PRODUCTIVITY SHORTCUTS</p>
+            <p className="eyebrow">Keyboard shortcuts</p>
             <h2 id="shortcuts-modal-title">Keyboard Navigation & Actions</h2>
           </div>
           <button
@@ -40,7 +41,7 @@ export function KeyboardShortcutsModal({
             onClick={onClose}
             aria-label="Close shortcuts dialog"
           >
-            ×
+            <X size={18} aria-hidden />
           </button>
         </div>
 

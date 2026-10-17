@@ -28,15 +28,19 @@ try {
   for (const name of (await readdir("migrations"))
     .filter((n) => n.endsWith(".sql"))
     .sort()) {
-    const sql = await readFile(`migrations/${name}`, "utf8");
-    const checksum = createHash("sha256").update(sql).digest("hex");
+    // Line endings depend on the checkout (core.autocrlf), so a migration is
+    // recorded with LF endings and either form of a recorded checksum matches.
+    const sql = (await readFile(`migrations/${name}`, "utf8")).replace(/\r\n/g, "\n");
+    const hash = (text) => createHash("sha256").update(text).digest("hex");
+    const checksum = hash(sql);
+    const accepted = [checksum, hash(sql.replace(/\n/g, "\r\n"))];
     const tx = await client.transaction("write");
     try {
       const old = await tx.execute({
         sql: "SELECT checksum FROM schema_migrations WHERE name = ?",
         args: [name],
       });
-      if (old.rows.length && old.rows[0].checksum !== checksum)
+      if (old.rows.length && !accepted.includes(String(old.rows[0].checksum)))
         throw new Error(`Applied migration changed: ${name}`);
       if (!old.rows.length) {
         for (const statement of sql

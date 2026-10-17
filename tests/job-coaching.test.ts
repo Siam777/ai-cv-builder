@@ -495,6 +495,15 @@ test("wired coaching uses real account ledger, immutable retries, shared quotas 
       consent: true as const,
       job: value.input,
     };
+    // AI job coaching is a Pro feature: refused on Go, before any AI call.
+    await client.execute(
+      "INSERT INTO subscriptions VALUES ('sub_owner','owner','cus_owner',NULL,'go','active',NULL,0,'2026-01-01','2026-01-01'), ('sub_other','other','cus_other',NULL,'pro','active',NULL,0,'2026-01-01','2026-01-01')",
+    );
+    await assert.rejects(
+      requestRewrite("owner", input),
+      (error) => (error as { code: string }).code === "PLAN_REQUIRED",
+    );
+    await client.execute("UPDATE subscriptions SET plan_id='pro' WHERE user_id='owner'");
     let calls = 0;
     const general = async () => {
       throw new Error("General generator must not handle coaching");

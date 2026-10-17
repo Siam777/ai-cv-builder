@@ -8,29 +8,51 @@ import {
   documentSchema,
   uid,
   newEntry,
+  labels,
   type ResumeDocument,
 } from "@/lib/document";
 import { createRepository } from "@/lib/repository";
 import { ResumePreview, type PreviewHandle } from "./resume-preview";
-import { DesignPanel } from "./design-panel";
+import { DesignPanel, type TemplateFilter } from "./design-panel";
 import { templates } from "@/lib/presentation";
 import { AccountPanel } from "./account-panel";
-import { AIPanel, type AiPanelMode } from "./ai-panel";
+import { AIPanel } from "./ai-panel";
+import {
+  FieldAiProvider,
+  useRewriteAvailability,
+  type FieldAiServices,
+  type PendingFieldAction,
+} from "./editor/FieldAiContext";
+import type { HelpItem } from "@/lib/help-me-finish";
+import { planAllows } from "@/lib/ai-access";
+import { aiFixFor } from "@/lib/field-ai";
 import type { Proposal } from "@/lib/ai-proposals";
 import type { LayoutBlock } from "@/lib/layout";
 import {
   accountRequest,
   createCloudRepository,
   transferLocalResumes,
+  importReceipts,
   CloudRequestError,
 } from "@/lib/cloud-repository";
-import type { AccountUser } from "@/lib/cloud-contract";
+import { userCanExport, type AccountUser } from "@/lib/cloud-contract";
 import { EditorHeader } from "./editor/EditorHeader";
-import { DocumentToolbar } from "./editor/DocumentToolbar";
+import {
+  EditorToolbar,
+  type ExportFormat,
+  type SidePanelId,
+} from "./editor/EditorToolbar";
+import { SidePanel, useSheetLayout } from "./editor/SidePanel";
+import { cvStrength } from "@/lib/cv-strength";
+import { lintResumeDocument } from "@/lib/linter/ats-linter";
 import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
 import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
-import { ColdStartImporter } from "./editor/ColdStartImporter";
+import { StartScreen } from "./editor/StartScreen";
+import { AiInterview } from "./editor/AiInterview";
+import { AskAi } from "./editor/AskAi";
+import type { AskAction } from "@/lib/ai-contract";
+import { BrowserCvsBanner } from "./editor/BrowserCvsBanner";
 import {
   ImportReviewModal,
   type StagedImportData,
@@ -45,14 +67,16 @@ import { reviewSnapshot } from "@/lib/vault/job-evidence";
 import { CoverLetterModal } from "./vault/CoverLetterModal";
 import { VersionHistoryModal } from "./editor/VersionHistoryModal";
 import { AddSectionModal } from "./editor/AddSectionModal";
-import { AtsReadinessPanel } from "./editor/AtsReadinessPanel";
-import { scoreResume } from "@/lib/linter/resume-score";
+import { CheckPanel } from "./editor/CheckPanel";
+import { loadDismissed, saveDismissed } from "@/lib/dismissed-findings";
+import { issuesToFix } from "@/lib/check-findings";
+import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
+import { LockedFeature } from "./billing/LockedFeature";
 import { AiCvGeneratorModal } from "./editor/AiCvGeneratorModal";
 import { DemoResumesModal } from "./editor/DemoResumesModal";
 import { DocumentLibrary } from "./editor/DocumentLibrary";
-import { EditorStartGuide } from "./editor/EditorStartGuide";
 import { documentsInCollection, startFromDesign } from "@/lib/document-library";
 import {
   requestExport,
@@ -60,12 +84,14 @@ import {
   printArtifact,
 } from "@/lib/export-client";
 import type { ExportRequest, ExportSource } from "@/lib/export-contract";
-import type { PlanId } from "@/lib/billing-plans";
+import { normalizePlanId, type PlanId } from "@/lib/billing-plans";
 import type { StartingDesign } from "@/lib/public-catalog";
 import type { FocusTarget, SaveState } from "./editor/types";
-import type { ExportFormat } from "./editor/DocumentToolbar";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { watchSessionChanges } from "@/lib/session-events";
+import {
+  notifySessionChange,
+  watchSessionChanges,
+} from "@/lib/session-events";
 import { GuidedStartModal } from "./editor/GuidedStartModal";
 import { PanelDialog } from "./editor/PanelDialog";
 
@@ -89,6 +115,14 @@ function download(
     }
     URL.revokeObjectURL(url);
   }, 2000);
+}
+
+/** The job title examples are suggested for: the headline, else the latest job. */
+function starterTitle(doc: ResumeDocument) {
+  const job = doc.sections
+    .find((section) => section.type === "experience")
+    ?.entries.find((entry) => entry.title.trim());
+  return (doc.contact.headline.trim() || job?.title.trim() || "").slice(0, 120);
 }
 
 export function ResumeStudio({
@@ -116,76 +150,97 @@ export function ResumeStudio({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showDesign, setShowDesign] = useState(false);
+  // Design, Check and AI share one side panel that replaces the preview.
+  const [activePanel, setActivePanel] = useState<SidePanelId | null>(null);
+  const showDesign = activePanel === "design";
+  const showAts = activePanel === "check";
+  const showAI = activePanel === "ai";
+  const panelSetter =
+    (id: SidePanelId) =>
+    (value: boolean | ((previous: boolean) => boolean)) =>
+      setActivePanel((previous) => {
+        const open =
+          typeof value === "function" ? value(previous === id) : value;
+        return open ? id : previous === id ? null : previous;
+      });
+  const setShowDesign = panelSetter("design");
+  const setShowAts = panelSetter("check");
+  const setShowAI = panelSetter("ai");
+  const sheetLayout = useSheetLayout();
+  const [designFilter, setDesignFilter] = useState<TemplateFilter>("all");
   const [showAccount, setShowAccount] = useState(false);
-  const [showAI, setShowAI] = useState(false);
-  const [writingTarget, setWritingTarget] = useState<{
-    mode: AiPanelMode;
-    bulletId?: string;
-    instruction?: string;
-  }>({ mode: "bullet" });
-  function openWriting(
-    bulletId?: string,
-    action: "improve" | "concise" | "metric" | "summary" = "improve",
-  ) {
-    setWritingTarget({
-      mode:
-        action === "metric"
-          ? "interview"
-          : action === "summary"
-            ? "summary"
-            : "bullet",
-      bulletId,
-      instruction:
-        action === "concise"
-          ? "Shorten this bullet without adding or strengthening facts."
-          : undefined,
-    });
-    setShowAI(true);
-  }
+  // A sparkle action the AI Assistant asked a field to start.
+  const [pendingField, setPendingField] = useState<PendingFieldAction | null>(
+    null,
+  );
+  const pendingFieldId = useRef(0);
   const [showAiGen, setShowAiGen] = useState(false);
   const [showGuidedStart, setShowGuidedStart] = useState(false);
+  const [showStart, setShowStart] = useState(false);
   const [showDemoGallery, setShowDemoGallery] = useState(false);
-  const [showTailor, setShowTailor] = useState(false);
   const [reviewedVariantUndo, setReviewedVariantUndo] = useState<{
     variantId: string;
     revision: number;
     sourceId: string;
   } | null>(null);
-  const [showAts, setShowAts] = useState(false);
-  const [atsTab, setAtsTab] = useState<"score" | "role">("score");
-  function openReview(tab: "score" | "role" = "score") {
-    setAtsTab(tab);
-    setShowAts(true);
-  }
   const [showPricing, setShowPricing] = useState(false);
-  const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isSubscriber, setIsSubscriber] = useState(false);
   const [currentPlanId, setCurrentPlanId] = useState<PlanId>("free");
+  // The plan comes from the beta's free Go period, and how long that lasts.
+  const [planBeta, setPlanBeta] = useState<{ active: boolean; endsAt: number | null; days: number }>({
+    active: false,
+    endsAt: null,
+    days: 0,
+  });
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
+  // Browser CVs never copied to the signed-in account (one-time banner).
+  // CVs saved in this browser while signed in: all of them, and the ones that
+  // can still be copied (own CVs never copied before).
+  const [browserCvs, setBrowserCvs] = useState<{
+    total: number;
+    pending: ResumeDocument[];
+  } | null>(null);
+  const [browserCvsCheck, setBrowserCvsCheck] = useState(0);
+  const rewriteAvailability = useRewriteAvailability(cloudUser?.id ?? null);
+  // One-time AI consent on the account; set here once the person turns it on.
+  const [aiConsentSet, setAiConsentSet] = useState<boolean | null>(null);
+  useEffect(() => setAiConsentSet(null), [cloudUser?.id]);
+  const aiConsent =
+    aiConsentSet ??
+    (typeof rewriteAvailability === "object" && rewriteAvailability
+      ? Boolean(rewriteAvailability.aiConsent)
+      : false);
+  // Sign in to use AI: after signing in, the open draft is copied to the account.
+  const aiSignIn = useRef(false);
+  // Build my CV with AI: the CV the interview is filling, and a guest's wish to start one.
+  const [interviewDocId, setInterviewDocId] = useState<string | null>(null);
+  const pendingInterview = useRef(false);
   const [sessionPaused, setSessionPaused] = useState(false);
   const paused = useRef(false);
   const preview = useRef<PreviewHandle>(null);
   const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
+  const future = useRef<ResumeDocument[]>([]);
   const [mobileTab, setMobileTab] = useState("editor");
   const [staged, setStaged] = useState<StagedImportData | null>(null);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
-  const liveScore = useMemo(() => (doc ? scoreResume(doc) : null), [doc]);
+  // Findings the person dismissed for the open CV (kept in this browser).
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const openDocId = doc?.id;
+  useEffect(() => {
+    setDismissed(openDocId ? loadDismissed(openDocId) : new Set());
+  }, [openDocId]);
 
+  // Docked side panels leave the editor usable, so they are not modal.
   const isModalActive = Boolean(
-    showDesign ||
     showAccount ||
-    showAI ||
     showAiGen ||
     showGuidedStart ||
     showDemoGallery ||
-    showTailor ||
-    showAts ||
     showPricing ||
-    showCoverLetter ||
     showHistory ||
     showAddSection ||
     showShortcuts ||
@@ -203,21 +258,140 @@ export function ResumeStudio({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // The start screen replaces an empty library and opens from New CV.
+  const startVisible =
+    showStart || (!doc && (!showLibrary || !documents.length));
+  const cloudUserId = cloudUser?.id;
+  useEffect(() => {
+    setBrowserCvs(null);
+    if (!cloudUserId) return;
+    let active = true;
+    void Promise.all([createRepository().list(), importReceipts(cloudUserId)])
+      .then(([local, receipts]) => {
+        const copied = new Set(receipts.map((receipt) => receipt.source_id));
+        const pending = local.filter(
+          (item) =>
+            !copied.has(item.id) && item.provenance.purpose !== "practice",
+        );
+        if (active)
+          setBrowserCvs(local.length ? { total: local.length, pending } : null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [cloudUserId, browserCvsCheck]);
+
   function select(next: ResumeDocument) {
+    // Coming from the start screen or library, begin at the top of the form
+    // rather than wherever that page was scrolled.
+    if (current.current?.id !== next.id) window.scrollTo({ top: 0 });
     setShowLibrary(false);
+    setShowStart(false);
     setShowAI(false);
     clearTimeout(timer.current);
     current.current = next;
     setDoc(next);
     history.current = [];
+    future.current = [];
     setUndoCount(0);
+    setRedoCount(0);
     change.current = 0;
     savedChange.current = 0;
     setSectionId("contact");
     setFocusTarget(null);
     setError("");
-    setStatus("Saved on this device");
+    setStatus("Saved in this browser");
   }
+
+  // The address follows the workspace: /builder lists CVs and
+  // /builder?cv=<id>&step=<section> is one CV open at a step. Opening or
+  // leaving a CV adds a history entry, so Back returns to the list; changing
+  // step replaces it, so Refresh keeps your place.
+  const urlRestored = useRef(false);
+  // The CV being opened from the address; the address waits until it is open.
+  const restoringCv = useRef<string | null>(null);
+  const inEditor = Boolean(doc) && !showLibrary && !startVisible;
+  const urlCv = inEditor ? doc!.id : null;
+  const urlStep = inEditor && sectionId !== "contact" ? sectionId : null;
+  useEffect(() => {
+    if (urlRestored.current || status === "Loading") return;
+    urlRestored.current = true;
+    const query = new URLSearchParams(window.location.search);
+    const id = query.get("cv");
+    if (!id) return;
+    const found = documents.find((item) => item.id === id);
+    if (!found) {
+      query.delete("cv");
+      query.delete("step");
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query.size ? `?${query}` : ""}`,
+      );
+      setNotice(
+        documents.length
+          ? "That CV is not in this workspace. Choose one below."
+          : "That CV is not in this workspace.",
+      );
+      return;
+    }
+    restoringCv.current = found.id;
+    select(found);
+    const step = query.get("step");
+    if (step && found.sections.some((section) => section.id === step))
+      setSectionId(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, documents]);
+  useEffect(() => {
+    if (!urlRestored.current) return;
+    if (restoringCv.current) {
+      if (urlCv !== restoringCv.current) return;
+      restoringCv.current = null;
+    }
+    const query = new URLSearchParams(window.location.search);
+    const previousCv = query.get("cv");
+    if (urlCv) query.set("cv", urlCv);
+    else query.delete("cv");
+    if (urlStep) query.set("step", urlStep);
+    else query.delete("step");
+    const next = `${window.location.pathname}${query.size ? `?${query}` : ""}`;
+    if (next === `${window.location.pathname}${window.location.search}`) return;
+    if (previousCv !== urlCv) window.history.pushState(null, "", next);
+    else window.history.replaceState(null, "", next);
+  }, [urlCv, urlStep]);
+  // Back and Forward: open the CV and step in the address, or the list.
+  const onHistory = useRef<() => void>(() => {});
+  onHistory.current = () => {
+    const query = new URLSearchParams(window.location.search);
+    const id = query.get("cv");
+    const found = id ? documents.find((item) => item.id === id) : undefined;
+    if (!found) {
+      setShowStart(false);
+      setShowLibrary(true);
+      return;
+    }
+    const step = query.get("step");
+    const goToStep = () =>
+      setSectionId(
+        step && found.sections.some((section) => section.id === step) ? step : "contact",
+      );
+    if (current.current?.id === found.id) {
+      setShowStart(false);
+      setShowLibrary(false);
+      goToStep();
+      return;
+    }
+    void action(async () => {
+      select(found);
+      goToStep();
+    });
+  };
+  useEffect(() => {
+    const listener = () => onHistory.current();
+    window.addEventListener("popstate", listener);
+    return () => window.removeEventListener("popstate", listener);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -231,10 +405,13 @@ export function ResumeStudio({
         )) as { user: AccountUser | null } | null;
         if (!active) return;
         setSessionUser(session?.user ?? null);
-        if (
-          session?.user &&
-          sessionStorage.getItem("cv-workspace") !== "device"
-        ) {
+        // A device-workspace request (from the grader hand-off or an explicit
+        // switch) applies to this page load only; signed-in users otherwise
+        // always open their account.
+        const deviceRequested =
+          sessionStorage.getItem("cv-workspace") === "device";
+        sessionStorage.removeItem("cv-workspace");
+        if (session?.user && !deviceRequested) {
           const cloud = createCloudRepository(session.user.id);
           const cloudList = await cloud.list();
           if (!active) return;
@@ -244,7 +421,7 @@ export function ResumeStudio({
         }
         list.forEach((d) => revisions.current.set(d.id, d.revision));
         setDocuments(list);
-        setStatus("Saved on this device");
+        setStatus("Saved in this browser");
       })
       .catch((e) => {
         if (active) {
@@ -275,7 +452,8 @@ export function ResumeStudio({
           const user = (value as { user: AccountUser | null }).user;
           setSessionUser((previous) =>
             previous?.id === user?.id &&
-            previous?.emailVerified === user?.emailVerified
+            previous?.emailVerified === user?.emailVerified &&
+            previous?.canExport === user?.canExport
               ? previous
               : user,
           );
@@ -284,7 +462,6 @@ export function ResumeStudio({
             setSessionPaused(true);
             clearTimeout(timer.current);
             setShowAI(false);
-            setShowCoverLetter(false);
             setError(
               "Your account session changed or expired. This workspace is paused; your draft is kept. Sign in to the original account or keep a copy on this device before switching.",
             );
@@ -320,23 +497,20 @@ export function ResumeStudio({
   }, []);
 
   useEffect(() => {
-    if (!sessionUser) {
-      setIsSubscriber(false);
-      setCurrentPlanId("free");
-      return;
-    }
+    // Guests get the free plan from the same endpoint.
     let active = true;
     fetch("/api/billing/subscription")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
-        if (data?.subscription?.planId && data.subscription.planId !== "free") {
-          setIsSubscriber(true);
-          setCurrentPlanId(data.subscription.planId || "job_hunter_monthly");
-        } else {
-          setIsSubscriber(false);
-          setCurrentPlanId("free");
-        }
+        const planId = normalizePlanId(data?.subscription?.planId);
+        setIsSubscriber(planId !== "free");
+        setCurrentPlanId(planId);
+        setPlanBeta({
+          active: Boolean(data?.subscription?.beta),
+          endsAt: data?.subscription?.currentPeriodEnd ?? null,
+          days: Number(data?.betaTrialDays ?? 0),
+        });
       })
       .catch(() => {
         if (active) {
@@ -376,7 +550,7 @@ export function ResumeStudio({
           setError("");
           setStatus(
             version === change.current
-              ? "Saved on this device"
+              ? "Saved in this browser"
               : "Unsaved changes",
           );
         } catch (e) {
@@ -411,11 +585,13 @@ export function ResumeStudio({
     if (record) {
       history.current.push(before);
       if (history.current.length > 80) history.current.shift();
+      future.current = [];
     }
     current.current = next;
     change.current++;
     setDoc(next);
     setUndoCount(history.current.length);
+    setRedoCount(future.current.length);
     setStatus("Unsaved changes");
     clearTimeout(timer.current);
     if (!paused.current)
@@ -426,7 +602,16 @@ export function ResumeStudio({
 
   function handleUndo() {
     const old = history.current.pop();
-    if (old) update((d) => Object.assign(d, old), false);
+    if (!old || !current.current) return;
+    future.current.push(current.current);
+    update((d) => Object.assign(d, old), false);
+  }
+
+  function handleRedo() {
+    const next = future.current.pop();
+    if (!next || !current.current) return;
+    history.current.push(current.current);
+    update((d) => Object.assign(d, next), false);
   }
 
   useEffect(() => {
@@ -445,16 +630,6 @@ export function ResumeStudio({
         if (showAts) {
           e.preventDefault();
           setShowAts(false);
-          return;
-        }
-        if (showTailor) {
-          e.preventDefault();
-          setShowTailor(false);
-          return;
-        }
-        if (showCoverLetter) {
-          e.preventDefault();
-          setShowCoverLetter(false);
           return;
         }
         if (showHistory) {
@@ -477,9 +652,9 @@ export function ResumeStudio({
           setShowDemoGallery(false);
           return;
         }
-        if (showAI) {
+        if (activePanel) {
           e.preventDefault();
-          setShowAI(false);
+          setActivePanel(null);
           return;
         }
         if (staged) {
@@ -498,23 +673,20 @@ export function ResumeStudio({
           target.tagName === "SELECT" ||
           target.isContentEditable);
 
-      // Global Undo: Ctrl+Z or Cmd+Z when NOT typing inside an editable field
-      if (
+      // Global Undo/Redo: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y when NOT typing in a field
+      // Browser autofill fires keydown events without a key; ignore those.
+      if (typeof e.key !== "string") return;
+      const key = e.key.toLowerCase();
+      const redo =
         (e.ctrlKey || e.metaKey) &&
-        e.key.toLowerCase() === "z" &&
-        !e.shiftKey
-      ) {
+        ((key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey));
+      if ((e.ctrlKey || e.metaKey) && (redo || (key === "z" && !e.shiftKey))) {
         const isAnyModalOpen =
           showAccount ||
-          showAI ||
-          showTailor ||
-          showAts ||
           showPricing ||
-          showCoverLetter ||
           showHistory ||
           showAddSection ||
           showShortcuts ||
-          showDesign ||
           showAiGen ||
           showGuidedStart ||
           showDemoGallery ||
@@ -522,7 +694,10 @@ export function ResumeStudio({
 
         if (!isEditable) {
           e.preventDefault();
-          if (!isAnyModalOpen) handleUndo();
+          if (!isAnyModalOpen) {
+            if (redo) handleRedo();
+            else handleUndo();
+          }
           return;
         }
       }
@@ -541,8 +716,6 @@ export function ResumeStudio({
     showShortcuts,
     showPricing,
     showAts,
-    showTailor,
-    showCoverLetter,
     showHistory,
     showAddSection,
     showAccount,
@@ -550,6 +723,7 @@ export function ResumeStudio({
     showGuidedStart,
     isModalActive,
     showDesign,
+    activePanel,
     showAiGen,
     showDemoGallery,
     staged,
@@ -667,6 +841,139 @@ export function ResumeStudio({
     });
   }
 
+  /**
+   * Signed in while the open CV is still the copy saved in this browser (for
+   * example after signing in mid-edit): copy it to the account and open the
+   * account copy. The browser copy is kept.
+   */
+  function copyCurrentToAccount(signedIn?: AccountUser) {
+    const user = signedIn ?? sessionUser;
+    const source = current.current;
+    if (!user || !source || cloudUser || sessionPaused) return Promise.resolve();
+    return action(async () => {
+      await flush();
+      const latest =
+        (await repository.current!.list()).find((d) => d.id === source.id) ??
+        source;
+      let [result] = await transferLocalResumes(user.id, [latest]);
+      // Copied before: send the current version as a new copy so the latest
+      // edits reach the account.
+      if (result.status === "already_imported")
+        [result] = await transferLocalResumes(user.id, [
+          duplicateDocument(latest, latest.name),
+        ]);
+      await switchWorkspace(user, false);
+      const copy = (await repository.current!.list()).find(
+        (d) => d.id === result.resumeId,
+      );
+      if (copy) select(copy);
+      setNotice(
+        "This CV is now saved to your account, so AI rewriting is available. The copy in this browser was kept.",
+      );
+    });
+  }
+
+  /**
+   * Build my CV with AI: a new account CV filled by the AI interview. Guests
+   * sign in first; a CV list in this browser switches to the account.
+   */
+  function buildWithAi() {
+    if (!sessionUser) {
+      pendingInterview.current = true;
+      signInForAi();
+      return;
+    }
+    const user = sessionUser;
+    void action(async () => {
+      if (!cloudUser) await switchWorkspace(user, false);
+      await startInterviewCv();
+    });
+  }
+
+  async function startInterviewCv() {
+    const next = createDocument();
+    next.name = "My CV (AI interview)";
+    await addDocument(next);
+    setShowStart(false);
+    setShowLibrary(false);
+    setInterviewDocId(next.id);
+  }
+
+  /** Leaves the interview, optionally opening the summary or skills help. */
+  function finishInterview(next: "summary" | "skills" | null) {
+    setInterviewDocId(null);
+    if (!doc || !next) return;
+    const section = doc.sections.find((s) => s.type === next);
+    startFieldAction({
+      id: `interview-${next}`,
+      kind: next,
+      action:
+        next === "summary"
+          ? planAllows(currentPlanId, "ai-summary")
+            ? "ai-draft"
+            : "draft"
+          : planAllows(currentPlanId, "ai-skills")
+            ? "ai-skills"
+            : "skills",
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: section?.id ?? null,
+      sectionType: next,
+    });
+  }
+
+  /** Guests: sign in, then the open draft is copied to the account in one step. */
+  function signInForAi() {
+    aiSignIn.current = true;
+    setShowAI(false);
+    setShowAccount(true);
+  }
+
+  async function grantAiConsent() {
+    await accountRequest(
+      "/api/account",
+      { method: "PATCH", body: JSON.stringify({ aiWritingHelp: true }) },
+      (cloudUser ?? sessionUser)?.id,
+    );
+    setAiConsentSet(true);
+  }
+
+  /** Opens the start screen; the open CV stays as it is underneath. */
+  function openStart() {
+    void action(async () => {
+      setShowStart(true);
+    });
+  }
+
+  async function handleSignedOut(deleted?: boolean) {
+    setSessionUser(null);
+    if (deleted) {
+      paused.current = false;
+      setSessionPaused(false);
+    }
+    if (!deleted && cloudUser && current.current) {
+      paused.current = true;
+      setSessionPaused(true);
+      setError(
+        "Signed out. Your account draft is kept in this tab. Sign in again or keep a copy on this device.",
+      );
+    } else await switchWorkspace(null, false);
+  }
+
+  /** Sign out from the account menu, keeping the current draft safe first. */
+  async function signOut() {
+    await action(async () => {
+      await accountRequest("/api/auth", {
+        method: "POST",
+        body: JSON.stringify({ action: "signout" }),
+      });
+      notifySessionChange();
+      await handleSignedOut();
+      setNotice("Signed out. CVs saved in this browser stay here.");
+    });
+  }
+
   async function switchWorkspace(user: AccountUser | null, save = true) {
     if (cloudUser && current.current && paused.current) {
       if (user?.id === cloudUser.id) {
@@ -694,15 +1001,16 @@ export function ResumeStudio({
     setDocuments([]);
     setShowLibrary(true);
     setShowAI(false);
-    setShowCoverLetter(false);
     setShowAts(false);
     setShowHistory(false);
     setShowDesign(false);
-    setShowTailor(false);
+    setDesignFilter("all");
     setReviewedVariantUndo(null);
     setStaged(null);
     history.current = [];
+    future.current = [];
     setUndoCount(0);
+    setRedoCount(0);
     change.current = savedChange.current = 0;
     const next = user ? createCloudRepository(user.id) : createRepository();
     repository.current = next;
@@ -713,7 +1021,7 @@ export function ResumeStudio({
       revisions.current = new Map(list.map((d) => [d.id, d.revision]));
       setDocuments(list);
       setError("");
-      setStatus("Saved on this device");
+      setStatus("Saved in this browser");
     } catch (error) {
       setStatus("Save failed");
       setError((error as Error).message);
@@ -764,7 +1072,7 @@ export function ResumeStudio({
     };
   }
 
-  async function acceptAI(proposal: Proposal) {
+  async function acceptAI(proposal: Proposal, bulletIds?: string[]) {
     const before = await prepareAI();
     if (
       proposal.documentId !== before.id ||
@@ -775,7 +1083,11 @@ export function ResumeStudio({
       `/api/ai/${encodeURIComponent(proposal.id)}`,
       {
         method: "POST",
-        body: JSON.stringify({ decision: "accept", confirmed: true }),
+        body: JSON.stringify({
+          decision: "accept",
+          confirmed: true,
+          ...(bulletIds ? { bulletIds } : {}),
+        }),
       },
       cloudUser!.id,
     )) as { document: unknown };
@@ -789,7 +1101,7 @@ export function ResumeStudio({
     setDocuments((list) => [saved, ...list.filter((d) => d.id !== saved.id)]);
     savedChange.current = change.current;
     setError("");
-    setStatus("Saved on this device");
+    setStatus("Saved in this browser");
   }
 
   function checkedExport(format: ExportFormat | "print", recovery = false) {
@@ -815,7 +1127,7 @@ export function ResumeStudio({
       setSessionUser(user);
       if (!user) {
         setPendingExport(pending);
-        setShowCoverLetter(false);
+        setShowAI(false);
         setShowAccount(true);
         setNotice("Sign in to export. Your CV and chosen format are kept.");
         return;
@@ -824,9 +1136,9 @@ export function ResumeStudio({
         throw new Error(
           "This CV belongs to a different account workspace. Sign in to the original account; your edits are kept.",
         );
-      if (!user.emailVerified) {
+      if (!userCanExport(user)) {
         setPendingExport(pending);
-        setShowCoverLetter(false);
+        setShowAI(false);
         setShowAccount(true);
         setNotice(
           "Verify your email to continue exporting. Your CV and chosen format are kept.",
@@ -899,7 +1211,7 @@ export function ResumeStudio({
         (error.status === 401 || error.code === "EMAIL_VERIFICATION_REQUIRED")
       ) {
         setPendingExport(pending);
-        setShowCoverLetter(false);
+        setShowAI(false);
         setShowAccount(true);
       }
       setError((error as Error).message);
@@ -1000,6 +1312,278 @@ export function ResumeStudio({
   }
 
   const ready = status !== "Loading";
+  const allIssues = useMemo(
+    () => (doc ? lintResumeDocument(doc).issues : []),
+    [doc],
+  );
+  const openIssues = useMemo(
+    () => allIssues.filter((issue) => !dismissed.has(issue.id)),
+    [allIssues, dismissed],
+  );
+  const strength = useMemo(
+    () =>
+      doc
+        ? cvStrength(doc, openIssues)
+        : { percent: 0, items: [], next: null, steps: {} },
+    [doc, openIssues],
+  );
+  function setDismissedFor(id: string, isDismissed: boolean) {
+    if (!doc) return;
+    const next = new Set(dismissed);
+    if (isDismissed) next.add(id);
+    else next.delete(id);
+    setDismissed(next);
+    saveDismissed(doc.id, next);
+  }
+  /** Show the field a finding is about, keeping the docked panel open. */
+  function fixIssue(issue: AtsLintIssue) {
+    const sectionId = issue.sectionId || "contact";
+    setSectionId(sectionId);
+    setMobileTab("editor");
+    const contactField = issue.id.startsWith("contact-")
+      ? issue.id.slice("contact-".length)
+      : undefined;
+    setFocusTarget({
+      sectionId,
+      entryId: issue.entryId,
+      bulletId: issue.bulletId,
+      field: contactField,
+    });
+    // A bottom sheet would cover the field.
+    if (sheetLayout) setShowAts(false);
+  }
+  const steps = doc
+    ? [
+        { id: "contact", label: "Personal details" },
+        ...doc.sections.map((s) => ({
+          id: s.id,
+          label: s.label || labels[s.type],
+        })),
+      ]
+    : [];
+  /** Saves a reviewed job variant as its own CV, keeping the original. */
+  async function applyTailoredVariant(
+    tailored: ResumeDocument,
+    sourceSnapshot: string,
+  ) {
+    let succeeded = false;
+    await action(async () => {
+      const active = current.current!;
+      const snapshot = {
+        ...active,
+        revision: revisions.current.get(active.id) ?? active.revision,
+      };
+      const list = await repository.current!.list();
+      const latest = list.find((item) => item.id === snapshot.id);
+      if (
+        reviewSnapshot(snapshot) !== sourceSnapshot ||
+        !latest ||
+        reviewSnapshot(latest) !== sourceSnapshot
+      ) {
+        throw new Error(
+          "The source CV changed or was removed after review. Reload it and analyze the current snapshot again.",
+        );
+      }
+      const alreadySaved = list.find((item) => item.id === tailored.id);
+      if (alreadySaved) {
+        if (reviewSnapshot(alreadySaved) !== reviewSnapshot(tailored)) {
+          throw new Error(
+            "This pending variant already exists with later changes. Your edits are kept; reload to review it.",
+          );
+        }
+        revisions.current.set(alreadySaved.id, alreadySaved.revision);
+        setDocuments(list);
+        select(alreadySaved);
+      } else {
+        await addDocument(tailored);
+      }
+      setReviewedVariantUndo({
+        variantId: tailored.id,
+        revision: revisions.current.get(tailored.id)!,
+        sourceId: snapshot.id,
+      });
+      setNotice(
+        "Reviewed ordering saved in an independent variant. Your original CV is kept.",
+      );
+      succeeded = true;
+    });
+    return succeeded;
+  }
+
+  /**
+   * From the AI Assistant's to-do list: show the field an item is about and
+   * open its sparkle action there.
+   */
+  function startFieldAction(item: HelpItem) {
+    if (!doc) return;
+    let sectionId = item.sectionId;
+    let entryId = item.entryId;
+    if (item.kind !== "bullet") {
+      const existing = sectionId
+        ? doc.sections.find((s) => s.id === sectionId)
+        : undefined;
+      if (!existing || !existing.entries.length) {
+        const newId = existing?.id ?? uid();
+        sectionId = newId;
+        entryId = uid();
+        const entryTitle = item.kind === "summary" ? "Summary" : "Skills";
+        update((d) => {
+          let section = d.sections.find((s) => s.id === newId);
+          if (!section) {
+            section = {
+              id: newId,
+              type: item.sectionType === "summary" ? "summary" : "skills",
+              label:
+                item.sectionType === "summary"
+                  ? "Professional Summary"
+                  : "Technical Skills",
+              visible: true,
+              entries: [],
+            };
+            if (item.sectionType === "summary") d.sections.unshift(section);
+            else d.sections.push(section);
+          }
+          section.entries.push({
+            ...newEntry(),
+            id: entryId!,
+            title: entryTitle,
+          });
+        });
+      } else {
+        entryId = existing.entries[0].id;
+      }
+    }
+    if (!sectionId) return;
+    goToStep(sectionId, false);
+    setFocusTarget({ sectionId, entryId, bulletId: item.bulletId });
+    pendingFieldId.current += 1;
+    setPendingField({
+      id: pendingFieldId.current,
+      kind: item.kind,
+      action: item.action,
+      bulletId: item.bulletId,
+    });
+    // A bottom sheet would cover the field.
+    if (sheetLayout) setShowAI(false);
+  }
+  useEffect(() => {
+    if (!pendingField) return;
+    const timer = setTimeout(() => setPendingField(null), 1500);
+    return () => clearTimeout(timer);
+  }, [pendingField]);
+
+  /** Ask the AI buttons: start an existing tool on the right field; nothing is changed here. */
+  function runAskAction(action: AskAction) {
+    if (!doc) return;
+    if (action.type === "check") {
+      setActivePanel("check");
+      return;
+    }
+    if (action.type === "open-section") {
+      goToStep(action.targetId);
+      if (sheetLayout) setShowAI(false);
+      return;
+    }
+    if (action.type === "improve-bullet") {
+      const section = doc.sections.find((s) =>
+        s.entries.some((e) => e.bullets.some((b) => b.id === action.targetId)),
+      );
+      const entry = section?.entries.find((e) => e.bullets.some((b) => b.id === action.targetId));
+      if (!section || !entry) return;
+      startFieldAction({
+        id: `ask-${action.targetId}`,
+        kind: "bullet",
+        action: "improve",
+        title: "",
+        detail: "",
+        buttonLabel: "",
+        sectionId: section.id,
+        sectionType: section.type === "projects" ? "projects" : "experience",
+        entryId: entry.id,
+        bulletId: action.targetId,
+      });
+      return;
+    }
+    const kind = action.type === "write-summary" ? "summary" : "skills";
+    startFieldAction({
+      id: `ask-${kind}`,
+      kind,
+      action:
+        kind === "summary"
+          ? planAllows(currentPlanId, "ai-summary")
+            ? "ai-draft"
+            : "draft"
+          : planAllows(currentPlanId, "ai-skills")
+            ? "ai-skills"
+            : "skills",
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: doc.sections.find((s) => s.type === kind)?.id ?? null,
+      sectionType: kind,
+    });
+  }
+
+  /** Check my CV: run Improve wording or Shorten on the finding's bullet. */
+  function fixIssueWithAi(issue: AtsLintIssue) {
+    const action = aiFixFor(issue);
+    if (!doc || !action || !issue.bulletId) return;
+    const section = doc.sections.find((s) => s.id === issue.sectionId);
+    startFieldAction({
+      id: `check-${issue.id}`,
+      kind: "bullet",
+      action,
+      title: "",
+      detail: "",
+      buttonLabel: "",
+      sectionId: issue.sectionId ?? null,
+      sectionType: section?.type === "projects" ? "projects" : "experience",
+      entryId: issue.entryId,
+      bulletId: issue.bulletId,
+    });
+    if (sheetLayout) setShowAts(false);
+  }
+
+  /** Show a step and, unless a field will take focus, move focus to its form. */
+  function goToStep(id: string, focusForm = true) {
+    setSectionId(id);
+    setMobileTab("editor");
+    requestAnimationFrame(() => {
+      const form = document.querySelector<HTMLElement>(".editor-panel");
+      form?.scrollIntoView({ block: "start", behavior: "instant" });
+      if (focusForm) form?.focus({ preventScroll: true });
+    });
+  }
+
+  // Everything a sparkle menu or AI view needs; shared by the form and the AI Assistant.
+  const fieldAiServices: FieldAiServices | null = doc
+    ? {
+      doc,
+      owner: cloudUser?.id ?? null,
+      availability: rewriteAvailability,
+      signedIn: !!sessionUser,
+      onCopyToAccount: () => void copyCurrentToAccount(),
+      summaryDrafts: planAllows(currentPlanId, "ai-summary"),
+      aiConsent,
+      grantConsent: grantAiConsent,
+      starterTitle: starterTitle(doc),
+      skillsAi: planAllows(currentPlanId, "ai-skills"),
+      updateDocument: (mutator) => update(mutator),
+      onSeePlans: () => setShowPricing(true),
+      prepare: prepareAI,
+      accept: acceptAI,
+      onOpenAccount: signInForAi,
+      pending: pendingField,
+      consumePending: (id) =>
+        setPendingField((open) => (open?.id === id ? null : open)),
+      improveAll: planAllows(currentPlanId, "ai-improve-all"),
+      jobMatch: planAllows(currentPlanId, "ai-job-match"),
+      tailor: planAllows(currentPlanId, "ai-tailor"),
+      coverLetterAi: planAllows(currentPlanId, "ai-cover-letter"),
+      askAi: planAllows(currentPlanId, "ai-ask"),
+      saveTailoredCopy: applyTailoredVariant,
+    }
+    : null;
 
   return (
     <div
@@ -1023,21 +1607,31 @@ export function ResumeStudio({
         </a>
       )}
       <EditorHeader
-        doc={doc}
-        libraryMode={showLibrary}
+        libraryMode={showLibrary || startVisible}
+        // "New CV" only when asked for; an empty My CVs keeps its name.
+        heading={showStart ? "New CV" : "My CVs"}
         cloudUser={cloudUser}
+        sessionUser={sessionUser}
         status={status}
         busy={busy}
         ready={ready}
         showAccount={showAccount}
-        showAI={showAI}
         onOpenAccount={() => setShowAccount(true)}
+        onSignOut={() => void signOut()}
+        onUseAccount={
+          sessionUser && !sessionPaused
+            ? () => {
+                const user = sessionUser;
+                void action(() => switchWorkspace(user));
+              }
+            : undefined
+        }
         onOpenLibrary={() => {
           void action(async () => {
+            setShowStart(false);
             setShowLibrary(true);
           });
         }}
-        onOpenAts={() => openReview()}
         onOpenPricing={() => setShowPricing(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
         isSubscriber={isSubscriber}
@@ -1061,8 +1655,8 @@ export function ResumeStudio({
             beforeChange={
               pendingExport || sessionPaused ? async () => {} : flush
             }
-            beforeNavigate={flush}
             pendingAction={pendingExport ? "Continue export" : undefined}
+            onAiWritingHelp={setAiConsentSet}
             onAuthenticated={async (user) => {
               setSessionUser(user);
               if (!cloudUser && current.current)
@@ -1072,29 +1666,32 @@ export function ResumeStudio({
                 setSessionPaused(false);
               }
               if (pendingExport) {
-                if (user.emailVerified) setShowAccount(false);
+                if (userCanExport(user)) setShowAccount(false);
                 await performExport(pendingExport, user);
+              } else if (aiSignIn.current && !cloudUser) {
+                aiSignIn.current = false;
+                setShowAccount(false);
+                if (pendingInterview.current) {
+                  pendingInterview.current = false;
+                  await action(async () => {
+                    await switchWorkspace(user, false);
+                    await startInterviewCv();
+                  });
+                } else if (current.current) await copyCurrentToAccount(user);
+                else await action(() => switchWorkspace(user));
               }
             }}
-            onLocal={() => switchWorkspace(null)}
             onCloud={(user) => switchWorkspace(user)}
-            onSignedOut={async (deleted) => {
-              setSessionUser(null);
-              if (deleted) {
-                paused.current = false;
-                setSessionPaused(false);
-              }
-              if (!deleted && cloudUser && current.current) {
-                paused.current = true;
-                setSessionPaused(true);
-                setError(
-                  "Signed out. Your account draft is kept in this tab. Sign in again or keep a copy on this device.",
-                );
-              } else await switchWorkspace(null, false);
+            onOpenPricing={() => {
+              setShowAccount(false);
+              setShowPricing(true);
             }}
+            onSignedOut={handleSignedOut}
             onClose={() => {
               setShowAccount(false);
               setPendingExport(null);
+              aiSignIn.current = false;
+              pendingInterview.current = false;
             }}
             loadLocal={async () => {
               await flush();
@@ -1105,6 +1702,7 @@ export function ResumeStudio({
               const result = await transferLocalResumes(owner, docs);
               if (cloudUser?.id === owner)
                 await switchWorkspace(cloudUser, false);
+              setBrowserCvsCheck((count) => count + 1);
               return `${result.filter((r) => r.status === "imported").length} resumes copied. Local originals were kept.`;
             }}
             onExport={async (owner) => {
@@ -1157,30 +1755,6 @@ export function ResumeStudio({
         </div>
       )}
 
-      {showAI && doc && (
-        <AIPanel
-          key={`${cloudUser?.id ?? "local"}:${doc.id}`}
-          doc={doc}
-          owner={cloudUser?.id ?? null}
-          prepare={prepareAI}
-          accept={acceptAI}
-          onClose={() => setShowAI(false)}
-          onUpdateDocument={update}
-          initialMode={writingTarget.mode}
-          initialBulletId={writingTarget.bulletId}
-          initialInstruction={writingTarget.instruction}
-          onOpenAccount={() => {
-            setShowAI(false);
-            setShowAccount(true);
-          }}
-          onEditSection={(id) => {
-            setShowAI(false);
-            setMobileTab("editor");
-            setSectionId(id);
-          }}
-        />
-      )}
-
       {showAiGen && (
         <AiCvGeneratorModal
           currentDoc={doc}
@@ -1229,119 +1803,17 @@ export function ResumeStudio({
         />
       )}
 
-      {showTailor && doc && (
-        <JobTailorModal
-          key={`${cloudUser?.id ?? "device"}:${doc.id}`}
-          owner={cloudUser?.id ?? null}
-          prepareHistory={prepareAI}
-          acceptCoaching={acceptAI}
-          doc={{
-            ...doc,
-            revision: revisions.current.get(doc.id) ?? doc.revision,
-          }}
-          busy={busy}
-          onApplyTailoredVariant={async (tailored, sourceSnapshot) => {
-            let succeeded = false;
-            await action(async () => {
-              const active = current.current!;
-              const snapshot = {
-                ...active,
-                revision: revisions.current.get(active.id) ?? active.revision,
-              };
-              const list = await repository.current!.list();
-              const latest = list.find((item) => item.id === snapshot.id);
-              if (
-                reviewSnapshot(snapshot) !== sourceSnapshot ||
-                !latest ||
-                reviewSnapshot(latest) !== sourceSnapshot
-              ) {
-                throw new Error(
-                  "The source CV changed or was removed after review. Reload it and analyze the current snapshot again.",
-                );
-              }
-              const alreadySaved = list.find((item) => item.id === tailored.id);
-              if (alreadySaved) {
-                if (reviewSnapshot(alreadySaved) !== reviewSnapshot(tailored)) {
-                  throw new Error(
-                    "This pending variant already exists with later changes. Your edits are kept; reload to review it.",
-                  );
-                }
-                revisions.current.set(alreadySaved.id, alreadySaved.revision);
-                setDocuments(list);
-                select(alreadySaved);
-              } else {
-                await addDocument(tailored);
-              }
-              setReviewedVariantUndo({
-                variantId: tailored.id,
-                revision: revisions.current.get(tailored.id)!,
-                sourceId: snapshot.id,
-              });
-              setShowTailor(false);
-              setNotice(
-                "Reviewed ordering saved in an independent variant. Your original CV is kept.",
-              );
-              succeeded = true;
-            });
-            return succeeded;
-          }}
-          onClose={() => setShowTailor(false)}
-        />
-      )}
-
-      {showAts && doc && (
-        <AtsReadinessPanel
-          doc={doc}
-          onNavigateToIssue={(issue) => {
-            if (issue.sectionId) setSectionId(issue.sectionId);
-            if (issue.sectionId || issue.bulletId || issue.entryId) {
-              setFocusTarget({
-                sectionId: issue.sectionId || "contact",
-                entryId: issue.entryId,
-                bulletId: issue.bulletId,
-              });
-            }
-            setShowAts(false);
-          }}
-          initialTab={atsTab}
-          onNavigateToSection={(id) => {
-            setMobileTab("editor");
-            setSectionId(id);
-            setFocusTarget({ sectionId: id });
-            setShowAts(false);
-          }}
-          onClose={() => setShowAts(false)}
-        />
-      )}
-
       {showPricing && (
         <PricingModal
           cloudUser={cloudUser}
           currentPlanId={currentPlanId}
+          beta={planBeta.active}
+          betaDays={planBeta.days}
           onOpenAccount={() => {
             setShowPricing(false);
             setShowAccount(true);
           }}
           onClose={() => setShowPricing(false)}
-        />
-      )}
-
-      {showCoverLetter && doc && (
-        <CoverLetterModal
-          doc={doc}
-          busy={busy}
-          onClose={() => setShowCoverLetter(false)}
-          onExport={(format, text, name) => {
-            if (!current.current) return;
-            const pending: PendingExport = {
-              doc: structuredClone(current.current),
-              owner: cloudUser?.id ?? null,
-              format,
-              letter: { text, name },
-            };
-            setPendingExport(pending);
-            void performExport(pending);
-          }}
         />
       )}
 
@@ -1380,25 +1852,24 @@ export function ResumeStudio({
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
-      {showDesign && doc && (
-        <DesignPanel
-          doc={doc}
-          disabled={busy}
-          onChange={(settings) =>
-            update((d) => {
-              Object.assign(d.presentation, settings);
-            })
-          }
-          onClose={() => setShowDesign(false)}
-          onOpenDemoGallery={() => setShowDemoGallery(true)}
-        />
-      )}
-
       {staged && (
         <ImportReviewModal
           staged={staged}
-          hasActiveDoc={!!doc}
+          hasActiveDoc={!!doc && !showStart}
           busy={busy}
+          tidy={{
+            owner: sessionUser?.id ?? null,
+            allowed: planAllows(currentPlanId, "ai-import-tidy"),
+            configured:
+              typeof rewriteAvailability === "object" && rewriteAvailability
+                ? rewriteAvailability.configured
+                : null,
+            consent: aiConsent,
+            grantConsent: grantAiConsent,
+            onSeePlans: () => setShowPricing(true),
+            onSignIn: signInForAi,
+            onTidied: (document) => setStaged((open) => (open ? { ...open, document } : open)),
+          }}
           onRestoreAsNew={() => {
             void action(async () => {
               await addDocument(
@@ -1408,7 +1879,7 @@ export function ResumeStudio({
             });
           }}
           onReplaceActive={
-            doc
+            doc && !showStart
               ? () => {
                   void action(async () => {
                     const imported = structuredClone(staged.document);
@@ -1433,11 +1904,7 @@ export function ResumeStudio({
         style={{ display: showAccount ? "none" : undefined }}
         disabled={
           showAccount ||
-          showAI ||
-          showTailor ||
-          showAts ||
           showPricing ||
-          showCoverLetter ||
           showHistory ||
           showAddSection ||
           showShortcuts ||
@@ -1448,11 +1915,7 @@ export function ResumeStudio({
         }
         inert={
           showAccount ||
-          showAI ||
-          showTailor ||
-          showAts ||
           showPricing ||
-          showCoverLetter ||
           showHistory ||
           showAddSection ||
           showShortcuts ||
@@ -1508,7 +1971,55 @@ export function ResumeStudio({
             e.target.value = "";
           }}
         />
-        {showLibrary ? (
+        {cloudUser && browserCvs && !(doc && !showLibrary && !showStart) && (
+          <BrowserCvsBanner
+            key={`${cloudUser.id}:${browserCvsCheck}`}
+            userId={cloudUser.id}
+            email={cloudUser.email}
+            total={browserCvs.total}
+            documents={browserCvs.pending}
+            busy={busy || !ready}
+            onShow={() => void action(() => switchWorkspace(null))}
+            onDone={() => setBrowserCvsCheck((count) => count + 1)}
+            onCopy={async (selected) => {
+              await flush();
+              const result = await transferLocalResumes(
+                cloudUser.id,
+                selected,
+              );
+              await switchWorkspace(cloudUser, false);
+              setNotice(
+                `${result.filter((r) => r.status === "imported").length} CVs copied to your account. The copies in this browser were kept.`,
+              );
+            }}
+          />
+        )}
+        {startVisible ? (
+          <StartScreen
+            disabled={!ready || busy || status === "Save failed"}
+            signedIn={!!cloudUser}
+            betaDays={planBeta.days}
+            onSignInForAi={sessionUser ? undefined : signInForAi}
+            onBuildWithAi={buildWithAi}
+            startingDesign={selectedStart?.label}
+            onClearStartingDesign={clearStartingDesign}
+            onStaged={(data) => setStaged(data)}
+            onError={setError}
+            onScratch={createSelectedResume}
+            onGuided={() => setShowGuidedStart(true)}
+            onExamples={() => setShowDemoGallery(true)}
+            onPractice={() => setShowAiGen(true)}
+            onRestoreBackup={() => fileInput.current?.click()}
+            onBack={
+              documents.length
+                ? () => {
+                    setShowStart(false);
+                    if (!doc) setShowLibrary(true);
+                  }
+                : undefined
+            }
+          />
+        ) : showLibrary || !doc ? (
           <>
             {selectedStart && (
               <section
@@ -1518,8 +2029,8 @@ export function ResumeStudio({
                 <div>
                   <strong>Start with {selectedStart.label}</strong>
                   <p>
-                    Create my resume will use this design with empty personal
-                    details. Existing CVs stay unchanged.
+                    New CV will use this design with empty personal details.
+                    Existing CVs stay unchanged.
                   </p>
                 </div>
                 <button disabled={busy || !ready} onClick={clearStartingDesign}>
@@ -1541,114 +2052,44 @@ export function ResumeStudio({
               onClassify={(next, purpose) => {
                 void classifyDocument(next, purpose);
               }}
-              onNew={createSelectedResume}
-              onImport={() => {
-                setShowLibrary(false);
-                current.current = null;
-                setDoc(null);
-              }}
-              onExamples={() => setShowDemoGallery(true)}
-              onAccount={() => setShowAccount(true)}
-              onGuidedStart={() => setShowGuidedStart(true)}
+              onNew={openStart}
             />
           </>
-        ) : !doc ? (
-          <main id="workspace-main" tabIndex={-1} className="welcome no-print">
-            <span className="welcome-symbol">✦</span>
-            <p className="eyebrow">A FRESH START</p>
-            <h2>
-              Your experience deserves
-              <br />a thoughtful introduction.
-            </h2>
-            <p>
-              Start with a blank page, upload your current resume, or explore a
-              fictional example.
-              <br />
-              {cloudUser
-                ? "Your resumes are saved in your account."
-                : "Your resumes stay in this browser, on this device."}
-            </p>
-            <div className="button-row">
-              <button
-                className="primary"
-                disabled={!ready || busy || status === "Save failed"}
-                onClick={() => {
-                  void action(() => addDocument(createDocument()));
-                }}
-              >
-                Create my resume <span>↗</span>
-              </button>
-              <button
-                disabled={!ready || busy || status === "Save failed"}
-                onClick={() => {
-                  setShowDemoGallery(true);
-                }}
-              >
-                Explore an example
-              </button>
-              <button
-                disabled={!ready || busy}
-                onClick={() => fileInput.current?.click()}
-              >
-                Restore a backup
-              </button>
-            </div>
-
-            <ColdStartImporter
-              disabled={!ready || busy}
-              onStaged={(data) => setStaged(data)}
-              onError={(err) => setError(err)}
-              onOpenAiGenerator={() => setShowAiGen(true)}
-              onOpenDemoGallery={() => setShowDemoGallery(true)}
-            />
-
-            <p className="privacy-note">
-              Edit on this device without an account. Sign in to download or
-              export.
-              <br />
-              Clearing browser data removes local resumes. Server export
-              processing requires your confirmation.
-            </p>
-          </main>
         ) : (
           <>
-            <div className="document-context no-print">
-              <span className="library-kind">
-                {doc.provenance.purpose === "personal"
-                  ? "Personal CV"
-                  : doc.provenance.purpose === "practice"
-                    ? "Practice / fictional content"
-                    : "Older draft · needs review"}
-              </span>
-              <span>
-                {cloudUser
-                  ? `Saved in ${cloudUser.email}`
-                  : "On this device · not saved to an account"}
-              </span>
-              {doc.provenance.purpose !== "personal" && (
-                <button
-                  onClick={() => {
-                    void classifyDocument(doc, "personal");
-                  }}
-                >
-                  Review and mark as my CV
-                </button>
-              )}
-              <span>
-                {sessionUser
-                  ? `Signed in as ${sessionUser.email}`
-                  : "Sign in to export"}
-              </span>
-            </div>
-            <DocumentToolbar
+            <EditorToolbar
               doc={doc}
               documents={documentsInCollection(
                 documents,
                 doc.provenance.purpose,
               )}
               busy={busy}
-              undoCount={undoCount}
-              showDesign={showDesign}
+              canUndo={undoCount > 0}
+              canRedo={redoCount > 0}
+              status={status}
+              savedToAccount={!!cloudUser}
+              saveAction={
+                cloudUser
+                  ? undefined
+                  : sessionUser
+                    ? sessionPaused
+                      ? undefined
+                      : {
+                          label: "Copy to my account",
+                          onClick: () => void copyCurrentToAccount(),
+                        }
+                    : {
+                        label: "Sign in to use AI",
+                        onClick: signInForAi,
+                      }
+              }
+              issueCount={issuesToFix(allIssues, dismissed).length}
+              activePanel={activePanel}
+              onRename={(name) =>
+                update((d) => {
+                  d.name = name || "Untitled resume";
+                })
+              }
               onSelectDocument={(id) => {
                 void action(async () => {
                   const list = await repository.current!.list();
@@ -1662,84 +2103,29 @@ export function ResumeStudio({
                   select(next);
                 });
               }}
-              onNew={() => {
-                void action(() => addDocument(createDocument()));
-              }}
+              onNew={openStart}
+              onDelete={() => deleteSavedDocument(doc)}
               onDuplicate={() => {
                 void action(() =>
                   addDocument(duplicateDocument(current.current!)),
                 );
               }}
               onImportClick={() => fileInput.current?.click()}
-              onUndo={handleUndo}
-              onToggleDesign={() => setShowDesign((val) => !val)}
-              onOpenAI={() => openWriting()}
-              onOpenAiGenerator={() => setShowAiGen(true)}
-              onOpenDemoGallery={() => setShowDemoGallery(true)}
-              onOpenAts={() => openReview("role")}
-              onOpenTailor={() => setShowTailor(true)}
-              onOpenCoverLetter={() => setShowCoverLetter(true)}
               onOpenHistory={() => setShowHistory(true)}
+              onOpenDemoGallery={() => setShowDemoGallery(true)}
+              onOpenAiGenerator={() => setShowAiGen(true)}
+              onMarkPersonal={
+                doc.provenance.purpose !== "personal"
+                  ? () => void classifyDocument(doc, "personal")
+                  : undefined
+              }
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onTogglePanel={(panel) =>
+                setActivePanel((open) => (open === panel ? null : panel))
+              }
               onPrint={() => checkedExport("print")}
               onExport={checkedExport}
-            />
-
-            <nav
-              className="editor-taskbar no-print"
-              aria-label="Help with this CV"
-            >
-              {liveScore && (
-                <button
-                  className={`taskbar-score tone-${liveScore.total >= 90 ? "excellent" : liveScore.total >= 75 ? "strong" : liveScore.total >= 55 ? "fair" : "low"}`}
-                  disabled={busy}
-                  onClick={() => openReview()}
-                  aria-label={`Resume score ${liveScore.total} out of 100, ${liveScore.grade}. Check my CV`}
-                >
-                  <span className="taskbar-score-value">{liveScore.total}</span>
-                  <span className="taskbar-score-text">
-                    <strong>Check my CV</strong>
-                    <span>
-                      {liveScore.grade}
-                      {liveScore.topFixes[0]
-                        ? ` · next: ${liveScore.topFixes[0].label.toLowerCase()}`
-                        : ""}
-                    </span>
-                  </span>
-                </button>
-              )}
-              <button disabled={busy} onClick={() => openWriting()}>
-                <span aria-hidden="true">✨</span>
-                <strong>Writing help</strong>
-              </button>
-              <button disabled={busy} onClick={() => setShowTailor(true)}>
-                <span aria-hidden="true">🎯</span>
-                <strong>Compare with a job</strong>
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => {
-                  setSectionId("contact");
-                  setMobileTab("editor");
-                  setFocusTarget({ sectionId: "contact", field: "photo" });
-                }}
-              >
-                <span aria-hidden="true">📷</span>
-                <strong>Add or change photo</strong>
-              </button>
-            </nav>
-            <EditorStartGuide
-              key={doc.id}
-              doc={doc}
-              busy={busy}
-              onSection={(id) => {
-                setMobileTab("editor");
-                setSectionId(id);
-                setFocusTarget({
-                  sectionId: id,
-                  field: id === "contact" ? "name" : undefined,
-                });
-              }}
-              onReview={() => openReview()}
             />
 
             <div className="mobile-tabs no-print">
@@ -1757,92 +2143,226 @@ export function ResumeStudio({
               >
                 Preview resume
               </button>
-              <button disabled={busy} onClick={() => openReview()}>
-                Review resume
-              </button>
-              <span className="mobile-save-feedback">
-                {cloudUser && status === "Saved on this device"
-                  ? "Saved to your account"
-                  : status}
-              </span>
             </div>
 
             <main
               id="workspace-main"
               tabIndex={-1}
-              className={`editor-layout show-${mobileTab}`}
+              className={`editor-layout show-${mobileTab}${activePanel && !sheetLayout ? " has-panel" : ""}${activePanel === "design" && !sheetLayout ? " has-design" : ""}`}
             >
               <EditorSidebar
                 doc={doc}
                 sectionId={sectionId}
-                cloudUser={cloudUser}
-                onSelectSection={(id) => setSectionId(id)}
+                strength={strength}
+                onSelectSection={goToStep}
                 onAddSection={() => setShowAddSection(true)}
+                onNextStep={(id) => {
+                  goToStep(id, false);
+                  setFocusTarget({
+                    sectionId: id,
+                    field: id === "contact" ? "name" : undefined,
+                  });
+                }}
               />
 
-              <SectionEditor
-                doc={doc}
-                sectionId={sectionId}
-                busy={busy}
-                cloudUser={cloudUser}
-                focusTarget={focusTarget}
-                onWritingAction={openWriting}
-                onUpdateDocument={(mutator) => update(mutator)}
-                onDeleteSection={(secId) => {
-                  update((d) => {
-                    const idx = d.sections.findIndex((s) => s.id === secId);
-                    if (idx !== -1) {
-                      d.sections.splice(idx, 1);
-                    }
-                  });
-                  setSectionId("contact");
-                }}
-                onDeleteResume={() => deleteSavedDocument(doc)}
-              />
+              <FieldAiProvider value={fieldAiServices!}>
+                {doc.id === interviewDocId ? (
+                  <AiInterview doc={doc} onFinish={finishInterview} />
+                ) : (
+                <SectionEditor
+                  doc={doc}
+                  sectionId={sectionId}
+                  busy={busy}
+                  cloudUser={cloudUser}
+                  focusTarget={focusTarget}
+                  onOpenPhotoDesigns={() => {
+                    setDesignFilter("photo");
+                    setShowDesign(true);
+                  }}
+                  dismissed={dismissed}
+                  onUpdateDocument={(mutator) => update(mutator)}
+                  onDeleteSection={(secId) => {
+                    update((d) => {
+                      const idx = d.sections.findIndex((s) => s.id === secId);
+                      if (idx !== -1) {
+                        d.sections.splice(idx, 1);
+                      }
+                    });
+                    setSectionId("contact");
+                  }}
+                  steps={steps}
+                  onStep={goToStep}
+                  onFinish={() => setShowAts(true)}
+                />
+                )}
+              </FieldAiProvider>
+
+              {activePanel && (
+                <SidePanel
+                  key={activePanel}
+                  title={
+                    activePanel === "design"
+                      ? "Design"
+                      : activePanel === "check"
+                        ? "Check my CV"
+                        : "AI Assistant"
+                  }
+                  onClose={() => {
+                    setActivePanel(null);
+                    setDesignFilter("all");
+                  }}
+                >
+                  {activePanel === "design" && (
+                    <DesignPanel
+                      doc={doc}
+                      disabled={busy}
+                      onChange={(settings) =>
+                        update((d) => {
+                          Object.assign(d.presentation, settings);
+                        })
+                      }
+                      initialFilter={designFilter}
+                    />
+                  )}
+                  {activePanel === "check" && (
+                    <CheckPanel
+                      doc={doc}
+                      strength={strength}
+                      issues={allIssues}
+                      dismissed={dismissed}
+                      onDismiss={(id) => setDismissedFor(id, true)}
+                      onRestore={(id) => setDismissedFor(id, false)}
+                      onFix={fixIssue}
+                      onFixWithAi={fixIssueWithAi}
+                      onOpenStep={(id) => {
+                        goToStep(id, false);
+                        setFocusTarget({
+                          sectionId: id,
+                          field: id === "contact" ? "name" : undefined,
+                        });
+                        if (sheetLayout) setShowAts(false);
+                      }}
+                    />
+                  )}
+                  {activePanel === "ai" && (
+                    <FieldAiProvider value={fieldAiServices!}>
+                    <AIPanel
+                      key={`${cloudUser?.id ?? "local"}:${doc.id}`}
+                      doc={doc}
+                      owner={cloudUser?.id ?? null}
+                      availability={rewriteAvailability}
+                      signedIn={!!sessionUser}
+                      onCopyToAccount={() => void copyCurrentToAccount()}
+                      onStartAction={startFieldAction}
+                      onOpenAccount={signInForAi}
+                      onOpenCheck={() => setActivePanel("check")}
+                      askTab={(selectTab) => (
+                        <AskAi
+                          onAction={(action) => {
+                            if (action.type === "match-job") return selectTab("job");
+                            if (action.type === "cover-letter") return selectTab("letter");
+                            runAskAction(action);
+                          }}
+                        />
+                      )}
+                      jobTab={
+                        <JobTailorModal
+                          embedded
+                          owner={cloudUser?.id ?? null}
+                          prepareHistory={prepareAI}
+                          acceptCoaching={acceptAI}
+                          doc={{
+                            ...doc,
+                            revision:
+                              revisions.current.get(doc.id) ?? doc.revision,
+                          }}
+                          busy={busy}
+                          canCreateCopy={planAllows(
+                            currentPlanId,
+                            "tailored-copy",
+                          )}
+                          canCoach={planAllows(currentPlanId, "job-coaching")}
+                          onSeePlans={() => {
+                            if (sheetLayout) setShowAI(false);
+                            setShowPricing(true);
+                          }}
+                          onApplyTailoredVariant={applyTailoredVariant}
+                          onClose={() => setShowAI(false)}
+                        />
+                      }
+                      letterTab={
+                        !planAllows(currentPlanId, "cover-letter") ? (
+                          <LockedFeature
+                            feature="cover-letter"
+                            onSeePlans={() => {
+                              if (sheetLayout) setShowAI(false);
+                              setShowPricing(true);
+                            }}
+                          />
+                        ) : (
+                        <CoverLetterModal
+                          embedded
+                          doc={doc}
+                          busy={busy}
+                          onClose={() => setShowAI(false)}
+                          onExport={(format, text, name) => {
+                            if (!current.current) return;
+                            const pending: PendingExport = {
+                              doc: structuredClone(current.current),
+                              owner: cloudUser?.id ?? null,
+                              format,
+                              letter: { text, name },
+                            };
+                            setPendingExport(pending);
+                            void performExport(pending);
+                          }}
+                        />
+                        )
+                      }
+                    />
+                    </FieldAiProvider>
+                  )}
+                </SidePanel>
+              )}
 
               <section
                 id="resume-preview-panel"
                 className="preview-panel"
                 aria-label="Live preview"
+                // Design sits in the form's column so the preview stays visible.
+                hidden={!!activePanel && activePanel !== "design" && !sheetLayout}
               >
                 <div className="preview-toolbar no-print">
                   <div className="preview-toolbar-left">
-                    <span className="eyebrow">LIVE PREVIEW</span>
+                    <span className="eyebrow">Live preview</span>
                     <span className="template-label">
+                      Design:{" "}
                       {
                         templates.find(
                           (t) => t.id === doc.presentation.template,
                         )!.name
-                      }{" "}
-                      <span>✓</span>
+                      }
                     </span>
-                    <button
-                      type="button"
-                      className="preview-change-style-btn"
-                      onClick={() => setShowDesign(true)}
-                      title="Change template, colors, and typography"
-                    >
-                      🎨 Change style
-                    </button>
                   </div>
                   {!showDesign && (
-                    <label>
-                      Page size{" "}
-                      <select
-                        aria-label="Page size"
-                        disabled={busy}
-                        value={doc.presentation.pageSize}
-                        onChange={(e) =>
-                          update((d) => {
-                            d.presentation.pageSize = e.target.value as
-                              "A4" | "Letter";
-                          })
-                        }
-                      >
-                        <option>A4</option>
-                        <option>Letter</option>
-                      </select>
-                    </label>
+                  <label>
+                    Page size{" "}
+                    <select
+                      aria-label="Page size"
+                      disabled={busy}
+                      value={doc.presentation.pageSize}
+                      onChange={(e) =>
+                        update((d) => {
+                          d.presentation.pageSize = e.target.value as
+                            | "A4"
+                            | "Letter";
+                        })
+                      }
+                    >
+                      <option>A4</option>
+                      <option>Letter</option>
+                    </select>
+                  </label>
                   )}
                 </div>
                 <div className="paper-stage">
@@ -1867,10 +2387,9 @@ export function ResumeStudio({
             </main>
 
             <footer className="app-footer no-print">
-              <span>YOUR STORY, IN YOUR HANDS.</span>
+              <span>Your story, in your hands.</span>
               <span>
-                {cloudUser ? "Account editor" : "Local editor"} · AI suggestions
-                require your review
+                Developed by Elfasys Solution
               </span>
             </footer>
             <style>{`@page { size: ${doc.presentation.pageSize}; margin: 0; }`}</style>

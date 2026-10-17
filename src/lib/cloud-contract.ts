@@ -4,8 +4,13 @@ import { documentSchema } from "./document";
 export const userSchema = z.object({
   id: z.string().min(1).max(128),
   email: z.string(),
+  name: z.string().optional(),
   emailVerified: z.boolean().default(false),
+  /** Server decision: verified, or verification is unavailable on this installation. */
+  canExport: z.boolean().optional(),
 });
+export const userCanExport = (user: AccountUser) =>
+  user.canExport ?? user.emailVerified;
 export type AccountUser = z.infer<typeof userSchema>;
 export const saveRequestSchema = z.strictObject({
   document: documentSchema,

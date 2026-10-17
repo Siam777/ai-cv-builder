@@ -7,7 +7,7 @@ description: Implement an evidence-grounded chatbot and AI editing features insi
 
 Inspect the app's canonical document, revision model, and provider integration. Keep AI proposals separate from saved resume content. Read [chat-contract.md](references/chat-contract.md) when implementing prompts, tools, structured output, or evaluations.
 
-Make chat and AI assistants support concrete resume actions: gather missing facts, draft summaries, improve bullets via inline contextual magic bars, reorganize content, suggest supported skills, tailor to a pasted job description, and run the Google XYZ Impact Coach. Ask for missing impact evidence instead of inventing numbers. Preserve the distinction between an aspiration and a demonstrated skill.
+Make chat and AI assistants support concrete resume actions: gather missing facts, draft summaries, improve bullets via the per-field sparkle menu (inline accept or reject view), reorganize content, suggest supported skills, tailor to a pasted job description, and run the Google XYZ Impact Coach. Ask for missing impact evidence instead of inventing numbers. Preserve the distinction between an aspiration and a demonstrated skill.
 
 Use only candidate-provided facts for employers, dates, degrees, credentials, achievements, seniority, and skills. Every new factual assertion needs traceable support. A citation alone is insufficient: its source must actually support the claim. Suggestions requiring confirmation remain outside the resume until the user supplies the fact.
 
@@ -19,3 +19,11 @@ Explain job-match scores as transparent heuristic coverage, not hiring probabili
 
 Use provider credentials only on the server. Bound request size, latency, retries, concurrency, and spending. Send only the context needed for the action. Default logs to metadata and error categories rather than raw resumes or prompts; any content logging needs a deliberate retention and access policy. Verify current official model API behavior when integrating it.
 
+## Patterns this app uses (2026-10)
+
+- Consent is asked once per account (`ai_settings`, switch in Data & privacy); every AI view still says what it sends. Server routes check consent, plan (402 `PLAN_REQUIRED`), provider configuration and the document revision before any provider call, and every request counts toward the plan's daily limit.
+- Two kinds of output, always labelled: the person's facts reworded (evidence IDs, `hasNewNumbers`, one independent batch support check; failing items are withheld with a reason, never returned) and examples to edit (`[blank]`s that must be filled or removed; no support check; never presented as facts).
+- Structure-only AI (interview steps, import tidy-up) keeps only values the person's own words state (`statedIn`, `sameWords`, `statedDate`).
+- Multi-item results use one review list; acceptance applies only the ticked items (`bulletIds` on the decision) as one Undo step. The job post, notes about motivation and chat history are context, never evidence of the candidate's experience; the support check runs without the job post.
+- Ask the AI never edits the CV: answers are advice plus buttons into the existing tools, with targets validated against the document.
+- Each prompt has fictional evaluation cases (`scripts/lib/phase-*-evaluation.ts`) that run offline in `npm test` and live with `npm run ai:eval`; record live runs in `docs/plans/evaluations/`.

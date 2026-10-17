@@ -185,13 +185,21 @@ export function synthesizeVerifiedXyzBullet(
   // Ensure first character of coreAction is lowercase if appended
   const verb = preferredVerb || inferActionVerb(cleanOriginal);
 
+  // The bullet may already open with that verb; never repeat it.
+  const alreadyOpens =
+    coreAction.split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, "") ===
+    verb.toLowerCase().replace(/[^a-z]/g, "");
+  const lead = alreadyOpens
+    ? capitalize(coreAction)
+    : `${capitalize(verb)} ${coreAction}`;
+
   // If the metric already starts with a participle (e.g., "reducing latency by 40%"), integrate cleanly
   if (/^(reducing|increasing|saving|scaling|cutting|boosting|improving|lowering|accelerating)/i.test(cleanMetric)) {
-    return `${capitalize(verb)} ${coreAction}, ${cleanMetric}.`;
+    return `${lead}, ${cleanMetric}.`;
   }
 
   // If the metric is a noun phrase (e.g. "45% reduction in latency" or "$15k in monthly savings")
-  return `${capitalize(verb)} ${coreAction}, resulting in ${cleanMetric}.`;
+  return `${lead}, resulting in ${cleanMetric}.`;
 }
 
 function inferActionVerb(text: string): string {
@@ -200,6 +208,8 @@ function inferActionVerb(text: string): string {
   if (STRONG_ACTION_VERBS.has(first)) {
     return words[0];
   }
+  // A bullet that already opens with a past-tense verb keeps its own verb.
+  if (/^[a-z]{3,}ed$/.test(first)) return words[0];
   if (/design|ui|ux|mockup|prototype/i.test(text)) return "Designed";
   if (/build|develop|create|code/i.test(text)) return "Engineered";
   if (/optimize|speed|fast|perf/i.test(text)) return "Optimized";

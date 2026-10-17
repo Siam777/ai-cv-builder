@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDocument } from "../../src/lib/document";
-import { startSampleResume, openFirstCv } from "./helpers";
+import { startSampleResume, openFirstCv, editorTool } from "./helpers";
 
 test("guided start creates only supplied facts and retains them after reload", async ({
   page,
 }) => {
   await page.goto("/builder");
   await page
-    .getByRole("button", { name: "Help me start", exact: true })
+    .getByRole("button", { name: "Start from my job title", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Start a CV with guidance" });
   await dialog
@@ -34,7 +34,7 @@ test("guided start creates only supplied facts and retains them after reload", a
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Fictional Guide Candidate",
   );
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page);
   await page.getByRole("button", { name: /Experience/ }).click();
@@ -69,9 +69,29 @@ test("photo errors are recoverable and uploading enables preview on a supported 
     ),
   });
   await expect(page.getByAltText("Your resume photo")).toBeVisible();
-  await page
-    .getByRole("button", { name: "Use Modern design with photo" })
+  // The sample uses Classic, which cannot show a photo: say so instead of
+  // claiming the photo was added.
+  const warning = page.locator(".photo-design-warning");
+  await expect(warning).toContainText(
+    "Your current design (Classic) doesn't show photos.",
+  );
+  await expect(page.locator('[data-block-id="photo"]')).toHaveCount(0);
+  await warning
+    .getByRole("button", { name: "Switch to a photo design" })
     .click();
+  const designs = page.getByRole("complementary", { name: "Design" });
+  await expect(
+    designs.getByRole("button", { name: /^Supports photo/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    designs.getByRole("button", { name: "Classic template" }),
+  ).toHaveCount(0);
+  await designs
+    .getByRole("button", { name: "Modern template", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Close Design" }).click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByText("Photo added. It shows on your CV preview.")).toBeVisible();
   await expect(page.locator('[data-block-id="photo"]').first()).toBeVisible();
   await page.getByRole("button", { name: "Remove photo", exact: true }).click();
   await expect(page.getByAltText("Your resume photo")).toHaveCount(0);
@@ -79,7 +99,7 @@ test("photo errors are recoverable and uploading enables preview on a supported 
 });
 
 for (const width of [360, 1440]) {
-  test(`writing dialog scrolls, restores editing and routes the selected bullet at ${width}px`, async ({
+  test(`sparkle menu and AI panel scroll, restore editing and route the selected bullet at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 620 });
@@ -93,32 +113,38 @@ for (const width of [360, 1440]) {
       row: el.closest(".bullet-field")!.clientWidth,
     }));
     expect(size.input / size.row).toBeGreaterThan(0.7);
+    const sparkle = page
+      .getByRole("button", { name: "AI help for Bullet 1", exact: true })
+      .first();
+    expect((await sparkle.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await sparkle.click();
     await page
-      .getByRole("button", { name: "Improve this bullet", exact: true })
-      .first()
+      .getByRole("menuitem", { name: /^Improve wording/ })
       .click();
-    await page
-      .getByRole("button", { name: "Rewrite with AI", exact: true })
-      .first()
-      .click();
-    const dialog = page.getByRole("dialog", { name: "Writing assistant" });
-    await expect(dialog.locator(".selected-bullet")).toHaveText(
-      await bullet.inputValue(),
-    );
-    await expect(dialog).toContainText("sign in, explicitly copy this draft");
+    // A device-only CV cannot use AI rewriting; the reason is shown, not hidden.
+    const card = page.getByRole("group", { name: "AI help for Bullet 1" });
+    await expect(card).toContainText("works on CVs saved to your account");
+    await expect(card.getByRole("button", { name: "Sign in" })).toBeVisible();
+    await card.getByRole("button", { name: "Close" }).click();
+    await expect(card).toHaveCount(0);
+
+    await editorTool(page, "Writing help");
+    // Docked beside the form on wide screens, a bottom sheet on phones.
+    const dialog = page.locator("#side-panel");
+    await expect(dialog).toContainText("Things that would make your CV stronger");
+    await dialog.getByRole("tab", { name: "Match a job" }).click();
+    await expect(dialog).toContainText("See what your CV supports");
+    const body = dialog.locator(".side-panel-body");
+    // Long content scrolls inside the panel, never the page behind a sheet.
+    if (await body.evaluate((el) => el.scrollHeight > el.clientHeight + 1)) {
+      await body.hover();
+      await page.mouse.wheel(0, 900);
+      await expect
+        .poll(() => body.evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(0);
+    }
     await expect(
-      dialog.getByRole("button", { name: "Sign in / Open account" }),
-    ).toBeVisible();
-    await dialog.getByRole("tab", { name: "Write a summary" }).click();
-    await expect(dialog).toContainText("No AI request is made");
-    const body = dialog.locator(".ai-panel-body");
-    await body.hover();
-    await page.mouse.wheel(0, 900);
-    await expect
-      .poll(() => body.evaluate((el) => el.scrollTop))
-      .toBeGreaterThan(0);
-    await expect(
-      dialog.getByRole("button", { name: "Done & return to editor" }),
+      dialog.getByRole("button", { name: "Close AI Assistant" }),
     ).toBeInViewport();
     expect(
       await page.evaluate(
@@ -176,20 +202,22 @@ test("a pending AI suggestion can be closed without applying or locking the page
   try {
     await page.goto("/builder");
     await openFirstCv(page, "Practice copies");
+    await page.getByRole("button", { name: /Experience/ }).click();
     await page
-      .getByRole("button", { name: "Writing help", exact: false })
+      .getByRole("button", { name: "AI help for Bullet 1", exact: true })
+      .first()
       .click();
-    const dialog = page.getByRole("dialog", { name: "Writing assistant" });
-    await dialog
-      .getByLabel("Send this evidence and instruction to OpenAI.")
-      .check();
-    await dialog.getByRole("button", { name: "Suggest a rewrite" }).click();
+    await page.getByRole("menuitem", { name: /^Improve wording/ }).click();
+    const card = page.getByRole("group", { name: "AI help for Bullet 1" });
+    await card.getByRole("button", { name: "Turn on AI writing help" }).click();
     await expect.poll(() => calls).toBe(1);
-    await expect(dialog).toContainText("No change is applied automatically");
-    await dialog.getByRole("button", { name: "Close AI assistant" }).click();
-    await expect(dialog).toBeHidden();
+    await expect(card).toContainText("Nothing changes until you accept");
+    await card.getByRole("button", { name: "Cancel" }).click();
+    await expect(card).toHaveCount(0);
     await expect(page.locator("body")).not.toHaveClass(/modal-open/);
-    await expect(page.getByLabel("Full name", { exact: true })).toBeEnabled();
+    await expect(
+      page.getByLabel("Bullet 1", { exact: true }).first(),
+    ).toBeEnabled();
     const latest = await (
       await page.request.get(`/api/resumes/${fixture.id}`, { headers })
     ).json();
@@ -205,15 +233,15 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await page.setViewportSize({ width: 360, height: 620 });
   await page.goto("/builder");
   await startSampleResume(page);
-  await page.getByRole("button", { name: /Check my CV/ }).click();
-  const check = page.getByRole("dialog", { name: "Resume content review" });
-  await expect(check.getByRole("button", { name: /^Score/ })).toHaveClass(
-    /active/,
-  );
-  await expect(check.locator(".score-fixes")).toContainText("Fix these first");
-  await check.getByRole("button", { name: "Done", exact: true }).click();
-  await page.getByRole("button", { name: /Compare with a job/ }).click();
-  const dialog = page.getByRole("dialog", { name: "Job Tailoring Engine" });
+  await page.getByRole("button", { name: /^Check/ }).click();
+  // At this width the panel is a bottom sheet.
+  const check = page.getByRole("dialog", { name: "Check my CV" });
+  await expect(
+    check.getByRole("tab", { name: /To fix/ }),
+  ).toHaveAttribute("aria-selected", "true");
+  await check.getByRole("button", { name: "Close Check my CV" }).click();
+  await editorTool(page, "Match a job");
+  const dialog = page.getByRole("dialog", { name: "AI Assistant" });
   await expect(dialog).toContainText("See what your CV supports");
   for (const label of ["Target Job Title", "Company Name"]) {
     const box = await dialog.getByLabel(label).boundingBox();
@@ -222,4 +250,32 @@ test("CV checker starts with actionable findings and job fields fit a small view
   await page.screenshot({ path: "test-results/usability/job-mobile.png" });
   await page.keyboard.press("Escape");
   await expect(page.locator("body")).not.toHaveClass(/modal-open/);
+});
+
+test("a photo on Tech Startup shows the design warning and keeping the design hides it", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  const fixture = createDocument(true);
+  fixture.presentation.template = "tech";
+  await startSampleResume(page, fixture);
+  await page.getByLabel("Choose resume photo").setInputFiles({
+    name: "pixel.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jh1sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  const warning = page.locator(".photo-design-warning");
+  await expect(warning).toContainText(
+    "Your current design (Tech Startup) doesn't show photos.",
+  );
+  await expect(page.getByText("Photo added", { exact: false })).toHaveCount(0);
+  await warning
+    .getByRole("button", { name: "Keep design without photo" })
+    .click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByText("Photo saved but hidden on your CV")).toBeVisible();
+  await expect(page.locator('[data-block-id="photo"]')).toHaveCount(0);
 });

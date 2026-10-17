@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ResumeDocument } from "@/lib/document";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { LibraryResumeCard } from "./LibraryResumeCard";
 import {
   documentsInCollection,
@@ -18,10 +19,6 @@ export function DocumentLibrary({
   onDelete,
   onClassify,
   onNew,
-  onImport,
-  onExamples,
-  onAccount,
-  onGuidedStart,
 }: {
   documents: ResumeDocument[];
   accountEmail?: string;
@@ -30,11 +27,8 @@ export function DocumentLibrary({
   onDuplicate: (doc: ResumeDocument) => void;
   onDelete: (doc: ResumeDocument) => void;
   onClassify: (doc: ResumeDocument, purpose: "personal" | "practice") => void;
+  /** Opens the start screen (upload, LinkedIn, blank, guided or example). */
   onNew: () => void;
-  onImport: () => void;
-  onExamples: () => void;
-  onAccount: () => void;
-  onGuidedStart?: () => void;
 }) {
   const [collection, setCollection] = useState<LibraryCollection>("personal");
   const [query, setQuery] = useState("");
@@ -78,29 +72,14 @@ export function DocumentLibrary({
       aria-label="CV library"
     >
       <div className="library-heading">
-        <div>
-          <h2>{accountEmail ? "My CVs" : "On this device"}</h2>
-          <p>
-            {accountEmail
-              ? `Personal documents saved to ${accountEmail}.`
-              : "These drafts belong to this browser profile. They are not linked to an account."}
-          </p>
-        </div>
+        <p>
+          {accountEmail
+            ? `Your own CVs are saved to ${accountEmail}. Practice copies and older drafts have their own tabs.`
+            : "These CVs belong to this browser profile. Sign in to keep them in an account."}
+        </p>
         <div className="button-row">
           <button className="primary" disabled={busy} onClick={onNew}>
-            Create my resume
-          </button>
-          <button disabled={busy} onClick={onImport}>
-            Import my CV
-          </button>
-          <button disabled={busy} onClick={onGuidedStart}>
-            Help me start
-          </button>
-          <button disabled={busy} onClick={onExamples}>
-            Browse demo examples
-          </button>
-          <button disabled={busy} onClick={onAccount}>
-            {accountEmail ? "Change workspace" : "Sign in / My CVs"}
+            <Plus size={16} aria-hidden /> New CV
           </button>
         </div>
       </div>
@@ -168,15 +147,10 @@ export function DocumentLibrary({
           ) : collection === "personal" ? (
             <div className="library-first-steps">
               <p>
-                <strong>Write your own details</strong>
+                <strong>Start a CV</strong>
                 <br />
-                Create a blank CV, then add contact details and the experience
-                you can support.
-              </p>
-              <p>
-                <strong>Bring an existing CV</strong>
-                <br />
-                Choose Import my CV to review supported files before saving.
+                Choose New CV to upload your current CV, import from LinkedIn
+                or start from scratch.
               </p>
               <p>
                 <strong>Choose a presentation</strong>
@@ -203,8 +177,8 @@ export function DocumentLibrary({
         ))}
       </div>
       <p className="library-explanation">
-        Demo previews live in their own gallery. Browsing them never adds a CV
-        here. Sign in to download or export.
+        Example CVs live in their own gallery. Browsing them never adds a CV
+        here.
       </p>
     </main>
   );

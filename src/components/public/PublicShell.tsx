@@ -81,7 +81,7 @@ export function PublicShell({
           <Link href="/profile">Account</Link>
         </nav>
         <p className={styles.footerNote}>
-          Edit on your device. Sign in and verify your email to export.
+          Developed by Elfasys Solution
         </p>
       </footer>
     </div>

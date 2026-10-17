@@ -1,4 +1,8 @@
-import type { ResumeDocument } from "../document";
+import {
+  isAchievementSection,
+  type ResumeDocument,
+  type SectionType,
+} from "../document";
 
 export interface AtsLintIssue {
   id: string;
@@ -71,6 +75,76 @@ export function wordCount(text: string): number {
 }
 
 /**
+ * Checks one bullet. The editor uses this for inline hints and the full
+ * document report uses it for every visible bullet, so both always agree.
+ */
+export function lintBullet(
+  rawText: string,
+  sectionType: SectionType,
+  ref: { sectionId?: string; entryId?: string; bulletId: string },
+): {
+  counted: boolean;
+  weakOpening: boolean;
+  hasMetric: boolean;
+  issues: AtsLintIssue[];
+} {
+  const text = rawText.trim();
+  const issues: AtsLintIssue[] = [];
+  if (!text)
+    return { counted: false, weakOpening: false, hasMetric: false, issues };
+  const words = wordCount(text);
+  // List items such as a skill or a language may be one word; only
+  // achievement sentences get the verb and length checks.
+  const sentence = isAchievementSection(sectionType);
+  const weakOpening = sentence && isWeakOpening(text);
+  if (weakOpening) {
+    issues.push({
+      id: `weak-verb-${ref.bulletId}`,
+      ruleId: "weak_verb",
+      severity: "warning",
+      message: `Bullet starts with a vague opening: “${text.slice(0, 30)}…”.`,
+      ...ref,
+      suggestion:
+        "Replace with an active verb (e.g. Engineered, Spearheaded, Optimized).",
+    });
+  }
+  const hasMetric = hasQuantifiableMetric(text);
+  if (!hasMetric && sectionType === "experience") {
+    issues.push({
+      id: `no-metric-${ref.bulletId}`,
+      ruleId: "missing_metric",
+      severity: "suggestion",
+      message: `No numeric pattern found in: “${text.slice(0, 35)}…”.`,
+      ...ref,
+      suggestion:
+        "Describe a real outcome. Include a number only if you can support it; qualitative outcomes can also be useful.",
+    });
+  }
+  if (!sentence) {
+    // No length checks for list items.
+  } else if (words < 5) {
+    issues.push({
+      id: `short-${ref.bulletId}`,
+      ruleId: "bullet_length",
+      severity: "warning",
+      message: `Bullet is very short (${words} words): “${text}”.`,
+      ...ref,
+      suggestion: "Expand accomplishment to detail the task and the outcome.",
+    });
+  } else if (words > 40) {
+    issues.push({
+      id: `long-${ref.bulletId}`,
+      ruleId: "bullet_length",
+      severity: "suggestion",
+      message: `Bullet is lengthy (${words} words). Consider breaking it into two focused bullets.`,
+      ...ref,
+    });
+  }
+  // Only achievement sentences count toward the bullet and result totals.
+  return { counted: sentence, weakOpening, hasMetric, issues };
+}
+
+/**
  * Runs deterministic ATS quality heuristics across a ResumeDocument.
  */
 export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
@@ -110,7 +184,8 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
     issues.push({
       id: "contact-location",
       ruleId: "contact_missing",
-      severity: "warning",
+      // Optional advice, so it is a suggestion rather than a warning.
+      severity: "suggestion",
       message:
         "Location is missing. Consider including it if relevant to your application.",
       sectionId: "contact",
@@ -175,71 +250,16 @@ export function lintResumeDocument(doc: ResumeDocument): AtsReadinessReport {
 
       // Bullets check
       for (const bullet of entry.bullets) {
-        const text = bullet.text.trim();
-        if (!text) continue;
-
+        const result = lintBullet(bullet.text, section.type, {
+          sectionId: section.id,
+          entryId: entry.id,
+          bulletId: bullet.id,
+        });
+        if (!result.counted) continue;
         totalBullets++;
-        const words = wordCount(text);
-
-        // Check weak verb
-        const isPassive = isWeakOpening(text);
-        if (isPassive) {
-          weakOpeningCount++;
-          issues.push({
-            id: `weak-verb-${bullet.id}`,
-            ruleId: "weak_verb",
-            severity: "warning",
-            message: `Bullet starts with a vague opening: “${text.slice(0, 30)}…”.`,
-            sectionId: section.id,
-            entryId: entry.id,
-            bulletId: bullet.id,
-            suggestion:
-              "Replace with an active verb (e.g. Engineered, Spearheaded, Optimized).",
-          });
-        }
-
-        // Check quantifiable metric
-        const hasMetric = hasQuantifiableMetric(text);
-        if (hasMetric) {
-          metricsCount++;
-        } else if (section.type === "experience") {
-          issues.push({
-            id: `no-metric-${bullet.id}`,
-            ruleId: "missing_metric",
-            severity: "suggestion",
-            message: `No numeric pattern found in: “${text.slice(0, 35)}…”.`,
-            sectionId: section.id,
-            entryId: entry.id,
-            bulletId: bullet.id,
-            suggestion:
-              "Describe a real outcome. Include a number only if you can support it; qualitative outcomes can also be useful.",
-          });
-        }
-
-        // Check word length
-        if (words < 5) {
-          issues.push({
-            id: `short-${bullet.id}`,
-            ruleId: "bullet_length",
-            severity: "warning",
-            message: `Bullet is very short (${words} words): “${text}”.`,
-            sectionId: section.id,
-            entryId: entry.id,
-            bulletId: bullet.id,
-            suggestion:
-              "Expand accomplishment to detail the task and the outcome.",
-          });
-        } else if (words > 40) {
-          issues.push({
-            id: `long-${bullet.id}`,
-            ruleId: "bullet_length",
-            severity: "suggestion",
-            message: `Bullet is lengthy (${words} words). Consider breaking it into two focused bullets.`,
-            sectionId: section.id,
-            entryId: entry.id,
-            bulletId: bullet.id,
-          });
-        }
+        if (result.weakOpening) weakOpeningCount++;
+        if (result.hasMetric) metricsCount++;
+        issues.push(...result.issues);
       }
     }
   }

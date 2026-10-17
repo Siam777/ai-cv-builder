@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   emailDeliveryMode,
+  exportVerificationSatisfied,
   requireEmailDelivery,
   sendAuthEmail,
 } from "../src/lib/server/auth-email";
@@ -56,6 +57,32 @@ test("email delivery fails closed without configuration, disables file delivery 
       "AUTH_EMAIL_FROM",
       "NODE_ENV",
     ]) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
+  }
+});
+
+test("exports need verification only when an unverified email user could actually verify", () => {
+  const previous = { ...process.env };
+  const originalWarn = console.warn;
+  const warnings: unknown[] = [];
+  console.warn = (...args: unknown[]) => void warnings.push(args);
+  try {
+    delete process.env.AUTH_EMAIL_MODE;
+    Object.assign(process.env, {
+      RESEND_API_KEY: "synthetic-key",
+      AUTH_EMAIL_FROM: "CV <cv@example.test>",
+    });
+    assert.equal(exportVerificationSatisfied(false), false);
+    assert.equal(exportVerificationSatisfied(true), true);
+    delete process.env.RESEND_API_KEY;
+    assert.equal(exportVerificationSatisfied(false), true);
+    assert.equal(exportVerificationSatisfied(false), true);
+    assert.equal(warnings.length, 1);
+  } finally {
+    console.warn = originalWarn;
+    for (const name of ["AUTH_EMAIL_MODE", "RESEND_API_KEY", "AUTH_EMAIL_FROM"]) {
       if (previous[name] === undefined) delete process.env[name];
       else process.env[name] = previous[name];
     }

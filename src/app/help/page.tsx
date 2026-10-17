@@ -19,13 +19,14 @@ export default function Help() {
         <p>
           Choose <strong>Add or change photo</strong> in the editor, then Upload
           photo. Use a JPG, PNG or WebP smaller than 5 MB. If your design omits
-          photos, choose Use Modern design with photo. Check the preview; Word
-          and text exports omit photos.
+          photos, the editor tells you; choose Switch to a photo design and pick
+          a design marked Photo. Check the preview; Word and text exports omit
+          photos.
         </p>
         <h2>Get help with your wording</h2>
         <p>
           <strong>Writing help</strong> offers four actions. Rewrite a bullet
-          uses OpenAI for an account CV after your consent. The summary, result
+          uses OpenAI for an account CV once you turn on AI writing help. The summary, result
           and skill helpers run locally. You preview changes before using them,
           and Undo can restore earlier wording.
         </p>
@@ -101,6 +102,8 @@ export default function Help() {
           with your source material.{" "}
           <Link href="/privacy">Read how data is handled</Link>.
         </p>
+        <h2>About</h2>
+        <p>AI CV Builder is developed by Elfasys Solution.</p>
       </article>
     </PublicShell>
   );

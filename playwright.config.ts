@@ -18,7 +18,10 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       APP_ORIGIN: origin,
-      AUTH_EMAIL_MODE: "file",
+      // E2E_EMAIL=unconfigured runs the no-email-service installation checks.
+      AUTH_EMAIL_MODE:
+        process.env.E2E_EMAIL === "unconfigured" ? "" : "file",
+      E2E_EMAIL: process.env.E2E_EMAIL || "file",
       TURSO_DATABASE_URL: "file:./data/e2e.db",
       TURSO_AUTH_TOKEN: "",
       BETTER_AUTH_SECRET: "Synthetic-e2e-secret-for-local-tests-only-42",

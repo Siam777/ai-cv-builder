@@ -139,14 +139,19 @@ export function applyReviewedProposal(
   doc: ResumeDocument,
   input: unknown,
   appliedIds: ReadonlySet<string>,
+  /** Apply only these bullets (Improve all); every one must be in the proposal. */
+  only?: ReadonlySet<string>,
 ) {
   const { proposal, changes } = reviewProposal(doc, input);
   if (appliedIds.has(proposal.id))
     throw new Error("This proposal has already been applied.");
-  if (!changes.length)
+  if (only && [...only].some((id) => !changes.some((change) => change.bulletId === id)))
+    throw new Error("Choose only bullets from this proposal.");
+  const chosen = only ? changes.filter((change) => only.has(change.bulletId)) : changes;
+  if (!chosen.length)
     throw new Error("There are no proposed edits to accept.");
   const next = structuredClone(doc);
-  for (const change of changes) {
+  for (const change of chosen) {
     const bullet = next.sections
       .find((s) => s.id === change.sectionId)!
       .entries.find((e) => e.id === change.entryId)!

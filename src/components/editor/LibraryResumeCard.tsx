@@ -51,7 +51,7 @@ export function LibraryResumeCard({
           design · Draft
         </p>
         <small>
-          {accountEmail ? "Saved in your account" : "Saved on this device"} ·
+          {accountEmail ? "Saved in your account" : "Saved in this browser"} ·
           Updated{" "}
           <time dateTime={doc.updatedAt}>
             {new Date(doc.updatedAt).toLocaleDateString()}

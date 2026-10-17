@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/server/stripe";
-import { upsertSubscription, type PlanId } from "@/lib/server/entitlements";
+import { upsertSubscription } from "@/lib/server/entitlements";
+import { normalizePlanId } from "@/lib/billing-plans";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.client_reference_id || session.metadata?.userId;
-      const planId = (session.metadata?.planId as PlanId) || "job_hunter_monthly";
+      const planId = normalizePlanId(session.metadata?.planId ?? "go");
       const customerId = String(session.customer || "");
       const subscriptionId = session.subscription ? String(session.subscription) : null;
 
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
 
       if (rows.rows.length > 0) {
         const userId = String(rows.rows[0].user_id);
-        const planId = (rows.rows[0].plan_id as PlanId) || "job_hunter_monthly";
+        const planId = normalizePlanId(rows.rows[0].plan_id);
         await upsertSubscription({
           userId,
           stripeCustomerId: customerId,
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
 
       if (rows.rows.length > 0) {
         const userId = String(rows.rows[0].user_id);
-        const planId = (rows.rows[0].plan_id as PlanId) || "job_hunter_monthly";
+        const planId = normalizePlanId(rows.rows[0].plan_id);
         await upsertSubscription({
           userId,
           stripeCustomerId: customerId,

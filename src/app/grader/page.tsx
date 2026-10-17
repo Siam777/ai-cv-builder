@@ -30,6 +30,7 @@ import {
 } from "@/components/score/ResumeScoreReport";
 import { PublicShell } from "@/components/public/PublicShell";
 import type { ResumeDocument } from "@/lib/document";
+import { CircleX, FileText, TriangleAlert, X } from "lucide-react";
 
 const SAMPLE_RESUME_TEXT = `Alex Morgan
 alex.morgan@example.com · San Francisco, CA · github.com/alexmorgan
@@ -269,9 +270,7 @@ export default function GraderPage() {
                       }}
                     />
                     <label htmlFor="resume-file" className="dropzone-label">
-                      <span className="upload-icon" aria-hidden="true">
-                        📄
-                      </span>
+                      <FileText className="upload-icon" size={32} aria-hidden />
                       <strong>
                         {file ? file.name : "Choose a PDF, DOCX or TXT resume"}
                       </strong>
@@ -449,8 +448,12 @@ export default function GraderPage() {
                       key={issue.id}
                       className={`issue-item ${issue.severity}`}
                     >
-                      <span className="issue-icon" aria-hidden="true">
-                        {issue.severity === "critical" ? "❌" : "⚠️"}
+                      <span className="issue-icon">
+                        {issue.severity === "critical" ? (
+                          <CircleX size={18} aria-label="Critical" />
+                        ) : (
+                          <TriangleAlert size={18} aria-label="Warning" />
+                        )}
                       </span>
                       <div>
                         <strong>{issue.message}</strong>
@@ -496,7 +499,7 @@ export default function GraderPage() {
                       <ul className="gap-pill-list">
                         {report.jobAnalysis.skillGaps.map((gap) => (
                           <li key={gap.requirementId} className="gap-pill">
-                            ✗ {gap.description}
+                            <X size={16} aria-hidden /> {gap.description}
                           </li>
                         ))}
                       </ul>

@@ -1,31 +1,54 @@
 "use client";
 
-import { useRef } from "react";
-import type { Bullet } from "@/lib/document";
-import { uid } from "@/lib/document";
-import { InlineAiMagicBar } from "./InlineAiMagicBar";
+import { useRef, useState } from "react";
+import type { Bullet, SectionType } from "@/lib/document";
+import { lintBullet } from "@/lib/linter/ats-linter";
+import { describeFinding } from "@/lib/check-findings";
+import { isAchievementSection, uid } from "@/lib/document";
+import { FieldAi } from "./FieldAi";
+import { Lightbulb, TriangleAlert, X } from "lucide-react";
 
 export interface BulletListProps {
   bullets: Bullet[];
+  /** Section the bullets belong to; it decides which checks apply. */
+  sectionType?: SectionType;
+  dismissed?: Set<string>;
   onChange: (bullets: Bullet[]) => void;
   disabled?: boolean;
   activeBulletId?: string | null;
-  onWritingAction?: (
-    bulletId: string,
-    action: "improve" | "concise" | "metric",
-  ) => void;
 }
+
+/** How list items are named in sections that are not achievement sentences. */
+const ITEM_WORDING: Partial<Record<SectionType, { noun: string; placeholder: string }>> = {
+  skills: { noun: "skill", placeholder: "A skill, for example Python or Excel" },
+  languages: { noun: "language", placeholder: "A language, for example Spanish (fluent)" },
+  certifications: { noun: "detail", placeholder: "A detail, for example Credential ID or year" },
+  education: { noun: "detail", placeholder: "A detail, for example Dean's list or a key course" },
+};
 
 export function BulletList({
   bullets,
+  sectionType = "experience",
+  dismissed,
   onChange,
   disabled = false,
   activeBulletId,
-  onWritingAction,
 }: BulletListProps) {
+  // Achievement sections write sentences; the others list short items, which
+  // may be a single word.
+  const sentences = isAchievementSection(sectionType);
+  const wording = sentences
+    ? null
+    : (ITEM_WORDING[sectionType] ?? { noun: "item", placeholder: "Add an item" });
+  const itemLabel = (index: number) =>
+    wording
+      ? `${wording.noun[0].toUpperCase()}${wording.noun.slice(1)} ${index + 1}`
+      : `Bullet ${index + 1}`;
   const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(
     new Map(),
   );
+  // Hints wait until the person leaves a bullet, so typing is not interrupted.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   function updateBulletText(bulletId: string, text: string) {
     onChange(bullets.map((b) => (b.id === bulletId ? { ...b, text } : b)));
@@ -149,6 +172,13 @@ export function BulletList({
     <div className="bullet-list-flow">
       {bullets.map((bullet, bi) => {
         const isActive = activeBulletId === bullet.id;
+        const hints =
+          editingId === bullet.id
+            ? []
+            : lintBullet(bullet.text, sectionType, { bulletId: bullet.id })
+                .issues.filter((issue) => !dismissed?.has(issue.id))
+                .map((issue) => ({ id: issue.id, ...describeFinding(issue) }));
+        const hintId = `bullet-hints-${bullet.id}`;
         return (
           <div
             className={`bullet-field ${isActive ? "bullet-highlighted" : ""}`}
@@ -168,7 +198,7 @@ export function BulletList({
                   htmlFor={`field-bullet-${bullet.id}`}
                   className="sr-only"
                 >
-                  Bullet {bi + 1}
+                  {itemLabel(bi)}
                 </label>
                 <textarea
                   ref={(el) => {
@@ -176,12 +206,18 @@ export function BulletList({
                     else inputRefs.current.delete(bullet.id);
                   }}
                   id={`field-bullet-${bullet.id}`}
-                  aria-label={`Bullet ${bi + 1}`}
-                  className="bullet-textarea"
+                  aria-label={itemLabel(bi)}
+                  aria-describedby={hints.length ? hintId : undefined}
+                  onFocus={() => setEditingId(bullet.id)}
+                  onBlur={() => setEditingId(null)}
+                  className={`bullet-textarea${sentences ? "" : " list-item"}`}
                   disabled={disabled}
-                  rows={2}
+                  rows={sentences ? 2 : 1}
                   value={bullet.text}
-                  placeholder="What did you do? Add a result if you can support it."
+                  placeholder={
+                    wording?.placeholder ??
+                    "What did you do? Add a result if you can support it."
+                  }
                   onChange={(e) => updateBulletText(bullet.id, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, bullet, bi)}
                 />
@@ -189,27 +225,41 @@ export function BulletList({
               <button
                 type="button"
                 className="bullet-remove-btn"
-                aria-label={`Remove bullet ${bi + 1}`}
+                aria-label={`Remove ${itemLabel(bi).toLowerCase()}`}
                 title="Remove bullet (or Backspace when empty)"
                 onClick={() => removeBullet(bi)}
                 disabled={disabled}
               >
-                ×
+                <X size={14} aria-hidden />
               </button>
             </div>
-            <InlineAiMagicBar
-              bulletText={bullet.text}
-              disabled={disabled}
-              onApplyEdit={(newText) => updateBulletText(bullet.id, newText)}
-              onTriggerAction={
-                onWritingAction
-                  ? (action) => {
-                      if (action !== "match")
-                        onWritingAction(bullet.id, action);
-                    }
-                  : undefined
-              }
-            />
+            {/* Rewrite, Add a result and Shorten are for achievement sentences. */}
+            {sentences && (
+              <FieldAi
+                kind="bullet"
+                label={`Bullet ${bi + 1}`}
+                text={bullet.text}
+                bulletId={bullet.id}
+                focusId={`field-bullet-${bullet.id}`}
+                disabled={disabled}
+                onApply={(newText) => updateBulletText(bullet.id, newText)}
+              />
+            )}
+            {/* Below the AI bar, so hints appearing on blur never move a button being clicked. */}
+            {hints.length > 0 && (
+              <ul className="field-hints" id={hintId}>
+                {hints.map((hint) => (
+                  <li key={hint.id} className={hint.tone}>
+                    {hint.tone === "attention" ? (
+                      <TriangleAlert size={14} aria-hidden />
+                    ) : (
+                      <Lightbulb size={14} aria-hidden />
+                    )}
+                    {hint.title}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         );
       })}
@@ -227,7 +277,7 @@ export function BulletList({
           }, 10);
         }}
       >
-        + Add accomplishment bullet
+        {wording ? `+ Add ${wording.noun}` : "+ Add accomplishment bullet"}
       </button>
     </div>
   );

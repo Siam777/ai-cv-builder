@@ -1,4 +1,4 @@
-import { openEditorTools } from "./helpers";
+import { editorTool } from "./helpers";
 import { startSampleResume, openFirstCv, authenticateForExport } from "./helpers";
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
@@ -10,20 +10,33 @@ test("AI controls keep local data private and require account storage", async ({
 }) => {
   await page.goto("/builder");
   await startSampleResume(page);
-  await openEditorTools(page);
   await page
-    .getByRole("button", { name: "AI bullet assistant", exact: true })
+    .locator(".section-nav")
+    .getByRole("button", { name: /^Experience/ })
     .click();
+  await page
+    .getByRole("button", { name: "AI help for Bullet 1", exact: true })
+    .first()
+    .click();
+  // The AI options are shown with the reason they need an account, not hidden.
   await expect(
-    page.getByRole("region", { name: "AI bullet assistant" }),
-  ).toContainText("Local resumes are never uploaded automatically");
+    page.getByRole("menuitem", { name: /^Improve wording/ }),
+  ).toContainText("Needs your account");
+  await page.getByRole("menuitem", { name: /^Improve wording/ }).click();
+  const card = page.getByRole("group", { name: "AI help for Bullet 1" });
+  await expect(card).toContainText("works on CVs saved to your account");
   await expect(
     page.getByRole("button", { name: "Suggest a rewrite" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Close AI assistant" }).click();
-  await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
-    "Alex Morgan",
+  await card.getByRole("button", { name: "Close" }).click();
+
+  await editorTool(page, "Writing help");
+  const panel = page.getByRole("complementary", { name: "AI Assistant" });
+  await expect(panel.getByRole("status").first()).toContainText(
+    "works on CVs saved to your account",
   );
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
+  await expect(page.getByLabel("Bullet 1", { exact: true }).first()).toBeVisible();
 });
 
 test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves are real", async ({
@@ -103,6 +116,21 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
     });
   });
   try {
+    // Rewrites need AI writing help on the account; nothing is sent before that.
+    const rewrite = {
+      requestId: randomUUID(),
+      documentId: doc.id,
+      revision: 0,
+      bulletId: source.id,
+      instruction: "Rewrite",
+      consent: true,
+    };
+    const withoutConsent = await page.request.post("/api/ai", { headers, data: rewrite });
+    expect(withoutConsent.status()).toBe(403);
+    expect((await withoutConsent.json()).error).toBe("AI_CONSENT_REQUIRED");
+    expect(
+      (await page.request.patch("/api/account", { headers, data: { aiWritingHelp: true } })).status(),
+    ).toBe(200);
     // Real endpoints still enforce account ownership before checking provider configuration.
     expect(
       (
@@ -137,23 +165,36 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
     ).toBe(403);
     await page.goto("/builder");
     await openFirstCv(page, "Practice copies");
-    await openEditorTools(page);
-    await page
-      .getByRole("button", { name: "AI bullet assistant", exact: true })
-      .click();
-    const generate = page.getByRole("button", { name: "Suggest a rewrite" });
-    await expect(generate).toBeDisabled();
+    await page.getByRole("button", { name: /Experience/ }).click();
+    const field = page.locator(`[data-bullet-id="${source.id}"]`);
+    const openImprove = async () => {
+      await field.getByRole("button", { name: /^AI help for Bullet/ }).click();
+      await page.getByRole("menuitem", { name: /^Improve wording/ }).click();
+    };
+    const card = field.getByRole("group", { name: /^AI help for Bullet/ });
+    // Turn the account setting off again, so the editor asks once, then remembers.
+    await page.request.patch("/api/account", { headers, data: { aiWritingHelp: false } });
+    await openImprove();
+    // AI consent is asked once and kept on the account, not per request.
+    const turnOn = card.getByRole("button", { name: "Turn on AI writing help" });
+    await expect(turnOn).toBeVisible();
+    await expect(card).toContainText("contact details are not");
     expect(providerRequests).toBe(0);
-    await page
-      .getByLabel("Send this evidence and instruction to OpenAI.")
-      .check();
-    await generate.click();
-    await expect(page.locator(".ai-review")).toContainText(
-      "Controlled test suggestion",
-    );
-    const accept = page.getByRole("button", { name: "Accept and save" });
+    await turnOn.click();
+    await expect(card).toContainText("Controlled test suggestion");
+    expect(
+      (await (await page.request.get("/api/account")).json()).aiWritingHelp,
+    ).toBe(true);
+    // The inline view shows the change: removed words struck, added words marked.
+    await expect(card.locator(".field-ai-text ins").first()).toBeVisible();
+    const accept = card.getByRole("button", { name: "Accept" });
     await expect(accept).toBeDisabled();
-    await page.getByRole("button", { name: "Reject suggestion" }).click();
+    // Try again asks for a fresh suggestion; Keep mine rejects the proposal.
+    await card.getByRole("button", { name: "Try again" }).click();
+    await expect(card).toContainText("Controlled test suggestion");
+    expect(providerRequests).toBe(2);
+    await card.getByRole("button", { name: "Keep mine" }).click();
+    await expect(card).toHaveCount(0);
     expect(
       (
         await (
@@ -161,10 +202,12 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
         ).json()
       ).revision,
     ).toBe(0);
-    await generate.click();
-    await page
+    // Consent is already on: the request starts straight away.
+    await openImprove();
+    await expect(card).toContainText("Controlled test suggestion");
+    await card
       .getByLabel(
-        "I checked the wording and confirm it accurately describes my experience.",
+        "I checked the wording and it accurately describes my experience.",
       )
       .check();
     await page.screenshot({
@@ -182,8 +225,7 @@ test("AI review accepts, rejects and undoes controlled suggestions; SQLite saves
       fullPage: true,
     });
     await accept.click();
-    await expect(page.locator(".ai-panel")).toContainText("Suggestion saved");
-    await page.getByRole("button", { name: "Close AI assistant" }).click();
+    await expect(card).toContainText("Applied");
     await page.setViewportSize({ width: 1440, height: 1050 });
     await page.getByRole("button", { name: "Undo", exact: false }).click();
     await expect(page.locator(".save-status")).toHaveText(

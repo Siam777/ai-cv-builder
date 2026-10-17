@@ -14,6 +14,25 @@ export function emailDeliveryMode() {
   return "unconfigured";
 }
 
+let warnedUnverifiedExports = false;
+
+/**
+ * Exports need a verified email (Google sign-ins carry Google's own claim),
+ * except when email delivery is unconfigured: then no user could ever verify,
+ * so the installation owner is warned once instead.
+ */
+export function exportVerificationSatisfied(emailVerified: boolean) {
+  if (emailVerified) return true;
+  if (emailDeliveryMode() !== "unconfigured") return false;
+  if (!warnedUnverifiedExports) {
+    warnedUnverifiedExports = true;
+    console.warn(
+      "auth_email_unconfigured: exports are allowed without email verification. Configure RESEND_API_KEY and AUTH_EMAIL_FROM to require it.",
+    );
+  }
+  return true;
+}
+
 export function requireEmailDelivery() {
   if (emailDeliveryMode() === "unconfigured")
     throw new HttpError(

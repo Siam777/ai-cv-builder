@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS ai_interviews (owner_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, id TEXT NOT NULL, resume_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(owner_id,id));

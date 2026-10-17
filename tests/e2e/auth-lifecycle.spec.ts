@@ -329,7 +329,7 @@ test("cross-tab account changes pause the workspace and preserve a dirty draft f
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
     "Draft kept after another tab signs out",
   );
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
   await page.reload();
   await openFirstCv(page);
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(

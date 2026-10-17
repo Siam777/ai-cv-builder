@@ -6,7 +6,7 @@ import { bulletEvidence, proposalSchema } from "../../src/lib/ai-proposals";
 import { generateSchema } from "../../src/lib/ai-contract";
 import { createCoachingProposal } from "../../src/lib/job-coach";
 import { jobCoachContext } from "../../src/lib/server/job-coach-context";
-import { authenticateForExport, openFirstCv, openEditorTools } from "./helpers";
+import { authenticateForExport, openFirstCv, editorTool, grantProAccount } from "./helpers";
 const origin = process.env.E2E_ORIGIN || "http://localhost:3100";
 const consent =
   "Send this criterion, target context, entry bullets and instruction to OpenAI.";
@@ -15,6 +15,8 @@ const rewrite = "Conducted customer interviews about onboarding friction.";
 async function setup(page: Page) {
   await page.goto("/builder");
   const owner = await authenticateForExport(page);
+  // AI job coaching is a Pro feature.
+  await grantProAccount(owner.id);
   const fixture = createDocument(true);
   fixture.provenance = { purpose: "personal", origin: "import" };
   fixture.sections
@@ -32,8 +34,7 @@ async function setup(page: Page) {
   return { owner, doc, headers: { origin, "X-Workspace-User": owner.id } };
 }
 async function openCoach(page: Page) {
-  await openEditorTools(page);
-  await page.getByRole("button", { name: "🎯 Tailor for job" }).click();
+  await editorTool(page, "Match a job");
   await page.getByLabel("Target Job Title").fill("Product Designer");
   await page
     .getByLabel("Job Description", { exact: true })
@@ -275,7 +276,7 @@ test("configured coaching uses the real adapter and ledger, recovers a lost resp
     exported.aiRequests.find((row: any) => row.id === ids[0]).proposal.coaching
       .promptVersion,
   ).toBe("job-criterion-coach-v1");
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
   await page.getByRole("button", { name: "Undo", exact: false }).click();
   await expect(page.locator(".save-status")).toHaveText(
     "Saved to your account",
@@ -353,7 +354,7 @@ test("controlled criterion coaching requires consent and factual confirmation, r
     fullPage: true,
   });
   const overflow = await page
-    .getByRole("dialog")
+    .getByRole("region", { name: "Job Tailoring Engine" })
     .evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await proposal.getByRole("button", { name: "Accept coaching edit" }).click();
@@ -378,7 +379,7 @@ test("controlled criterion coaching requires consent and factual confirmation, r
     exported.aiRequests.find((row: any) => row.id === replies.ids[1]).proposal
       .coaching.model,
   ).toBe("controlled-test-reply");
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI Assistant" }).click();
   await page.getByRole("button", { name: "Undo", exact: false }).click();
   await expect(page.locator(".save-status")).toHaveText(
     "Saved to your account",
