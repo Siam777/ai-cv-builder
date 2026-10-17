@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { database } from "./database";
 import * as schema from "./schema";
-import { HttpError } from "./http";
+import { HttpError, normalizeOrigin } from "./http";
 import { after } from "next/server";
 import {
   emailDeliveryMode,
@@ -12,7 +12,8 @@ import {
 } from "./auth-email";
 import { googleProvider } from "./google-config";
 
-export const origin = () => process.env.APP_ORIGIN || "http://localhost:3000";
+/** The app's public origin; APP_ORIGIN is cleaned of quotes, spaces, a stray \r and any path. */
+export const origin = () => normalizeOrigin(process.env.APP_ORIGIN) || "http://localhost:3000";
 let instance: ReturnType<typeof createAuth> | undefined;
 export function auth() {
   return (instance ??= createAuth());

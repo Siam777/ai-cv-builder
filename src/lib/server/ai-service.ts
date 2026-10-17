@@ -640,6 +640,7 @@ export async function requestEntryBullets(
       requestId: input.requestId,
       message: draft.message,
       title: draft.title,
+      description: draft.description,
       bullets: draft.bullets,
       withheld: draft.withheld,
       questions: draft.questions,

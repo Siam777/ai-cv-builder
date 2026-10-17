@@ -83,6 +83,8 @@ jobs:
               cp /opt/elfasys/config/ai-cv-builder/production.env deploy/production.env
             fi
             if [ -f "deploy/production.env" ]; then
+              # Windows line endings leave a hidden \r on every value (APP_ORIGIN, keys).
+              sed -i 's/\r$//' deploy/production.env 2>/dev/null || true
               sed -i '/HTTP_PORT=/d' deploy/production.env 2>/dev/null || true
               echo "HTTP_PORT=7892" >> deploy/production.env
               sed -i '/^CV_ENV_FILE=/d' deploy/production.env 2>/dev/null || true

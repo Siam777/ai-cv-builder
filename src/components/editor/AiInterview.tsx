@@ -446,13 +446,14 @@ export function AiInterview({
                   entry={savedJob}
                   noun="job"
                   autoOpen
-                  onAdd={(texts, title) =>
+                  onAdd={(texts, title, description) =>
                     services.updateDocument((draft) => {
                       const target = draft.sections
                         .flatMap((s) => s.entries)
                         .find((e) => e.id === savedJob.id);
                       if (!target) return;
                       if (title && !target.title.trim()) target.title = title;
+                      if (description) target.description = description;
                       target.bullets = target.bullets
                         .filter((b) => b.text.trim())
                         .concat(texts.map((text) => ({ id: uid(), text })))

@@ -108,6 +108,7 @@ describe("Write with AI (entry bullets) and examples for a job title", () => {
       {
         message: "Built from your notes.",
         title: "",
+        description: { text: "", evidenceIds: [] },
         bullets: [
           { text: "Handled customer tickets using Zendesk.", evidenceIds: ["note-1"] },
           { text: "Trained 3 new staff members.", evidenceIds: ["note-1"] },
@@ -149,6 +150,7 @@ describe("Write with AI (entry bullets) and examples for a job title", () => {
       {
         message: "",
         title: "",
+        description: { text: "", evidenceIds: [] },
         bullets: [
           { text: "Trained 5 new staff members.", evidenceIds: ["note-1"] },
           { text: "Handled customer tickets.", evidenceIds: ["note-1"] },
@@ -173,6 +175,7 @@ describe("Write with AI (entry bullets) and examples for a job title", () => {
       {
         message: "",
         title: "",
+        description: { text: "", evidenceIds: [] },
         bullets: [
           { text: "Led the customer support team.", evidenceIds: ["note-1"] },
           { text: "Used Zendesk for customer tickets.", evidenceIds: ["note-1"] },
@@ -194,11 +197,67 @@ describe("Write with AI (entry bullets) and examples for a job title", () => {
     assert.ok(result.withheld.some((w) => /notes that do not exist/.test(w.reason)));
   });
 
+  test("a role description from the notes is offered only when it passes the same checks", async () => {
+    const a = await account();
+    const notes = "Develop features\nFull stack development - react, angular, asp.net\nDatabase maintenance";
+    const reply = (description: { text: string; evidenceIds: string[] }) => ({
+      message: "",
+      title: "",
+      description,
+      bullets: [
+        {
+          text: "Developed new application features across the full stack with React, Angular and ASP.NET.",
+          evidenceIds: ["note-1", "note-2"],
+        },
+      ],
+      questions: [],
+    });
+    const good = fakeTransport(
+      reply({
+        text: "Full-stack developer building features with React, Angular and ASP.NET and maintaining the application databases.",
+        evidenceIds: ["note-1", "note-2", "note-3"],
+      }),
+      { results: [0, 1].map((index) => ({ index, supported: true, reason: "Stated." })) },
+    );
+    const kept = await services.requestEntryBullets(a.id, entryInput(a, notes), entryWith(good.transport));
+    assert.match(kept.description, /React, Angular and ASP\.NET/);
+    assert.equal(kept.bullets.length, 1);
+    // The description is checked in the same support call as the bullets.
+    assert.match(good.sent[1], /role description/);
+
+    const numbers = await services.requestEntryBullets(
+      a.id,
+      entryInput(a, notes),
+      entryWith(
+        fakeTransport(
+          reply({ text: "Led a team of 6 full-stack developers.", evidenceIds: ["note-2"] }),
+          { results: [{ index: 0, supported: true, reason: "Stated." }] },
+        ).transport,
+      ),
+    );
+    assert.equal(numbers.description, "");
+    assert.ok(numbers.withheld.some((w) => /role description went beyond your notes/.test(w.reason)));
+
+    const unsupported = await services.requestEntryBullets(
+      a.id,
+      entryInput(a, notes),
+      entryWith(
+        fakeTransport(
+          reply({ text: "Owned the architecture of the whole platform.", evidenceIds: ["note-2"] }),
+          { results: [{ index: 0, supported: true, reason: "Stated." }, { index: 1, supported: false, reason: "Not stated." }] },
+        ).transport,
+      ),
+    );
+    assert.equal(unsupported.description, "");
+    assert.equal(unsupported.bullets.length, 1);
+  });
+
   test("a title is offered only when the notes state it", async () => {
     const a = await account();
     const reply = (title: string) => ({
       message: "",
       title,
+      description: { text: "", evidenceIds: [] },
       bullets: [],
       questions: ["What did you do most days?"],
     });
@@ -322,6 +381,7 @@ describe("Write with AI (entry bullets) and examples for a job title", () => {
     const bullets = async () => ({
       message: "",
       title: "",
+      description: "",
       bullets: [],
       withheld: [],
       questions: ["What did you do?"],

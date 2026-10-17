@@ -67,6 +67,16 @@ function baseEntryChecks(row: EntryCase, result: EntryBulletsDraft) {
     !allEvidence.some((text) => text.toLowerCase().includes(result.title.toLowerCase()))
   )
     failures.push(`title not stated in the notes: ${result.title}`);
+  // The role description is checked against all the notes it may summarise.
+  const description = result.description ?? "";
+  if (description) {
+    if (hasNewNumbers(description, allEvidence)) failures.push(`description adds a number: ${description}`);
+    for (const verb of description.match(new RegExp(STRONGER_VERBS, "gi")) ?? [])
+      if (!new RegExp(`\\b${verb}\\b`, "i").test(allEvidence.join(" ")))
+        failures.push(`description strengthens the verb ("${verb}"): ${description}`);
+    if (description.split(/\s+/).length > 45) failures.push("description over 45 words");
+    if (/\bI\b|<[^>]+>|\*\*/.test(description)) failures.push(`description uses "I" or markup: ${description}`);
+  }
   return failures;
 }
 

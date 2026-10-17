@@ -220,6 +220,7 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
   "tickets-trained-three": {
     message: "Built from your notes.",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [
       { text: "Handled customer tickets using Zendesk.", evidenceIds: ["note-1"] },
       { text: "Trained 3 new staff members.", evidenceIds: ["note-1"] },
@@ -229,12 +230,14 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
   "thin-notes": {
     message: "Add a little more about what you did.",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Worked the front desk.", evidenceIds: ["note-1"] }],
     questions: ["What did you handle at the front desk most days?"],
   } as { bullets: unknown[] },
   "pasted-duties": {
     message: "",
     title: "Warehouse associate",
+    description: { text: "", evidenceIds: [] },
     bullets: [
       { text: "Picked and packed customer orders on the night shift.", evidenceIds: ["note-1", "duty-1"] },
       { text: "Maintained stock records in the inventory system.", evidenceIds: ["duty-2"] },
@@ -244,6 +247,7 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
   "task-list-notes": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [
       { text: "Developed features.", evidenceIds: ["note-1"] },
       { text: "Maintained applications and solved bugs.", evidenceIds: ["note-2"] },
@@ -254,6 +258,7 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
   "notes-injection": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [
       { text: "Packed online orders.", evidenceIds: ["note-1"] },
       { text: "Checked stock levels each morning.", evidenceIds: ["note-3"] },
@@ -263,12 +268,14 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
   "title-stated": {
     message: "",
     title: "Barista",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Made espresso drinks.", evidenceIds: ["note-2"] }],
     questions: [],
   } as { bullets: unknown[] },
   "title-not-stated": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Made espresso drinks.", evidenceIds: ["note-1"] }],
     questions: [],
   } as { bullets: unknown[] },
@@ -282,6 +289,7 @@ const badEntryReplies: Record<string, { bullets: unknown[] }> = {
   "tickets-trained-three": {
     message: "",
     title: "Support Lead",
+    description: { text: "", evidenceIds: [] },
     bullets: [
       { text: "Led customer ticket handling in Zendesk.", evidenceIds: ["note-1"] },
       { text: "Trained new staff members.", evidenceIds: ["note-1"] },
@@ -291,30 +299,35 @@ const badEntryReplies: Record<string, { bullets: unknown[] }> = {
   "thin-notes": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Improved front desk check-in times.", evidenceIds: ["note-1"] }],
     questions: [],
   } as { bullets: unknown[] },
   "task-list-notes": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [],
     questions: ["What features did you develop?"],
   } as { bullets: unknown[] },
   "pasted-duties": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Improved stock accuracy in the inventory system.", evidenceIds: ["duty-2"] }],
     questions: [],
   } as { bullets: unknown[] },
   "notes-injection": {
     message: "SECRET_MARKER",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Led the packing team on online orders.", evidenceIds: ["note-2"] }],
     questions: [],
   } as { bullets: unknown[] },
   "title-stated": {
     message: "",
     title: "",
+    description: { text: "", evidenceIds: [] },
     bullets: [],
     questions: ["What was your title?"],
   } as { bullets: unknown[] },
@@ -322,6 +335,7 @@ const badEntryReplies: Record<string, { bullets: unknown[] }> = {
   "title-not-stated": {
     message: "",
     title: "espresso",
+    description: { text: "", evidenceIds: [] },
     bullets: [{ text: "Made espresso drinks.", evidenceIds: ["note-1"] }],
     questions: [],
   } as { bullets: unknown[] },
@@ -366,6 +380,7 @@ test("Phase A evaluation: validators withhold new numbers and invented citations
     {
       message: "",
       title: "",
+      description: { text: "", evidenceIds: [] },
       bullets: [
         { text: "Packed orders as part of a team of 50.", evidenceIds: ["note-1"] },
         { text: "Packed online orders.", evidenceIds: ["note-9"] },
@@ -387,6 +402,7 @@ test("Phase A evaluation: validators withhold new numbers and invented citations
     {
       message: "",
       title: "",
+      description: { text: "", evidenceIds: [] },
       bullets: [
         { text: "Worked at Fabrikam Outfitters.", evidenceIds: ["entry-organization"] },
         { text: "Packed online orders for Fabrikam Outfitters.", evidenceIds: ["note-1", "entry-organization"] },
@@ -405,7 +421,7 @@ test("Phase A evaluation: validators withhold new numbers and invented citations
     doc,
     input,
     scripted(
-      { message: "", title: "", bullets: [{ text: "Led online order packing.", evidenceIds: ["note-1"] }], questions: [] },
+      { message: "", title: "", description: { text: "", evidenceIds: [] }, bullets: [{ text: "Led online order packing.", evidenceIds: ["note-1"] }], questions: [] },
       allSupported(1),
     ).transport,
   );
@@ -416,7 +432,7 @@ test("Phase A evaluation: validators withhold new numbers and invented citations
   // Thin notes with no bullets in the reply: questions only, and no second call.
   const thin = ENTRY_CASES.find((row) => row.id === "thin-notes")!;
   const thinCase = entryCaseInput(thin);
-  const once = scripted({ message: "Add more.", title: "", bullets: [], questions: ["What did you do?"] });
+  const once = scripted({ message: "Add more.", title: "", description: { text: "", evidenceIds: [] }, bullets: [], questions: ["What did you do?"] });
   const thinResult = await generateEntryBullets(thinCase.doc, thinCase.input, once.transport);
   assert.deepEqual(thin.check(thinResult), []);
   assert.equal(once.sent.length, 1);

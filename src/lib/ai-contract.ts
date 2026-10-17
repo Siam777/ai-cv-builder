@@ -213,6 +213,11 @@ export const entryBulletsDraftSchema = z.strictObject({
       }),
     )
     .max(5),
+  /** A one- or two-sentence description of the role, from the notes only. */
+  description: z.strictObject({
+    text: z.string().max(600),
+    evidenceIds: z.array(z.string().max(100)).max(10),
+  }),
   questions: z.array(z.string().max(300)).max(5),
 });
 export const entryBulletsSupportSchema = z.strictObject({
@@ -244,6 +249,8 @@ export interface EntryBulletsResult {
     /** The note lines or CV text each bullet came from, quoted. */
     evidence: string[];
   }[];
+  /** A short description of the role from the notes; empty when withheld or too thin. */
+  description: string;
   /** Suggestions that failed a check: the reason only, never the wording. */
   withheld: { reason: string }[];
   questions: string[];

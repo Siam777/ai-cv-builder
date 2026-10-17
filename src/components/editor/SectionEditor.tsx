@@ -532,13 +532,14 @@ export function SectionEditor({
                       entry={entry}
                       noun={ENTRY_NOUN[activeSection.type]}
                       disabled={busy}
-                      onAdd={(texts, title) =>
+                      onAdd={(texts, title, description) =>
                         onUpdateDocument((d) => {
                           const target = d.sections
                             .find((sec) => sec.id === activeSection.id)
                             ?.entries.find((item) => item.id === entry.id);
                           if (!target) return;
                           if (title && !target.title.trim()) target.title = title;
+                          if (description) target.description = description;
                           // Drop an empty starter bullet so the added ones come first.
                           target.bullets = target.bullets
                             .filter((b) => b.text.trim())

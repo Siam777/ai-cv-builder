@@ -44,6 +44,24 @@ export async function handle(work: () => Promise<Response>) {
     );
   }
 }
+/**
+ * Reduces a configured origin with quotes, spaces, a trailing slash or a path
+ * to its scheme and host ("https://example.com"). Env files edited on Windows
+ * often end lines with a hidden carriage return, which would otherwise make
+ * every same-origin check fail. Returns "" when the value is empty or not an
+ * http(s) URL.
+ */
+export function normalizeOrigin(value: string | undefined) {
+  const cleaned = (value ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+  if (!cleaned) return "";
+  try {
+    const url = new URL(cleaned);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
+  } catch {
+    return "";
+  }
+}
+
 export function requireSameOrigin(request: Request, configuredOrigin?: string) {
   const expected = configuredOrigin || new URL(request.url).origin;
   if (

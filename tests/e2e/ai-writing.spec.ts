@@ -101,6 +101,7 @@ test("Write with AI turns notes into ticked bullets, shows withheld suggestions 
         requestId: body.requestId,
         message: "Built from your notes.",
         title: "",
+        description: "Customer support role handling tickets in Zendesk and training new staff.",
         bullets: [
           {
             id: "b1",
@@ -160,18 +161,27 @@ test("Write with AI turns notes into ticked bullets, shows withheld suggestions 
     expect(sent[0].notes).toBe("handled customer tickets, trained 3 new staff, used Zendesk");
     expect(JSON.stringify(sent[0])).not.toContain("alex@example.com");
 
+    // A role description from the notes can be added too; it is editable.
+    const roleDescription = card.getByRole("textbox", { name: "Role description" });
+    await expect(roleDescription).toHaveValue("Customer support role handling tickets in Zendesk and training new staff.");
+    await roleDescription.fill("Customer support role handling Zendesk tickets and training new staff.");
+
     await card.getByLabel("Add bullet 1").uncheck();
     await card.getByRole("textbox", { name: "Suggestion 2" }).fill("Trained 3 new support staff members.");
-    await card.getByRole("button", { name: "Add 1 bullet" }).click();
-    await expect(card).toContainText("Added 1 bullet. Undo removes it.");
+    await card.getByRole("button", { name: "Add 1 bullet and description" }).click();
+    await expect(card).toContainText("Added 1 bullet and the role description. Undo removes them.");
     await expect
       .poll(() => bulletValues(page, job.id))
       .toEqual([...job.bullets.map((b: { text: string }) => b.text), "Trained 3 new support staff members."]);
+    const description = page.locator(`[data-entry-id="${job.id}"]`).getByRole("textbox", { name: "Description", exact: true });
+    await expect(description).toHaveValue("Customer support role handling Zendesk tickets and training new staff.");
 
+    // One Undo removes the bullet and the description together.
     await page.getByRole("button", { name: "Undo", exact: false }).click();
     await expect
       .poll(() => bulletValues(page, job.id))
       .toEqual(job.bullets.map((b: { text: string }) => b.text));
+    await expect(description).toHaveValue(job.description);
   } finally {
     await cleanup();
   }

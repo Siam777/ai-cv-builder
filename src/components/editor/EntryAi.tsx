@@ -38,6 +38,9 @@ type Session =
       result: EntryBulletsResult;
       bullets: (Pick & { evidence: string[] })[];
       useTitle: boolean;
+      /** The suggested role description, editable, and whether to add it. */
+      description: string;
+      useDescription: boolean;
     }
   | {
       stage: "examples";
@@ -90,7 +93,7 @@ export function EntryAi({
   disabled?: boolean;
   /** Open the notes box straight away (used by the AI interview). */
   autoOpen?: boolean;
-  onAdd: (bullets: string[], title?: string) => void;
+  onAdd: (bullets: string[], title?: string, description?: string) => void;
 }) {
   const ai = useFieldAi();
   const [session, setSession] = useState<Session | null>(null);
@@ -196,6 +199,9 @@ export function EntryAi({
           stage: "review",
           result,
           useTitle: false,
+          description: result.description ?? "",
+          // Ticked when the job has no description yet; replacing one is a choice.
+          useDescription: Boolean(result.description) && !entry.description.trim(),
           bullets: result.bullets.map((bullet) => ({
             id: bullet.id,
             text: bullet.text,
@@ -257,11 +263,16 @@ export function EntryAi({
     show(null, message);
   }
 
-  function finish(count: number, withTitle = false) {
+  function finish(count: number, withTitle = false, withDescription = false) {
+    const parts = [
+      count ? `${count} bullet${count === 1 ? "" : "s"}` : "",
+      withDescription ? "the role description" : "",
+      withTitle ? "the title" : "",
+    ].filter(Boolean);
     show(
       {
         stage: "done",
-        message: `Added ${count} bullet${count === 1 ? "" : "s"}${withTitle ? " and the title" : ""}. Undo removes ${count === 1 && !withTitle ? "it" : "them"}.`,
+        message: `Added ${parts.join(" and ") || "nothing"}. Undo removes ${parts.length === 1 && count <= 1 ? "it" : "them"}.`,
       },
       "Added. Undo removes the change.",
     );
@@ -427,6 +438,35 @@ export function EntryAi({
                   Use the title from your notes: {session.result.title}
                 </label>
               )}
+              {session.result.description && (
+                <div className="entry-ai-description">
+                  <label className="field-ai-check">
+                    <input
+                      type="checkbox"
+                      checked={session.useDescription}
+                      onChange={(event) =>
+                        setSession({ ...session, useDescription: event.target.checked })
+                      }
+                    />
+                    {entry.description.trim()
+                      ? "Replace this job's description with:"
+                      : "Add a description of this role:"}
+                  </label>
+                  <textarea
+                    aria-label="Role description"
+                    rows={3}
+                    maxLength={600}
+                    value={session.description}
+                    onChange={(event) =>
+                      setSession({
+                        ...session,
+                        description: event.target.value,
+                        useDescription: true,
+                      })
+                    }
+                  />
+                </div>
+              )}
               {session.bullets.length > 0 && (
                 <fieldset>
                   <legend className="sr-only">Bullets to add</legend>
@@ -525,6 +565,7 @@ export function EntryAi({
                   ref={session.bullets.length ? undefined : setPrimary}
                   disabled={
                     !session.useTitle &&
+                    !(session.useDescription && session.description.trim()) &&
                     !session.bullets.some((b) => b.picked && b.text.trim())
                   }
                   onClick={() => {
@@ -532,14 +573,23 @@ export function EntryAi({
                       .filter((b) => b.picked && b.text.trim())
                       .map((b) => b.text.trim());
                     const newTitle = session.useTitle ? session.result.title : undefined;
-                    onAdd(picked, newTitle);
-                    finish(picked.length, Boolean(newTitle));
+                    const newDescription =
+                      session.useDescription && session.description.trim()
+                        ? session.description.trim()
+                        : undefined;
+                    onAdd(picked, newTitle, newDescription);
+                    finish(picked.length, Boolean(newTitle), Boolean(newDescription));
                   }}
                 >
                   <Check size={16} aria-hidden />{" "}
                   {(() => {
                     const n = session.bullets.filter((b) => b.picked && b.text.trim()).length;
-                    return n ? `Add ${n} bullet${n === 1 ? "" : "s"}` : session.useTitle ? "Add the title" : "Add";
+                    const extra = [
+                      session.useDescription && session.description.trim() ? "description" : "",
+                      session.useTitle ? "title" : "",
+                    ].filter(Boolean);
+                    if (n) return `Add ${n} bullet${n === 1 ? "" : "s"}${extra.length ? ` and ${extra.join(" and ")}` : ""}`;
+                    return extra.length ? `Add the ${extra.join(" and ")}` : "Add";
                   })()}
                 </button>
                 <button type="button" onClick={() => show({ stage: "notes", prompts: [] })}>
