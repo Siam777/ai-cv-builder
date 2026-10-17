@@ -1,4 +1,4 @@
-﻿# AI CV Builder — Deployment & CI/CD Guide
+# AI CV Builder � Deployment & CI/CD Guide
 
 This guide covers deployment of AI CV Builder to Ubuntu 24.04 (Contabo VPS or similar) using Docker Compose and GitHub Actions.
 
@@ -6,7 +6,7 @@ This guide covers deployment of AI CV Builder to Ubuntu 24.04 (Contabo VPS or si
 
 - **Next.js 16 Standalone Container**: Node 20 runtime, non-root user (`nextjs:nodejs`, UID 10001), listening on `0.0.0.0:3000`.
 - **Docker Compose**: Maps container to host `127.0.0.1:7892`.
-- **Nginx Reverse Proxy**: Terminates TLS (`https://cv.elfasyssolution.com`), provides Let's Encrypt certificates, disables buffering for real-time AI token streaming, and reverse-proxies to `127.0.0.1:7892`.
+- **Nginx Reverse Proxy**: Terminates TLS (`https://cv-builder.elfasyssolution.com`), provides Let's Encrypt certificates, disables buffering for real-time AI token streaming, and reverse-proxies to `127.0.0.1:7892`.
 - **GitHub Actions**: Runs lint, typechecks, unit tests, and production build verification, then executes zero-downtime SSH remote deployment on the VPS.
 
 ---
@@ -48,9 +48,9 @@ Ensure you provide:
 
 ### Configure Nginx and SSL
 ```bash
-sudo cp deploy/nginx/cv.elfasyssolution.com.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/cv.elfasyssolution.com.conf /etc/nginx/sites-enabled/
-sudo certbot --nginx -d cv.elfasyssolution.com
+sudo cp deploy/nginx/cv-builder.elfasyssolution.com.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/cv-builder.elfasyssolution.com.conf /etc/nginx/sites-enabled/
+sudo certbot --nginx -d cv-builder.elfasyssolution.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -58,7 +58,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 2. GitHub Actions Secrets
 
-In your GitHub repository, navigate to **Settings** → **Secrets and variables** → **Actions** and add:
+In your GitHub repository, navigate to **Settings** ? **Secrets and variables** ? **Actions** and add:
 
 | Secret Name | Value |
 | :--- | :--- |
@@ -88,5 +88,5 @@ docker compose -p cv-production \
 Verify container health:
 ```bash
 curl http://127.0.0.1:7892/api/healthz
-curl https://cv.elfasyssolution.com/api/healthz
+curl https://cv-builder.elfasyssolution.com/api/healthz
 ```

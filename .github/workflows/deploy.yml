@@ -61,7 +61,6 @@ jobs:
           script: |
             set -e
             echo "=== [1/5] Pulling Latest Commits ==="
-            # Ensure parent repos directory exists
             mkdir -p /opt/elfasys/repos
 
             # If directory exists but is not a git repo, or doesn't exist yet:
@@ -114,8 +113,8 @@ jobs:
             sudo chmod -R 775 "$DATA_DIR" 2>/dev/null || true
 
             # Sync Nginx configuration to point to port 7892 if site conf exists
-            if [ -f "/etc/nginx/sites-available/cv.elfasyssolution.com.conf" ]; then
-              sudo sed -i -E "s/127\.0\.0\.1:[0-9]+/127.0.0.1:7892/g" /etc/nginx/sites-available/cv.elfasyssolution.com.conf 2>/dev/null || true
+            if [ -f "/etc/nginx/sites-available/cv-builder.elfasyssolution.com.conf" ]; then
+              sudo sed -i -E "s/127\.0\.0\.1:[0-9]+/127.0.0.1:7892/g" /etc/nginx/sites-available/cv-builder.elfasyssolution.com.conf 2>/dev/null || true
               sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
             fi
 
@@ -163,6 +162,6 @@ jobs:
             fi
 
             # End-to-end check through Nginx domain if domain resolves locally
-            curl -fsS -k "https://cv.elfasyssolution.com/api/healthz" 2>/dev/null && echo "Public Nginx domain is live!" || true
+            curl -fsS -k "https://cv-builder.elfasyssolution.com/api/healthz" 2>/dev/null && echo "Public Nginx domain is live!" || true
 
             echo "=== AI CV Builder Deployment Successful! ==="
