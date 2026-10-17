@@ -210,7 +210,8 @@ test("the landing route preserves existing IndexedDB drafts; explicit design sta
   await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
   await expect(page.getByLabel("Email", { exact: true })).toHaveValue("");
   await expect(page.locator(".paginated-resume")).toHaveClass(/template-tech/);
-  await expect(page).toHaveURL("/builder");
+  // The design choice leaves the address; the new CV is in it.
+  await expect(page).toHaveURL(/\/builder\?cv=[^&]+$/);
   const after = (await records(page)) as Array<{
     id: string;
     sections: Array<{ entries: unknown[] }>;

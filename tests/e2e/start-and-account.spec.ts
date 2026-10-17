@@ -225,8 +225,9 @@ test("signed in with a browser CV open, one click copies it to the account for A
   await signUp(page);
   // The tab keeps the browser copy for one load, as after signing in mid-edit.
   await page.evaluate(() => sessionStorage.setItem("cv-workspace", "device"));
+  // The reload reopens the browser CV from the address.
   await page.reload();
-  await page.getByRole("button", { name: "Open CV", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/builder\?cv=/);
   await expect(page.locator(".save-status")).toHaveText("Saved in this browser");
 
   // AI explains the real situation instead of asking to sign in again.

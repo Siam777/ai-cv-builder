@@ -27,8 +27,15 @@ export async function openFirstCv(
   page: Page,
   collection?: "Practice copies" | "Review older drafts",
 ) {
-  // A reload keeps the open CV (?cv= in the address); start from the list.
-  if (new URL(page.url()).searchParams.has("cv")) await page.goto("/builder");
+  // A reload keeps the open CV (?cv= in the address); go to the list in the
+  // same workspace (a new page load could switch workspace).
+  if (new URL(page.url()).searchParams.has("cv")) {
+    await expect(page.locator(".save-status")).not.toHaveText("Loading");
+    await page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name: "My CVs" })
+      .click();
+  }
   if (collection)
     await page
       .getByRole("navigation", { name: "Document collections" })
