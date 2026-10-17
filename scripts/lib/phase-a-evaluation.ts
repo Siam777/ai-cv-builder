@@ -5,10 +5,10 @@ import {
   numbersOutsideBlanks,
   type StartersRequest,
 } from "../../src/lib/ai-contract";
-import type { EntryBulletsDraft } from "../../src/lib/server/openai-provider";
+import { openAIModel, type EntryBulletsDraft } from "../../src/lib/server/openai-provider";
 
 /**
- * Fictional evaluation cases for the Phase A prompts (entry-bullets-v1 and
+ * Fictional evaluation cases for the Phase A prompts (entry-bullets-v3 and
  * starters-v1). Every name, employer and note here is invented. The checks are
  * deterministic and lexical: they catch drift, not every unsupported claim, so
  * live output must still be read by a person.
@@ -50,10 +50,14 @@ function baseEntryChecks(row: EntryCase, result: EntryBulletsDraft) {
   for (const bullet of result.bullets) {
     if (!bullet.evidenceIds.some((id) => /^(?:note|duty)-\d+$/.test(id)))
       failures.push(`bullet cites no note or duty: ${bullet.text}`);
-    if (hasNewNumbers(bullet.text, allEvidence))
+    // Compare with the lines this bullet cites, not all notes: a "led" elsewhere
+    // (such as an injected line) must not excuse it.
+    if (hasNewNumbers(bullet.text, bullet.evidence))
       failures.push(`bullet adds a number: ${bullet.text}`);
-    if (STRONGER_VERBS.test(bullet.text) && !STRONGER_VERBS.test(allEvidence.join(" ")))
-      failures.push(`bullet strengthens the verb: ${bullet.text}`);
+    const cited = bullet.evidence.join(" ");
+    for (const verb of bullet.text.match(new RegExp(STRONGER_VERBS, "gi")) ?? [])
+      if (!new RegExp(`\\b${verb}\\b`, "i").test(cited))
+        failures.push(`bullet strengthens the verb ("${verb}"): ${bullet.text}`);
     if (bullet.text.split(/\s+/).length > 30) failures.push(`bullet over 30 words: ${bullet.text}`);
     if (/\bI\b|<[^>]+>|\*\*/.test(bullet.text))
       failures.push(`bullet uses "I" or markup: ${bullet.text}`);
@@ -153,6 +157,23 @@ const ENTRY_CASE_ROWS: EntryCase[] = [
     },
   },
   {
+    id: "task-list-notes",
+    notes: "2. Develop features\n3. Maintaining applications and solving bugs\n4.Database maintenance\n5. Full stack development",
+    rationale:
+      "Short task-style notes are the person's own work: plain bullets restating them must pass the support check, not all be withheld.",
+    check(result) {
+      const failures: string[] = [];
+      if (result.bullets.length < 2)
+        failures.push(`${result.bullets.length} bullets from four task notes (${result.withheld.length} withheld)`);
+      for (const bullet of result.bullets) {
+        if (/\p{N}/u.test(bullet.text.replace(/^\d+\.\s*/, "")))
+          failures.push(`number invented: ${bullet.text}`);
+        if (RESULT_WORDS.test(bullet.text)) failures.push(`result invented: ${bullet.text}`);
+      }
+      return failures;
+    },
+  },
+  {
     id: "title-not-stated",
     notes: "made espresso drinks\nopened the shop on weekends\ncleaned the machines at close",
     rationale: "No title in the notes: none may be invented.",
@@ -223,12 +244,44 @@ export function checkStarters(row: StarterCase, output: StarterOutput) {
   return failures;
 }
 
-/** Published prices for the default model, in USD per million tokens; override with env. */
-export function tokenPrices() {
-  return {
-    inputPerMillion: Number(process.env.EVAL_INPUT_USD_PER_M ?? 0.4),
-    outputPerMillion: Number(process.env.EVAL_OUTPUT_USD_PER_M ?? 1.6),
-  };
+/**
+ * OpenAI list prices in USD per million tokens (input, output), standard tier.
+ * Check https://openai.com/api/pricing before recording a run; a dated snapshot
+ * such as gpt-4.1-mini-2025-04-14 uses its base model's price.
+ */
+export const MODEL_PRICES: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {
+  "gpt-4.1": { inputPerMillion: 2, outputPerMillion: 8 },
+  "gpt-4.1-mini": { inputPerMillion: 0.4, outputPerMillion: 1.6 },
+  "gpt-4.1-nano": { inputPerMillion: 0.1, outputPerMillion: 0.4 },
+  "gpt-4o": { inputPerMillion: 2.5, outputPerMillion: 10 },
+  "gpt-4o-mini": { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+};
+
+/**
+ * Prices for the model being evaluated. EVAL_INPUT_USD_PER_M and
+ * EVAL_OUTPUT_USD_PER_M override the table (set both); a model that is not in
+ * the table and has no override is refused, so a cost is never guessed.
+ */
+export function tokenPrices(model = openAIModel()) {
+  const input = process.env.EVAL_INPUT_USD_PER_M?.trim();
+  const output = process.env.EVAL_OUTPUT_USD_PER_M?.trim();
+  if (input || output) {
+    const prices = { inputPerMillion: Number(input), outputPerMillion: Number(output) };
+    if (
+      !input ||
+      !output ||
+      !Object.values(prices).every((price) => Number.isFinite(price) && price >= 0)
+    )
+      throw new Error("Set both EVAL_INPUT_USD_PER_M and EVAL_OUTPUT_USD_PER_M as numbers.");
+    return { ...prices, model, source: "env" as const };
+  }
+  const base = model.replace(/-\d{4}-\d{2}-\d{2}$/, "");
+  const known = MODEL_PRICES[base];
+  if (!known)
+    throw new Error(
+      `No price for model "${model}". Set EVAL_INPUT_USD_PER_M and EVAL_OUTPUT_USD_PER_M (USD per million tokens) before the run.`,
+    );
+  return { ...known, model, source: "table" as const };
 }
 export const DAILY_LIMITS = { free: 5, go: 50, pro: 200 } as const;
 
@@ -263,8 +316,7 @@ export function metered(base: typeof fetch, usage: Usage, last: { output?: unkno
   }) as typeof fetch;
 }
 
-export function costOf(usage: Usage) {
-  const prices = tokenPrices();
+export function costOf(usage: Usage, prices = tokenPrices()) {
   return (
     (usage.inputTokens * prices.inputPerMillion + usage.outputTokens * prices.outputPerMillion) /
     1_000_000

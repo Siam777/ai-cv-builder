@@ -95,9 +95,11 @@ async function main() {
     throw new Error(
       "Set OPENAI_API_KEY privately in .env.local before running live evaluations.",
     );
-  // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 12 (entry)
+  // Refuse before any paid call when the model's price is unknown.
+  tokenPrices();
+  // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 14 (entry)
   // + 6 (starters) + 12 (skills) + 6 (interview) + 24 (match) + 12 (improve)
-  // + 6 (letter) + 3 (tidy) + 6 (ask) = 95 paid API calls, with no retries.
+  // + 6 (letter) + 3 (tidy) + 6 (ask) = 97 paid API calls, with no retries.
   console.log(
     `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}, ${ASK_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
@@ -205,7 +207,8 @@ async function main() {
 
 /** Average and worst cost per action, and what a full day at each plan limit would cost. */
 function costSummary(usages: Usage[]) {
-  const costs = usages.map(costOf);
+  const prices = tokenPrices();
+  const costs = usages.map((usage) => costOf(usage, prices));
   const average =
     costs.reduce((sum, cost) => sum + cost, 0) / Math.max(costs.length, 1);
   const worst = Math.max(0, ...costs);

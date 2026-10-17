@@ -198,7 +198,7 @@ test("AI Evaluation Gate: unsupported metrics, prompt injection, cross-user targ
   }
 });
 
-// Phase A prompts (entry-bullets-v1, starters-v1): the same fictional cases that
+// Phase A prompts (entry-bullets-v3, starters-v1): the same fictional cases that
 // `npm run ai:eval` sends to OpenAI, run offline with scripted replies.
 function scripted(...payloads: unknown[]) {
   const sent: string[] = [];
@@ -240,6 +240,16 @@ const goodEntryReplies: Record<string, { bullets: unknown[] }> = {
       { text: "Maintained stock records in the inventory system.", evidenceIds: ["duty-2"] },
     ],
     questions: ["How many orders did you pack in a shift?"],
+  } as { bullets: unknown[] },
+  "task-list-notes": {
+    message: "",
+    title: "",
+    bullets: [
+      { text: "Developed features.", evidenceIds: ["note-1"] },
+      { text: "Maintained applications and solved bugs.", evidenceIds: ["note-2"] },
+      { text: "Maintained databases.", evidenceIds: ["note-3"] },
+    ],
+    questions: ["What features did you develop?"],
   } as { bullets: unknown[] },
   "notes-injection": {
     message: "",
@@ -284,6 +294,12 @@ const badEntryReplies: Record<string, { bullets: unknown[] }> = {
     bullets: [{ text: "Improved front desk check-in times.", evidenceIds: ["note-1"] }],
     questions: [],
   } as { bullets: unknown[] },
+  "task-list-notes": {
+    message: "",
+    title: "",
+    bullets: [],
+    questions: ["What features did you develop?"],
+  } as { bullets: unknown[] },
   "pasted-duties": {
     message: "",
     title: "",
@@ -302,10 +318,11 @@ const badEntryReplies: Record<string, { bullets: unknown[] }> = {
     bullets: [],
     questions: ["What was your title?"],
   } as { bullets: unknown[] },
+  // "espresso" is in the notes, so the provider's title filter lets it through.
   "title-not-stated": {
     message: "",
-    title: "",
-    bullets: [{ text: "Made drinks.", evidenceIds: ["entry-organization"] }],
+    title: "espresso",
+    bullets: [{ text: "Made espresso drinks.", evidenceIds: ["note-1"] }],
     questions: [],
   } as { bullets: unknown[] },
 };
@@ -364,6 +381,37 @@ test("Phase A evaluation: validators withhold new numbers and invented citations
   assert.deepEqual(injection.check(result), []);
   // Withheld wording never reaches the support check.
   assert.doesNotMatch(fake.sent[1], /team of 50/);
+
+  // A bullet that cites only the job's employer is withheld, not offered.
+  const orgOnly = scripted(
+    {
+      message: "",
+      title: "",
+      bullets: [
+        { text: "Worked at Fabrikam Outfitters.", evidenceIds: ["entry-organization"] },
+        { text: "Packed online orders for Fabrikam Outfitters.", evidenceIds: ["note-1", "entry-organization"] },
+      ],
+      questions: [],
+    },
+    allSupported(1),
+  );
+  const orgResult = await generateEntryBullets(doc, input, orgOnly.transport);
+  assert.deepEqual(orgResult.bullets.map((b) => b.text), ["Packed online orders for Fabrikam Outfitters."]);
+  assert.match(orgResult.withheld[0].reason, /did not come from your notes/);
+
+  // The shared verb check compares each bullet with the lines it cites, so the
+  // "led" in the injected line cannot excuse "Led" on a bullet from note-1.
+  const strengthened = await generateEntryBullets(
+    doc,
+    input,
+    scripted(
+      { message: "", title: "", bullets: [{ text: "Led online order packing.", evidenceIds: ["note-1"] }], questions: [] },
+      allSupported(1),
+    ).transport,
+  );
+  assert.ok(
+    injection.check(strengthened).some((f) => /strengthens the verb \("Led"\)/.test(f)),
+  );
 
   // Thin notes with no bullets in the reply: questions only, and no second call.
   const thin = ENTRY_CASES.find((row) => row.id === "thin-notes")!;
@@ -454,7 +502,7 @@ test("Phase A evaluation: starter cases pass with good replies and flag drift", 
 });
 
 test("Phase A evaluation: usage metering and cost per action", async () => {
-  const { metered, emptyUsage, costOf, DAILY_LIMITS } = await import(
+  const { metered, emptyUsage, costOf, tokenPrices, DAILY_LIMITS } = await import(
     "../scripts/lib/phase-a-evaluation"
   );
   const usage = emptyUsage();
@@ -465,8 +513,26 @@ test("Phase A evaluation: usage metering and cost per action", async () => {
   assert.equal((await response.json()).status, "completed");
   assert.deepEqual(usage, { calls: 1, inputTokens: 1000, outputTokens: 200 });
   assert.deepEqual(last.output, { bullets: [], summary: "", skills: [] });
-  // Default prices (gpt-4.1-mini): 1000 × 0.40 + 200 × 1.60 USD per million tokens.
-  assert.equal(costOf(usage).toFixed(6), "0.000720");
+  // Table prices for the default model (gpt-4.1-mini): 1000 × 0.40 + 200 × 1.60 per million.
+  assert.equal(costOf(usage, tokenPrices("gpt-4.1-mini-2025-04-14")).toFixed(6), "0.000720");
+  assert.equal(tokenPrices("gpt-4.1").inputPerMillion, 2);
+  // An unknown model is refused rather than priced as the default.
+  assert.throws(() => tokenPrices("gpt-6-luna"), /No price for model "gpt-6-luna"/);
+  process.env.EVAL_INPUT_USD_PER_M = "1.25";
+  process.env.EVAL_OUTPUT_USD_PER_M = "5";
+  try {
+    assert.deepEqual(tokenPrices("gpt-6-luna"), {
+      inputPerMillion: 1.25,
+      outputPerMillion: 5,
+      model: "gpt-6-luna",
+      source: "env",
+    });
+    delete process.env.EVAL_OUTPUT_USD_PER_M;
+    assert.throws(() => tokenPrices("gpt-6-luna"), /Set both/);
+  } finally {
+    delete process.env.EVAL_INPUT_USD_PER_M;
+    delete process.env.EVAL_OUTPUT_USD_PER_M;
+  }
   assert.deepEqual(DAILY_LIMITS, { free: 5, go: 50, pro: 200 });
 });
 

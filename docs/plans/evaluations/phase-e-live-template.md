@@ -16,7 +16,7 @@ To run every phase at once (at most 95 paid calls):
 npm run ai:eval -- --save
 ```
 
-Prices default to gpt-4.1-mini ($0.40 in / $1.60 out per million tokens); if the model or prices differ, set `EVAL_INPUT_USD_PER_M` and `EVAL_OUTPUT_USD_PER_M` before the run and record them below. The offline version of these checks runs in `npm test` (`tests/ai-evaluations.test.ts`).
+Prices come from the table in `scripts/lib/phase-a-evaluation.ts` (gpt-4.1-mini: $0.40 in / $1.60 out per million tokens; check current OpenAI pricing). A model not in the table is refused before any paid call unless you set `EVAL_INPUT_USD_PER_M` and `EVAL_OUTPUT_USD_PER_M` before the run and record them below. The offline version of these checks runs in `npm test` (`tests/ai-evaluations.test.ts`).
 
 ## Run
 

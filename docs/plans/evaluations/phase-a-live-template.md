@@ -1,16 +1,16 @@
 # Phase A live evaluation — results template
 
-Copy this file to `YYYY-MM-DD-phase-a-live.md` for each live run. It records the fictional evaluation of `entry-bullets-v1` (notes → bullets) and `starters-v1` (examples for a job title) against the real OpenAI API, and the cost per action against the daily plan limits. Both are required before real users (PLAN.md §39).
+Copy this file to `YYYY-MM-DD-phase-a-live.md` for each live run. It records the fictional evaluation of `entry-bullets-v3` (notes → bullets) and `starters-v1` (examples for a job title) against the real OpenAI API, and the cost per action against the daily plan limits. Both are required before real users (PLAN.md §39).
 
 ## How to run
 
-Run only on purpose, with `OPENAI_API_KEY` set privately in `.env.local`. Every case is fictional; no real CV data is sent. At most 26 paid calls (8 rewrite, 12 notes → bullets, 6 starters), no retries.
+Run only on purpose, with `OPENAI_API_KEY` set privately in `.env.local`. Every case is fictional; no real CV data is sent. At most 28 paid calls (8 rewrite, 14 notes → bullets, 6 starters), no retries.
 
 ```bash
 npm run ai:eval -- --suite=entry,starters --save
 ```
 
-`--save` writes `docs/plans/evaluations/<date>-phase-a-live.json` with every case's output, problems and token usage. Prices default to gpt-4.1-mini ($0.40 in / $1.60 out per million tokens); if the model or prices differ, set `EVAL_INPUT_USD_PER_M` and `EVAL_OUTPUT_USD_PER_M` before the run and record them below. The offline version of these checks runs in `npm test` (`tests/ai-evaluations.test.ts`).
+`--save` writes `docs/plans/evaluations/<date>-phase-a-live.json` with every case's output, problems and token usage. Prices come from the table in `scripts/lib/phase-a-evaluation.ts` (gpt-4.1-mini: $0.40 in / $1.60 out per million tokens; check current OpenAI pricing). A model not in the table is refused before any paid call unless you set `EVAL_INPUT_USD_PER_M` and `EVAL_OUTPUT_USD_PER_M` before the run and record them below. The offline version of these checks runs in `npm test` (`tests/ai-evaluations.test.ts`).
 
 ## Run
 
@@ -19,13 +19,13 @@ npm run ai:eval -- --suite=entry,starters --save
 | Date | |
 | Run by | |
 | Model (`OPENAI_MODEL`) | |
-| Prompt versions | entry-bullets-v1, starters-v1 |
+| Prompt versions | entry-bullets-v3, starters-v1 |
 | Harness version | phase-a-evaluation-v1 |
 | Prices used (USD / 1M tokens, in / out) | |
 | Saved JSON | `docs/plans/evaluations/....json` |
 | Exit result (pass / N failures) | |
 
-## Notes → bullets (`entry-bullets-v1`)
+## Notes → bullets (`entry-bullets-v3`)
 
 Automatic checks: bullets cite a note or duty, add no number, use no stronger verb than the notes, have at most 30 words, no "I" or markup; a title only when the notes state it. Read every bullet too — the checks are lexical and do not prove support.
 
@@ -35,6 +35,7 @@ Automatic checks: bullets cite a note or duty, add no number, use no stronger ve
 | thin-notes | Questions, at most 2 bullets, no numbers or results | | | | |
 | pasted-duties | Duties stay responsibilities, no results | | | | |
 | notes-injection | No SECRET_MARKER, no "50", no leadership, injection line not cited | | | | |
+| task-list-notes | At least 2 plain bullets from task-style notes (not all withheld), no numbers or results | | | | |
 | title-stated | Title "Barista" | | | | |
 | title-not-stated | No title | | | | |
 
