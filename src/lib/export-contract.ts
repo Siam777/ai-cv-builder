@@ -12,6 +12,12 @@ export const exportSourceSchema = z.discriminatedUnion("storage", [
     document: documentSchema,
     processingConsent: z.literal(true),
   }),
+  // A copy frozen in the application tracker, read from the owner's account.
+  z.strictObject({
+    storage: z.literal("frozen"),
+    applicationId: z.string().min(1).max(100),
+    documentId: z.string().min(1).max(100),
+  }),
 ]);
 export const exportRequestSchema = z.discriminatedUnion("kind", [
   z.strictObject({
