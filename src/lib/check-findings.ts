@@ -91,7 +91,75 @@ export function describeFinding(
         detail: "Add an entry, or hide the section if it does not apply.",
         tone,
       };
+    // Whole-CV consistency findings. The wording never implies dishonesty.
+    case "date_order":
+      return { title: "End date is before the start date", detail: issue.message, tone };
+    case "date_future":
+      return { title: "End date is in the future", detail: issue.message, tone };
+    case "date_missing":
+      return {
+        title: "Add a start date",
+        detail: `${issue.message} Dates help a reader follow your career.`,
+        tone,
+      };
+    case "date_overlap":
+      return {
+        title: "Check these dates",
+        detail: `${issue.message} That is fine for part-time or freelance work; confirm it if it is right.`,
+        tone,
+      };
+    case "org_spelling":
+      return { title: "Write the employer the same way", detail: issue.message, tone };
+    case "title_variant":
+      return { title: "Write the job title the same way", detail: issue.message, tone };
+    case "duplicate_bullet":
+      return {
+        title: "Two bullets say the same thing",
+        detail: issue.message,
+        quote: sourceText?.trim() ? excerpt(sourceText) : undefined,
+        tone,
+      };
+    case "repeated_number":
+      return {
+        title: "The same number appears twice",
+        detail: issue.message,
+        quote: sourceText?.trim() ? excerpt(sourceText) : undefined,
+        tone,
+      };
+    case "years_claim":
+      return {
+        title: "Check the years you mention",
+        detail: `${issue.message} If your CV shows only your recent roles, confirm this; otherwise check the number.`,
+        tone,
+      };
+    case "skill_without_evidence":
+      return {
+        title: "Show where you used these skills",
+        detail: `Not mentioned anywhere else in your CV: ${issue.message} Add them to a bullet, or confirm they belong.`,
+        tone,
+      };
+    case "number_to_confirm":
+      return {
+        title: "Can you back up these numbers?",
+        detail: `${issue.message} Be ready to explain each one in an interview, then confirm.`,
+        tone,
+      };
   }
+}
+
+/** A whole-CV consistency finding, shown under its own heading. */
+export function isConsistency(issue: AtsLintIssue) {
+  return issue.category === "consistency";
+}
+
+/**
+ * Open consistency findings that need attention before an export: not
+ * dismissed, not confirmed and not just suggestions.
+ */
+export function exportReminders(issues: AtsLintIssue[], hidden: Set<string>) {
+  return issues.filter(
+    (issue) => isConsistency(issue) && issue.severity !== "suggestion" && !hidden.has(issue.id),
+  );
 }
 
 /**

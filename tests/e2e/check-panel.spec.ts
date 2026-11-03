@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createDocument } from "../../src/lib/document";
-import { openFirstCv, startSampleResume } from "./helpers";
+import { authenticateForExport, openFirstCv, startSampleResume } from "./helpers";
 
 function fixture() {
   const doc = createDocument(true);
@@ -116,4 +116,122 @@ test("the advanced view keeps the text and file checks out of the way", async ({
   await expect(panel.locator(".plaintext-terminal")).toContainText("ALEX MORGAN");
   await panel.getByRole("button", { name: "File diagnostics" }).click();
   await expect(panel.getByLabel("File to check")).toBeVisible();
+});
+
+function overlapFixture() {
+  const doc = createDocument(true);
+  // Northstar starts 2022-03 and is current; Fieldwork now runs to 2022-09.
+  doc.sections.find((s) => s.type === "experience")!.entries[1].end = "2022-09";
+  return doc;
+}
+
+test("a consistency finding can be confirmed, and editing the dates reopens it", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  await startSampleResume(page, overlapFixture());
+  await page.getByRole("button", { name: /^Check/ }).click();
+  const panel = page.getByRole("complementary", { name: "Check my CV" });
+  const work = panel.getByRole("region", { name: /^Experience/ });
+  await expect(work.getByRole("heading", { name: "Is everything consistent?" })).toBeVisible();
+  await expect(work).toContainText("Check these dates");
+  await expect(work).toContainText("overlap by about 7 months");
+
+  await panel.getByRole("button", { name: "Confirm: Check these dates" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(panel).not.toContainText("Check these dates");
+  await panel.getByRole("button", { name: "Show 1 confirmed" }).click();
+  await expect(panel.locator(".finding.confirmed")).toContainText("Confirmed");
+  await panel.getByRole("button", { name: "Hide confirmed" }).click();
+
+  // Confirmations survive a reload.
+  await page.reload();
+  await openFirstCv(page);
+  await page.getByRole("button", { name: /^Check/ }).click();
+  await expect(panel).not.toContainText("Check these dates");
+
+  await page
+    .getByRole("complementary", { name: "Resume sections" })
+    .getByRole("button", { name: /^Experience/ })
+    .click();
+  const end = page.getByLabel("End date (YYYY or YYYY-MM)").nth(1);
+  await expect(end).toHaveValue("2022-09");
+  await end.fill("2022-11");
+  await expect(panel).toContainText("overlap by about 9 months");
+  await expect(panel.getByRole("button", { name: "Confirm: Check these dates" })).toBeVisible();
+});
+
+function dateOrderFixture() {
+  const doc = createDocument(true);
+  doc.sections.find((s) => s.type === "experience")!.entries[1].end = "2018-01";
+  return doc;
+}
+
+async function downloadTxt(page: import("@playwright/test").Page) {
+  await page.locator(".export-menu summary").click();
+  await page.getByRole("button", { name: "Plain text (.txt)" }).click();
+}
+
+test("the export reminder never blocks and can be skipped for this version", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("/builder");
+  await startSampleResume(page, dateOrderFixture());
+  await authenticateForExport(page);
+
+  await downloadTxt(page);
+  const reminder = page.getByRole("dialog", { name: /Before you send it: 1 thing to check/ });
+  await expect(reminder).toContainText("End date is before the start date");
+  // Escape closes it without exporting.
+  await page.keyboard.press("Escape");
+  await expect(reminder).toHaveCount(0);
+
+  // Review opens Check my CV.
+  await downloadTxt(page);
+  await reminder.getByRole("button", { name: "Review" }).click();
+  await expect(reminder).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Check my CV" })).toContainText(
+    "End date is before the start date",
+  );
+
+  // Export anyway continues the normal export.
+  await downloadTxt(page);
+  await reminder.getByLabel("Don't remind me for this version").check();
+  const downloading = page.waitForEvent("download");
+  await reminder.getByRole("button", { name: "Export anyway" }).click();
+  expect((await downloading).suggestedFilename()).toMatch(/\.txt$/);
+
+  // Skipped for this version: the next export goes straight through.
+  const again = page.waitForEvent("download");
+  await downloadTxt(page);
+  expect((await again).suggestedFilename()).toMatch(/\.txt$/);
+  await expect(reminder).toHaveCount(0);
+});
+
+test("no export reminder without attention-level consistency findings", async ({
+  page,
+}) => {
+  await page.goto("/builder");
+  await startSampleResume(page);
+  await authenticateForExport(page);
+  const downloading = page.waitForEvent("download");
+  await downloadTxt(page);
+  expect((await downloading).suggestedFilename()).toMatch(/\.txt$/);
+  await expect(page.getByRole("dialog", { name: /Before you send it/ })).toHaveCount(0);
+});
+
+test("the export reminder fits a phone screen", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 760 });
+  await page.goto("/builder");
+  await startSampleResume(page, dateOrderFixture());
+  await authenticateForExport(page);
+  await downloadTxt(page);
+  const reminder = page.getByRole("dialog", { name: /Before you send it/ });
+  for (const name of ["Review", "Export anyway"])
+    await expect(reminder.getByRole("button", { name })).toBeInViewport();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });

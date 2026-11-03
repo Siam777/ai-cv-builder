@@ -45,6 +45,7 @@ import {
 import { SidePanel, useSheetLayout } from "./editor/SidePanel";
 import { cvStrength } from "@/lib/cv-strength";
 import { lintResumeDocument } from "@/lib/linter/ats-linter";
+import { checkConsistency } from "@/lib/linter/consistency";
 import { rememberWorkspaceFocus } from "@/lib/use-modal-focus";
 import { EditorSidebar } from "./editor/EditorSidebar";
 import { SectionEditor } from "./editor/SectionEditor";
@@ -69,7 +70,14 @@ import { VersionHistoryModal } from "./editor/VersionHistoryModal";
 import { AddSectionModal } from "./editor/AddSectionModal";
 import { CheckPanel } from "./editor/CheckPanel";
 import { loadDismissed, saveDismissed } from "@/lib/dismissed-findings";
-import { issuesToFix } from "@/lib/check-findings";
+import {
+  exportReminderSkipped,
+  loadConfirmed,
+  saveConfirmed,
+  skipExportReminder,
+} from "@/lib/confirmed-findings";
+import { exportReminders, issuesToFix } from "@/lib/check-findings";
+import { ExportCheckDialog } from "./editor/ExportCheckDialog";
 import type { AtsLintIssue } from "@/lib/linter/ats-linter";
 import { KeyboardShortcutsModal } from "./editor/KeyboardShortcutsModal";
 import { PricingModal } from "./billing/PricingModal";
@@ -229,10 +237,20 @@ export function ResumeStudio({
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   // Findings the person dismissed for the open CV (kept in this browser).
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  // Consistency findings the person confirmed as true (kept in this browser).
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const openDocId = doc?.id;
   useEffect(() => {
     setDismissed(openDocId ? loadDismissed(openDocId) : new Set());
+    setConfirmed(openDocId ? loadConfirmed(openDocId) : new Set());
   }, [openDocId]);
+  /** Dismissed or confirmed: either way, not a finding to fix. */
+  const settled = useMemo(() => new Set([...dismissed, ...confirmed]), [dismissed, confirmed]);
+  // The reminder before an export, with the export it holds back.
+  const [exportCheck, setExportCheck] = useState<{
+    format: ExportFormat | "print";
+    issues: AtsLintIssue[];
+  } | null>(null);
 
   // Docked side panels leave the editor usable, so they are not modal.
   const isModalActive = Boolean(
@@ -244,6 +262,7 @@ export function ResumeStudio({
     showHistory ||
     showAddSection ||
     showShortcuts ||
+    exportCheck ||
     staged,
   );
   useBodyScrollLock(isModalActive);
@@ -690,6 +709,7 @@ export function ResumeStudio({
           showAiGen ||
           showGuidedStart ||
           showDemoGallery ||
+          !!exportCheck ||
           !!staged;
 
         if (!isEditable) {
@@ -1104,8 +1124,23 @@ export function ResumeStudio({
     setStatus("Saved in this browser");
   }
 
-  function checkedExport(format: ExportFormat | "print", recovery = false) {
+  function checkedExport(
+    format: ExportFormat | "print",
+    recovery = false,
+    reminded = false,
+  ) {
     if (!current.current) return;
+    // Remind (never block) before sending a CV with consistency findings
+    // that need attention. Backups and account data are not CVs to send.
+    if (!recovery && !reminded && format !== "json") {
+      const active = current.current;
+      const revision = revisions.current.get(active.id) ?? active.revision;
+      const reminders = exportReminders(allIssues, settled);
+      if (reminders.length && !exportReminderSkipped(active.id, revision)) {
+        setExportCheck({ format, issues: reminders });
+        return;
+      }
+    }
     const pending: PendingExport = {
       doc: structuredClone(current.current),
       owner: cloudUser?.id ?? null,
@@ -1313,12 +1348,12 @@ export function ResumeStudio({
 
   const ready = status !== "Loading";
   const allIssues = useMemo(
-    () => (doc ? lintResumeDocument(doc).issues : []),
+    () => (doc ? [...lintResumeDocument(doc).issues, ...checkConsistency(doc)] : []),
     [doc],
   );
   const openIssues = useMemo(
-    () => allIssues.filter((issue) => !dismissed.has(issue.id)),
-    [allIssues, dismissed],
+    () => allIssues.filter((issue) => !settled.has(issue.id)),
+    [allIssues, settled],
   );
   const strength = useMemo(
     () =>
@@ -1335,6 +1370,14 @@ export function ResumeStudio({
     setDismissed(next);
     saveDismissed(doc.id, next);
   }
+  function setConfirmedFor(id: string, isConfirmed: boolean) {
+    if (!doc) return;
+    const next = new Set(confirmed);
+    if (isConfirmed) next.add(id);
+    else next.delete(id);
+    setConfirmed(next);
+    saveConfirmed(doc.id, next);
+  }
   /** Show the field a finding is about, keeping the docked panel open. */
   function fixIssue(issue: AtsLintIssue) {
     const sectionId = issue.sectionId || "contact";
@@ -1347,7 +1390,7 @@ export function ResumeStudio({
       sectionId,
       entryId: issue.entryId,
       bulletId: issue.bulletId,
-      field: contactField,
+      field: issue.field ?? contactField,
     });
     // A bottom sheet would cover the field.
     if (sheetLayout) setShowAts(false);
@@ -1852,6 +1895,30 @@ export function ResumeStudio({
         <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
+      {exportCheck && (
+        <ExportCheckDialog
+          issues={exportCheck.issues}
+          onClose={() => setExportCheck(null)}
+          onReview={() => {
+            const first = exportCheck.issues[0];
+            setExportCheck(null);
+            setShowAts(true);
+            if (first) fixIssue(first);
+          }}
+          onExportAnyway={(skipForVersion) => {
+            const { format } = exportCheck;
+            setExportCheck(null);
+            const active = current.current;
+            if (skipForVersion && active)
+              skipExportReminder(
+                active.id,
+                revisions.current.get(active.id) ?? active.revision,
+              );
+            checkedExport(format, false, true);
+          }}
+        />
+      )}
+
       {staged && (
         <ImportReviewModal
           staged={staged}
@@ -1911,6 +1978,7 @@ export function ResumeStudio({
           showAiGen ||
           showGuidedStart ||
           showDemoGallery ||
+          !!exportCheck ||
           !!staged
         }
         inert={
@@ -1922,6 +1990,7 @@ export function ResumeStudio({
           showAiGen ||
           showGuidedStart ||
           showDemoGallery ||
+          !!exportCheck ||
           !!staged
         }
       >
@@ -2083,7 +2152,7 @@ export function ResumeStudio({
                         onClick: signInForAi,
                       }
               }
-              issueCount={issuesToFix(allIssues, dismissed).length}
+              issueCount={issuesToFix(allIssues, settled).length}
               activePanel={activePanel}
               onRename={(name) =>
                 update((d) => {
@@ -2230,8 +2299,11 @@ export function ResumeStudio({
                       strength={strength}
                       issues={allIssues}
                       dismissed={dismissed}
+                      confirmed={confirmed}
                       onDismiss={(id) => setDismissedFor(id, true)}
                       onRestore={(id) => setDismissedFor(id, false)}
+                      onConfirm={(id) => setConfirmedFor(id, true)}
+                      onUnconfirm={(id) => setConfirmedFor(id, false)}
                       onFix={fixIssue}
                       onFixWithAi={fixIssueWithAi}
                       onOpenStep={(id) => {

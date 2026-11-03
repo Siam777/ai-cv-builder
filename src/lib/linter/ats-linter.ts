@@ -3,6 +3,7 @@ import {
   type ResumeDocument,
   type SectionType,
 } from "../document";
+import type { ConsistencyRule } from "./consistency";
 
 export interface AtsLintIssue {
   id: string;
@@ -12,12 +13,20 @@ export interface AtsLintIssue {
     | "bullet_length"
     | "contact_missing"
     | "date_format"
-    | "empty_section";
+    | "empty_section"
+    | ConsistencyRule;
   severity: "critical" | "warning" | "suggestion";
   message: string;
   sectionId?: string;
   entryId?: string;
   bulletId?: string;
+  /** Contact field the finding is about, such as "headline". */
+  field?: string;
+  /** Other items a finding about two or more items refers to. */
+  relatedEntryIds?: string[];
+  relatedBulletIds?: string[];
+  /** Whole-CV consistency findings are shown under their own heading. */
+  category?: "consistency";
   suggestion?: string;
 }
 

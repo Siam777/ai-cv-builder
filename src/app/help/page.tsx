@@ -102,6 +102,30 @@ export default function Help() {
           with your source material.{" "}
           <Link href="/privacy">Read how data is handled</Link>.
         </p>
+        <h2>Check that everything is consistent</h2>
+        <p>
+          <strong>Check my CV</strong> also reads your whole CV for statements
+          that contradict or repeat each other, under{" "}
+          <strong>Is everything consistent?</strong>. It runs in your browser
+          and does not use AI. It looks for:
+        </p>
+        <ul>
+          <li>End dates before start dates, end dates in the future, and jobs with no start date.</li>
+          <li>Jobs that overlap by three months or more. Part-time and freelance work often overlaps, so confirm it if it is right.</li>
+          <li>The same employer, school or job title written two ways, such as &ldquo;Sr. Engineer&rdquo; and &ldquo;Senior Engineer&rdquo;.</li>
+          <li>Two bullets that say the same thing, and the same percentage or amount claimed in two roles.</li>
+          <li>&ldquo;N years of experience&rdquo; in your headline or profile that is more than your job dates show.</li>
+          <li>Skills you list that appear nowhere else in your CV.</li>
+          <li>Numbers you should be ready to explain in an interview.</li>
+        </ul>
+        <p>
+          Fix a finding, dismiss it, or confirm it is true. Changing the text
+          brings it back. Confirmations are kept in this browser only. Before
+          you download a CV, you are reminded of anything that needs attention;
+          you can always export anyway. Employment gaps are{" "}
+          <strong>not</strong> checked: a gap is not a contradiction, and you
+          should not feel you have to hide one.
+        </p>
         <h2>About</h2>
         <p>AI CV Builder is developed by Elfasys Solution.</p>
       </article>
