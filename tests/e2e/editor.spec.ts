@@ -181,6 +181,11 @@ test("blank editor supports all sections, ordering, replacement undo and long ex
   await authenticateForExport(page);
   const textDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Plain text (.txt)" }).click();
+  // The experience entry has no start date, so the consistency reminder
+  // appears first; it never blocks the export.
+  const reminder = page.getByRole("dialog", { name: /Before you send it/ });
+  await expect(reminder).toContainText("Add a start date");
+  await reminder.getByRole("button", { name: "Export anyway" }).click();
   expect(
     await readFile((await (await textDownload).path())!, "utf8"),
   ).toContain("Zoë Example");

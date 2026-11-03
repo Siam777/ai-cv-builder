@@ -22,9 +22,11 @@ import type { CvStrength } from "@/lib/cv-strength";
 import {
   describeFinding,
   groupFindings,
+  isConsistency,
   isNotStarted,
   issuesToFix,
 } from "@/lib/check-findings";
+import { CONFIRMABLE_RULES } from "@/lib/linter/consistency";
 import { FileDiagnostics } from "./FileDiagnostics";
 import { RoleComparison } from "./RoleComparison";
 
@@ -34,8 +36,12 @@ export interface CheckPanelProps {
   /** Every finding for the CV, including dismissed ones. */
   issues: AtsLintIssue[];
   dismissed: Set<string>;
+  /** Consistency findings confirmed as true. */
+  confirmed?: Set<string>;
   onDismiss: (id: string) => void;
   onRestore: (id: string) => void;
+  onConfirm?: (id: string) => void;
+  onUnconfirm?: (id: string) => void;
   onFix: (issue: AtsLintIssue) => void;
   /** Runs the matching bullet action (Improve wording or Shorten) with AI. */
   onFixWithAi?: (issue: AtsLintIssue) => void;
@@ -47,24 +53,31 @@ function FindingRow({
   sourceText,
   active,
   dismissed,
+  confirmed,
   onFix,
   onFixWithAi,
   onDismiss,
   onRestore,
+  onConfirm,
+  onUnconfirm,
 }: {
   issue: AtsLintIssue;
   sourceText?: string;
   active: boolean;
   dismissed: boolean;
+  confirmed: boolean;
   onFix: () => void;
   onFixWithAi?: () => void;
   onDismiss: () => void;
   onRestore: () => void;
+  onConfirm?: () => void;
+  onUnconfirm?: () => void;
 }) {
   const copy = describeFinding(issue, sourceText);
+  const confirmable = Boolean(onConfirm) && CONFIRMABLE_RULES.has(issue.ruleId);
   return (
     <li
-      className={`finding ${copy.tone}${active ? " active" : ""}${dismissed ? " dismissed" : ""}`}
+      className={`finding ${copy.tone}${active ? " active" : ""}${dismissed ? " dismissed" : ""}${confirmed ? " confirmed" : ""}`}
       data-finding-id={issue.id}
     >
       <span className="finding-icon">
@@ -83,14 +96,44 @@ function FindingRow({
         {copy.detail && <p>{copy.detail}</p>}
       </div>
       <div className="finding-actions">
-        {dismissed ? (
-          <button type="button" onClick={onRestore} aria-label={`Restore: ${copy.title}`}>
+        {confirmed ? (
+          <>
+            <span className="finding-confirmed">
+              <Check size={16} aria-hidden /> Confirmed
+            </span>
+            <button
+              type="button"
+              onClick={onUnconfirm}
+              aria-label={`Undo confirm: ${copy.title}`}
+            >
+              <Undo2 size={16} aria-hidden /> Undo
+            </button>
+          </>
+        ) : dismissed ? (
+          <button
+            type="button"
+            onClick={onRestore}
+            aria-label={`Restore: ${copy.title}`}
+          >
             <Undo2 size={16} aria-hidden /> Restore
           </button>
         ) : (
           <>
-            <button type="button" onClick={onFix} aria-label={`Fix: ${copy.title}`}>
-              Fix
+            {confirmable && (
+              <button
+                type="button"
+                onClick={onConfirm}
+                aria-label={`Confirm: ${copy.title}`}
+              >
+                <Check size={16} aria-hidden /> Confirm
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onFix}
+              aria-label={`${confirmable ? "Edit" : "Fix"}: ${copy.title}`}
+            >
+              {confirmable ? "Edit" : "Fix"}
             </button>
             {onFixWithAi && (
               <button
@@ -117,14 +160,19 @@ function FindingRow({
   );
 }
 
+const NO_IDS: Set<string> = new Set();
+
 /** Check my CV: completeness, findings to fix, role comparison and file views. */
 export function CheckPanel({
   doc,
   strength,
   issues,
   dismissed,
+  confirmed = NO_IDS,
   onDismiss,
   onRestore,
+  onConfirm,
+  onUnconfirm,
   onFix,
   onFixWithAi,
   onOpenStep,
@@ -132,27 +180,53 @@ export function CheckPanel({
   const [tab, setTab] = useState<"fix" | "role">("fix");
   const [showInfo, setShowInfo] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
+  const [showConfirmed, setShowConfirmed] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [advancedView, setAdvancedView] = useState<"text" | "file">("text");
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Sections not started yet are to-dos, listed apart and not counted.
-  const fixable = useMemo(() => issues.filter((issue) => !isNotStarted(issue)), [issues]);
-  const open = useMemo(() => issuesToFix(issues, dismissed), [issues, dismissed]);
+  const fixable = useMemo(
+    () => issues.filter((issue) => !isNotStarted(issue)),
+    [issues],
+  );
+  const settled = useMemo(
+    () => new Set([...dismissed, ...confirmed]),
+    [dismissed, confirmed],
+  );
+  const open = useMemo(() => issuesToFix(issues, settled), [issues, settled]);
+  const confirmedCount = useMemo(
+    () => fixable.filter((issue) => confirmed.has(issue.id)).length,
+    [fixable, confirmed],
+  );
+  const listConfirmed = showConfirmed && confirmedCount > 0;
   const notStarted = useMemo(
-    () => issues.filter((issue) => isNotStarted(issue) && !dismissed.has(issue.id)),
+    () =>
+      issues.filter((issue) => isNotStarted(issue) && !dismissed.has(issue.id)),
     [issues, dismissed],
   );
-  const hidden = fixable.length - open.length;
+  const hidden = fixable.filter(
+    (issue) => dismissed.has(issue.id) && !confirmed.has(issue.id),
+  ).length;
   // With nothing dismissed there is nothing to show or hide.
   const listDismissed = showDismissed && hidden > 0;
   const groups = useMemo(
-    () => groupFindings(doc, listDismissed ? fixable : open),
-    [doc, fixable, open, listDismissed],
+    () =>
+      groupFindings(
+        doc,
+        fixable.filter(
+          (issue) =>
+            !settled.has(issue.id) ||
+            (listDismissed &&
+              dismissed.has(issue.id) &&
+              !confirmed.has(issue.id)) ||
+            (listConfirmed && confirmed.has(issue.id)),
+        ),
+      ),
+    [doc, fixable, settled, dismissed, confirmed, listDismissed, listConfirmed],
   );
   const ordered = useMemo(
-    () =>
-      groupFindings(doc, open).flatMap((group) => group.issues),
+    () => groupFindings(doc, open).flatMap((group) => group.issues),
     [doc, open],
   );
   const bulletText = useMemo(() => {
@@ -163,7 +237,8 @@ export function CheckPanel({
     return map;
   }, [doc]);
   const audit = useMemo(
-    () => (advanced && advancedView === "text" ? auditAtsExtraction(doc) : null),
+    () =>
+      advanced && advancedView === "text" ? auditAtsExtraction(doc) : null,
     [doc, advanced, advancedView],
   );
 
@@ -274,7 +349,11 @@ export function CheckPanel({
       </div>
 
       {tab === "fix" ? (
-        <div id="check-panel-fix" role="tabpanel" aria-labelledby="check-tab-fix">
+        <div
+          id="check-panel-fix"
+          role="tabpanel"
+          aria-labelledby="check-tab-fix"
+        >
           <div className="findings-bar">
             <span>
               {open.length === 0
@@ -305,39 +384,75 @@ export function CheckPanel({
                 {group.label}
                 <span className="count">{group.issues.length}</span>
               </h3>
-              <ul>
-                {group.issues.map((issue) => (
-                  <FindingRow
-                    key={issue.id}
-                    issue={issue}
-                    sourceText={issue.bulletId ? bulletText.get(issue.bulletId) : undefined}
-                    active={issue.id === activeId}
-                    dismissed={dismissed.has(issue.id)}
-                    onFix={() => fix(issue)}
-                    onFixWithAi={
-                      onFixWithAi && aiFixFor(issue)
-                        ? () => {
-                            setActiveId(issue.id);
-                            onFixWithAi(issue);
+              {[
+                group.issues.filter((issue) => !isConsistency(issue)),
+                group.issues.filter(isConsistency),
+              ].map((rows, index) =>
+                rows.length === 0 ? null : (
+                  <div key={index}>
+                    {index === 1 && (
+                      <h4 className="finding-subhead">
+                        Is everything consistent?
+                      </h4>
+                    )}
+                    <ul>
+                      {rows.map((issue) => (
+                        <FindingRow
+                          key={issue.id}
+                          issue={issue}
+                          sourceText={
+                            issue.bulletId
+                              ? bulletText.get(issue.bulletId)
+                              : undefined
                           }
-                        : undefined
-                    }
-                    onDismiss={() => onDismiss(issue.id)}
-                    onRestore={() => onRestore(issue.id)}
-                  />
-                ))}
-              </ul>
+                          active={issue.id === activeId}
+                          dismissed={dismissed.has(issue.id)}
+                          confirmed={confirmed.has(issue.id)}
+                          onConfirm={
+                            onConfirm ? () => onConfirm(issue.id) : undefined
+                          }
+                          onUnconfirm={
+                            onUnconfirm
+                              ? () => onUnconfirm(issue.id)
+                              : undefined
+                          }
+                          onFix={() => fix(issue)}
+                          onFixWithAi={
+                            onFixWithAi && aiFixFor(issue)
+                              ? () => {
+                                  setActiveId(issue.id);
+                                  onFixWithAi(issue);
+                                }
+                              : undefined
+                          }
+                          onDismiss={() => onDismiss(issue.id)}
+                          onRestore={() => onRestore(issue.id)}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                ),
+              )}
             </section>
           ))}
           {notStarted.length > 0 && (
-            <section className="not-started" aria-labelledby="not-started-heading">
+            <section
+              className="not-started"
+              aria-labelledby="not-started-heading"
+            >
               <h3 id="not-started-heading">
-                Not started yet <span className="count">{notStarted.length}</span>
+                Not started yet{" "}
+                <span className="count">{notStarted.length}</span>
               </h3>
-              <p>Add an entry when you are ready, or hide a section you do not need.</p>
+              <p>
+                Add an entry when you are ready, or hide a section you do not
+                need.
+              </p>
               <ul>
                 {notStarted.map((issue) => {
-                  const section = doc.sections.find((s) => s.id === issue.sectionId);
+                  const section = doc.sections.find(
+                    (s) => s.id === issue.sectionId,
+                  );
                   return (
                     <li key={issue.id}>
                       <span>{section?.label || "Section"}</span>
@@ -364,9 +479,25 @@ export function CheckPanel({
               {listDismissed ? "Hide dismissed" : `Show ${hidden} dismissed`}
             </button>
           )}
+          {confirmedCount > 0 && (
+            <button
+              type="button"
+              className="text-link"
+              aria-pressed={listConfirmed}
+              onClick={() => setShowConfirmed(!listConfirmed)}
+            >
+              {listConfirmed
+                ? "Hide confirmed"
+                : `Show ${confirmedCount} confirmed`}
+            </button>
+          )}
         </div>
       ) : (
-        <div id="check-panel-role" role="tabpanel" aria-labelledby="check-tab-role">
+        <div
+          id="check-panel-role"
+          role="tabpanel"
+          aria-labelledby="check-tab-role"
+        >
           <RoleComparison doc={doc} />
         </div>
       )}
@@ -384,7 +515,11 @@ export function CheckPanel({
         </button>
         {advanced && (
           <div id="check-advanced-body">
-            <div className="advanced-switch" role="group" aria-label="Advanced views">
+            <div
+              className="advanced-switch"
+              role="group"
+              aria-label="Advanced views"
+            >
               <button
                 type="button"
                 aria-pressed={advancedView === "text"}
