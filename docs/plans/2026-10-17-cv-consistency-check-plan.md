@@ -1,6 +1,6 @@
 # Step 1 — CV truth and consistency check: implementation plan
 
-Date: 2026-10-17. Scope source: FEATURE-PLAN.md "Career workflow roadmap", step 1. Background: [2026-10-17-career-platform-analysis.md](2026-10-17-career-platform-analysis.md). Starts only after Gate 0. Nothing here is implemented.
+Date: 2026-10-17. Scope source: FEATURE-PLAN.md "Career workflow roadmap", step 1. Background: [2026-10-17-career-platform-analysis.md](2026-10-17-career-platform-analysis.md). Planned to start after Gate 0; started early on 2026-11-04 at the owner's request, with Gate 0 still open. Implemented locally on 2026-11-04 — see PLAN.md §41 for what was delivered, the deviations from this plan and what remains open.
 
 ## 1. Goal
 
@@ -34,7 +34,7 @@ Code: new pure module `src/lib/linter/consistency.ts` exporting `checkConsistenc
 | `title_variant` | The same title written two ways ("Sr. Engineer" / "Senior Engineer") | suggestion | Small abbreviation table |
 | `duplicate_bullet` | Two bullets that say the same thing (normalized word overlap ≥ 0.85) | attention | Quote both, link to both |
 | `repeated_number` | The same number and unit claimed in two different entries ("cut costs 30%") | suggestion | Often a copy-paste mistake |
-| `years_claim` | The summary or headline says "N years" and N is more than the years the dates cover plus one | attention | Uses experience dates only; says how many years the dates show |
+| `years_claim` | The headline or summary claims the person's own experience ("10+ years of experience", "12 years in logistics", "15 years leading teams") and N is more than the years the listed jobs cover plus one | suggestion, confirmable | **Revised 2026-11-04** ([plans review](2026-11-04-plans-review.md) finding 11): a targeted CV may list only recent roles, so the gap alone is not a contradiction. Wording: "the jobs listed here cover about N years; if your CV shows only your recent roles, confirm this". Durations that are not experience claims ("a 3-year roadmap", "within 2 years of launch", "9 years in a row") are ignored. No export reminder |
 | `skill_without_evidence` | A listed skill that appears nowhere else (summary, bullets, descriptions, projects, certificates) | suggestion | One grouped finding listing up to 8 skills, with "Show where you used it" |
 | `number_to_confirm` | A bullet with a specific number (percentages, money, team size, counts) | suggestion | "Can you back this up in an interview?" Buttons: Confirm or Edit. Never says the number is wrong |
 
