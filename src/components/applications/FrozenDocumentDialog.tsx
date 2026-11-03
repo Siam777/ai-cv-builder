@@ -40,9 +40,18 @@ export function FrozenDocumentDialog({
       const source = { storage: "frozen" as const, applicationId, documentId };
       const artifact =
         frozen.content.kind === "cv"
-          ? await requestExport({ kind: "resume", source, format: "pdf" }, owner)
+          ? await requestExport(
+              { kind: "resume", source, format: "pdf" },
+              owner,
+            )
           : await requestExport(
-              { kind: "letter", source, format: "txt", text: frozen.content.text, name: frozen.content.name },
+              {
+                kind: "letter",
+                source,
+                format: "txt",
+                text: frozen.content.text,
+                name: frozen.content.name,
+              },
               owner,
             );
       downloadArtifact(artifact.blob, artifact.filename);
@@ -61,8 +70,17 @@ export function FrozenDocumentDialog({
       wide
       footer={
         <>
-          <button type="button" className="primary" onClick={() => void download()} disabled={!frozen || working}>
-            {working ? "Preparing…" : frozen?.kind === "cover_letter" ? "Download again (.txt)" : "Download again (.pdf)"}
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void download()}
+            disabled={!frozen || working}
+          >
+            {working
+              ? "Preparing…"
+              : frozen?.kind === "cover_letter"
+                ? "Download again (.txt)"
+                : "Download again (.pdf)"}
           </button>
           <button type="button" onClick={onClose}>
             Close
@@ -84,9 +102,12 @@ export function FrozenDocumentDialog({
           <p className="tracker-muted">
             Kept on {new Date(frozen.createdAt).toLocaleString()}
             {frozen.exportSnapshotId ? " from the file you exported" : ""}
-            {frozen.sourceRevision !== null ? ` (CV version ${frozen.sourceRevision})` : ""}. The copy you sent is
-            kept as it was. If you change your CV later, this copy does not change. A new download is rendered from
-            this copy and can differ slightly if a design changes later.
+            {frozen.sourceRevision !== null
+              ? ` (CV version ${frozen.sourceRevision})`
+              : ""}
+            . The copy you sent is kept as it was. If you change your CV later,
+            this copy does not change. A new download is rendered from this copy
+            and can differ slightly if a design changes later.
           </p>
           {frozen.photoOmitted && (
             <p className="tracker-muted">
@@ -96,11 +117,19 @@ export function FrozenDocumentDialog({
             </p>
           )}
           {frozen.content.kind === "cv" ? (
-            <div className="tracker-frozen-preview" aria-label="Frozen CV" role="region">
+            <div
+              className="tracker-frozen-preview"
+              aria-label="Frozen CV"
+              role="region"
+            >
               <ResumePreview doc={frozen.content.document} />
             </div>
           ) : (
-            <div className="tracker-frozen-letter" aria-label="Frozen cover letter" role="region">
+            <div
+              className="tracker-frozen-letter"
+              aria-label="Frozen cover letter"
+              role="region"
+            >
               {frozen.content.text}
             </div>
           )}

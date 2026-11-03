@@ -28,14 +28,27 @@ export function trackerApi(owner: string) {
         owner,
       ) as Promise<ApplicationSummary[]>,
     get: (id: string) =>
-      accountRequest(`/api/applications/${encodeURIComponent(id)}`, {}, owner) as Promise<ApplicationDetail>,
+      accountRequest(
+        `/api/applications/${encodeURIComponent(id)}`,
+        {},
+        owner,
+      ) as Promise<ApplicationDetail>,
     create: (input: CreateApplication) =>
       send("/api/applications", "POST", input) as Promise<ApplicationDetail>,
     update: (id: string, input: UpdateApplication) =>
-      send(`/api/applications/${encodeURIComponent(id)}`, "PATCH", input) as Promise<ApplicationDetail>,
-    remove: (id: string) => send(`/api/applications/${encodeURIComponent(id)}`, "DELETE"),
+      send(
+        `/api/applications/${encodeURIComponent(id)}`,
+        "PATCH",
+        input,
+      ) as Promise<ApplicationDetail>,
+    remove: (id: string) =>
+      send(`/api/applications/${encodeURIComponent(id)}`, "DELETE"),
     freeze: (id: string, input: FreezeDocument) =>
-      send(`/api/applications/${encodeURIComponent(id)}/documents`, "POST", input) as Promise<FrozenDocument>,
+      send(
+        `/api/applications/${encodeURIComponent(id)}/documents`,
+        "POST",
+        input,
+      ) as Promise<FrozenDocument>,
     document: (id: string, documentId: string) =>
       accountRequest(
         `/api/applications/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}`,
@@ -43,12 +56,20 @@ export function trackerApi(owner: string) {
         owner,
       ) as Promise<FrozenDocument>,
     submit: (id: string, input: CreateSubmission) =>
-      send(`/api/applications/${encodeURIComponent(id)}/submissions`, "POST", input) as Promise<{
+      send(
+        `/api/applications/${encodeURIComponent(id)}/submissions`,
+        "POST",
+        input,
+      ) as Promise<{
         submission: Submission;
         application: ApplicationDetail;
       }>,
     snapshot: (snapshotId: string) =>
-      accountRequest(`/api/exports/snapshots/${encodeURIComponent(snapshotId)}`, {}, owner) as Promise<{
+      accountRequest(
+        `/api/exports/snapshots/${encodeURIComponent(snapshotId)}`,
+        {},
+        owner,
+      ) as Promise<{
         id: string;
         kind: "cv" | "cover_letter";
         format: string;
@@ -58,7 +79,10 @@ export function trackerApi(owner: string) {
         claimed: boolean;
       }>,
     dismissSnapshot: (snapshotId: string) =>
-      send(`/api/exports/snapshots/${encodeURIComponent(snapshotId)}`, "DELETE"),
+      send(
+        `/api/exports/snapshots/${encodeURIComponent(snapshotId)}`,
+        "DELETE",
+      ),
   };
 }
 
@@ -96,13 +120,18 @@ export const handoffSchema = z.discriminatedUnion("kind", [
 export type Handoff = z.infer<typeof handoffSchema>;
 export function stashHandoff(handoff: Handoff) {
   try {
-    sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(handoffSchema.parse(handoff)));
+    sessionStorage.setItem(
+      HANDOFF_KEY,
+      JSON.stringify(handoffSchema.parse(handoff)),
+    );
   } catch {
     // Storage blocked: the destination opens without pre-filled fields.
   }
 }
 /** Reads and removes a handoff of the wanted kinds; anything else is left in place. */
-export function takeHandoff<K extends Handoff["kind"]>(...kinds: K[]): Extract<Handoff, { kind: K }> | null {
+export function takeHandoff<K extends Handoff["kind"]>(
+  ...kinds: K[]
+): Extract<Handoff, { kind: K }> | null {
   try {
     const raw = sessionStorage.getItem(HANDOFF_KEY);
     if (!raw) return null;

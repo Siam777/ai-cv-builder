@@ -66,8 +66,13 @@ export function ApplicationFieldset({
   disabled?: boolean;
   showStage?: boolean;
 }) {
-  const set = (key: keyof ApplicationFields) => (value: string) => onChange({ ...fields, [key]: value });
-  const input = (key: keyof ApplicationFields, label: string, props: Record<string, unknown> = {}) => (
+  const set = (key: keyof ApplicationFields) => (value: string) =>
+    onChange({ ...fields, [key]: value });
+  const input = (
+    key: keyof ApplicationFields,
+    label: string,
+    props: Record<string, unknown> = {},
+  ) => (
     <label className="tracker-field">
       {label}
       <input
@@ -81,8 +86,15 @@ export function ApplicationFieldset({
   );
   return (
     <div className="tracker-fields">
-      {input("company", "Company", { required: true, maxLength: APPLICATION_LIMITS.company, autoComplete: "organization" })}
-      {input("role", "Role", { required: true, maxLength: APPLICATION_LIMITS.role })}
+      {input("company", "Company", {
+        required: true,
+        maxLength: APPLICATION_LIMITS.company,
+        autoComplete: "organization",
+      })}
+      {input("role", "Role", {
+        required: true,
+        maxLength: APPLICATION_LIMITS.role,
+      })}
       {showStage && (
         <label className="tracker-field">
           Stage
@@ -100,12 +112,24 @@ export function ApplicationFieldset({
           </select>
         </label>
       )}
-      {input("location", "Location", { maxLength: APPLICATION_LIMITS.location })}
-      {input("jobUrl", "Link to the job post", { type: "url", maxLength: APPLICATION_LIMITS.url, placeholder: "https://" })}
-      {input("source", "Where you found it", { maxLength: APPLICATION_LIMITS.source, placeholder: "LinkedIn, a referral, the company site…" })}
+      {input("location", "Location", {
+        maxLength: APPLICATION_LIMITS.location,
+      })}
+      {input("jobUrl", "Link to the job post", {
+        type: "url",
+        maxLength: APPLICATION_LIMITS.url,
+        placeholder: "https://",
+      })}
+      {input("source", "Where you found it", {
+        maxLength: APPLICATION_LIMITS.source,
+        placeholder: "LinkedIn, a referral, the company site…",
+      })}
       {input("appliedAt", "Date applied", { type: "date" })}
       {input("nextActionAt", "Reminder date", { type: "date" })}
-      {input("nextAction", "Next action", { maxLength: APPLICATION_LIMITS.nextAction, placeholder: "Follow up with the recruiter" })}
+      {input("nextAction", "Next action", {
+        maxLength: APPLICATION_LIMITS.nextAction,
+        placeholder: "Follow up with the recruiter",
+      })}
       <div className="tracker-field wide">
         <label htmlFor={`${idPrefix}-notes`}>Notes</label>
         <textarea
@@ -118,7 +142,8 @@ export function ApplicationFieldset({
           aria-describedby={`${idPrefix}-notes-count`}
         />
         <small id={`${idPrefix}-notes-count`}>
-          {fields.notes.length.toLocaleString()} / {APPLICATION_LIMITS.notes.toLocaleString()} characters
+          {fields.notes.length.toLocaleString()} /{" "}
+          {APPLICATION_LIMITS.notes.toLocaleString()} characters
         </small>
       </div>
       <div className="tracker-field wide">
@@ -134,7 +159,8 @@ export function ApplicationFieldset({
           placeholder="Paste the job post to keep it with this application."
         />
         <small id={`${idPrefix}-jobPost-count`}>
-          {fields.jobPost.length.toLocaleString()} / {APPLICATION_LIMITS.jobPost.toLocaleString()} characters
+          {fields.jobPost.length.toLocaleString()} /{" "}
+          {APPLICATION_LIMITS.jobPost.toLocaleString()} characters
         </small>
       </div>
     </div>
@@ -157,7 +183,9 @@ export function ApplicationForm({
   attachment?: string;
   existing?: ApplicationSummary[];
   busy: boolean;
-  onSubmit: (choice: { existingId: string } | { fields: ApplicationFields }) => void;
+  onSubmit: (
+    choice: { existingId: string } | { fields: ApplicationFields },
+  ) => void;
   onCancel: () => void;
 }) {
   const [fields, setFields] = useState(initial);
@@ -168,18 +196,27 @@ export function ApplicationForm({
     else onSubmit({ fields });
   }
   return (
-    <form className="tracker-form" onSubmit={submit} aria-label="Application details">
+    <form
+      className="tracker-form"
+      onSubmit={submit}
+      aria-label="Application details"
+    >
       {attachment && (
         <p className="tracker-attachment">
           <strong>Attaching:</strong> {attachment}
           <br />
-          The copy you sent is kept as it was. If you change your CV later, this copy does not change.
+          The copy you sent is kept as it was. If you change your CV later, this
+          copy does not change.
         </p>
       )}
       {attachment && existing && existing.length > 0 && (
         <label className="tracker-field">
           Attach to
-          <select value={target} onChange={(event) => setTarget(event.target.value)} disabled={busy}>
+          <select
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            disabled={busy}
+          >
             <option value="new">A new application</option>
             {existing.map((app) => (
               <option key={app.id} value={app.id}>
@@ -190,7 +227,12 @@ export function ApplicationForm({
         </label>
       )}
       {target === "new" && (
-        <ApplicationFieldset fields={fields} onChange={setFields} idPrefix="new-application" disabled={busy} />
+        <ApplicationFieldset
+          fields={fields}
+          onChange={setFields}
+          idPrefix="new-application"
+          disabled={busy}
+        />
       )}
       <div className="button-row">
         <button type="submit" className="primary" disabled={busy}>

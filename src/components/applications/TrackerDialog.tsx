@@ -29,15 +29,28 @@ export function TrackerDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <section className={wide ? "modal-card tracker-dialog wide" : "modal-card tracker-dialog"}>
+      <section
+        className={
+          wide ? "modal-card tracker-dialog wide" : "modal-card tracker-dialog"
+        }
+      >
         <header className="modal-header">
           <h2>{title}</h2>
-          <button type="button" className="icon-button" onClick={onClose} aria-label={`Close ${title}`}>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label={`Close ${title}`}
+          >
             <X size={18} aria-hidden />
           </button>
         </header>
         <div className="modal-body tracker-dialog-body">{children}</div>
-        {footer && <footer className="modal-footer tracker-dialog-footer">{footer}</footer>}
+        {footer && (
+          <footer className="modal-footer tracker-dialog-footer">
+            {footer}
+          </footer>
+        )}
       </section>
     </div>
   );

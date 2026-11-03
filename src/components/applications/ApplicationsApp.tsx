@@ -17,8 +17,17 @@ import {
 } from "@/lib/applications";
 import type { AccountUser } from "@/lib/cloud-contract";
 import { accountRequest, CloudRequestError } from "@/lib/cloud-repository";
-import { stashHandoff, takeHandoff, trackerApi } from "@/lib/applications-client";
-import { ApplicationForm, emptyFields, fieldsToInput, type ApplicationFields } from "./ApplicationForm";
+import {
+  stashHandoff,
+  takeHandoff,
+  trackerApi,
+} from "@/lib/applications-client";
+import {
+  ApplicationForm,
+  emptyFields,
+  fieldsToInput,
+  type ApplicationFields,
+} from "./ApplicationForm";
 import { ApplicationDetailPanel, sentAtFor } from "./ApplicationDetailPanel";
 import { TrackerDialog } from "./TrackerDialog";
 
@@ -41,7 +50,9 @@ type SentState = {
   day: string;
 };
 const date = (day: string) =>
-  new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" });
+  new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
+    dateStyle: "medium",
+  });
 /** Only this page may be the return target of the sign-in page. */
 export const RETURN_PATTERN = /^\/applications(\?[A-Za-z0-9=&%_.-]*)?$/;
 
@@ -70,7 +81,9 @@ export function ApplicationsApp() {
     setToday(localDay());
     setReturnTo(window.location.pathname + window.location.search);
     void accountRequest("/api/account")
-      .then((value) => setUser((value as { user?: AccountUser | null }).user ?? null))
+      .then((value) =>
+        setUser((value as { user?: AccountUser | null }).user ?? null),
+      )
       .catch(() => setUser(null));
   }, []);
 
@@ -103,20 +116,34 @@ export function ApplicationsApp() {
           return;
         }
         const handoff = takeHandoff("job", "letter");
-        if (params.has("from")) window.history.replaceState(null, "", "/applications");
+        if (params.has("from"))
+          window.history.replaceState(null, "", "/applications");
         if (handoff?.kind === "job")
           setCreate({
             title: "Save this job",
-            initial: { ...emptyFields(), company: handoff.company, role: handoff.role, jobPost: handoff.post },
+            initial: {
+              ...emptyFields(),
+              company: handoff.company,
+              role: handoff.role,
+              jobPost: handoff.post,
+            },
             requestId: crypto.randomUUID(),
             freezeRequestId: crypto.randomUUID(),
           });
         else if (handoff?.kind === "letter")
           setCreate({
             title: "Attach this cover letter",
-            initial: { ...emptyFields(), company: handoff.company, role: handoff.role },
+            initial: {
+              ...emptyFields(),
+              company: handoff.company,
+              role: handoff.role,
+            },
             attachment: `Cover letter “${handoff.name}”, as edited`,
-            letter: { text: handoff.text, name: handoff.name, resumeId: handoff.resumeId },
+            letter: {
+              text: handoff.text,
+              name: handoff.name,
+              resumeId: handoff.resumeId,
+            },
             requestId: crypto.randomUUID(),
             freezeRequestId: crypto.randomUUID(),
           });
@@ -135,7 +162,11 @@ export function ApplicationsApp() {
     try {
       await task();
     } catch (reason) {
-      if (reason instanceof CloudRequestError && reason.code === "APPLICATION_CHANGED") await refresh().catch(() => {});
+      if (
+        reason instanceof CloudRequestError &&
+        reason.code === "APPLICATION_CHANGED"
+      )
+        await refresh().catch(() => {});
       setError((reason as Error).message);
     } finally {
       setBusy(false);
@@ -143,47 +174,72 @@ export function ApplicationsApp() {
   }
 
   function replace(next: ApplicationSummary) {
-    setApps((list) => (list ?? []).map((item) => (item.id === next.id ? { ...item, ...next } : item)));
+    setApps((list) =>
+      (list ?? []).map((item) =>
+        item.id === next.id ? { ...item, ...next } : item,
+      ),
+    );
   }
   const changeStage = (app: ApplicationSummary, stage: Stage) =>
     work(async () => {
       const next = await api!.update(app.id, {
         updatedAt: app.updatedAt,
         stage,
-        ...(stage === "applied" && !app.appliedAt ? { appliedAt: localDay() } : {}),
+        ...(stage === "applied" && !app.appliedAt
+          ? { appliedAt: localDay() }
+          : {}),
       });
       replace(next);
-      setNotice(`${app.role} at ${app.company} moved to ${STAGE_LABELS[stage]}.`);
+      setNotice(
+        `${app.role} at ${app.company} moved to ${STAGE_LABELS[stage]}.`,
+      );
     });
 
-  const submitCreate = (choice: { existingId: string } | { fields: ApplicationFields }) =>
+  const submitCreate = (
+    choice: { existingId: string } | { fields: ApplicationFields },
+  ) =>
     work(async () => {
       if (!create || !api) return;
       const app =
         "existingId" in choice
           ? await api.get(choice.existingId)
-          : await api.create({ requestId: create.requestId, ...fieldsToInput(choice.fields), contacts: [] });
+          : await api.create({
+              requestId: create.requestId,
+              ...fieldsToInput(choice.fields),
+              contacts: [],
+            });
       let document: FrozenDocument | null = null;
       if (create.snapshotId)
-        document = await api.freeze(app.id, { requestId: create.freezeRequestId, source: "snapshot", snapshotId: create.snapshotId });
+        document = await api.freeze(app.id, {
+          requestId: create.freezeRequestId,
+          source: "snapshot",
+          snapshotId: create.snapshotId,
+        });
       else if (create.letter)
         document = await api.freeze(app.id, {
           requestId: create.freezeRequestId,
           source: "letter",
           text: create.letter.text,
           name: create.letter.name,
-          ...(create.letter.resumeId ? { resumeId: create.letter.resumeId } : {}),
+          ...(create.letter.resumeId
+            ? { resumeId: create.letter.resumeId }
+            : {}),
         });
       await refresh();
       setCreate(null);
       if (document) {
         const latest = await api.get(app.id);
-        const cv = document.kind === "cv" ? document.id : ([...latest.documents].reverse().find((doc) => doc.kind === "cv")?.id ?? null);
+        const cv =
+          document.kind === "cv"
+            ? document.id
+            : ([...latest.documents].reverse().find((doc) => doc.kind === "cv")
+                ?.id ?? null);
         setSent({
           app: latest,
           document,
           cvDocumentId: cv,
-          letterDocumentId: document.kind === "cover_letter" ? document.id : null,
+          letterDocumentId:
+            document.kind === "cover_letter" ? document.id : null,
           requestId: crypto.randomUUID(),
           day: localDay(),
         });
@@ -193,7 +249,8 @@ export function ApplicationsApp() {
   const cancelCreate = () =>
     work(async () => {
       // Closing "Record this as an application?" discards the export receipt at once.
-      if (create?.snapshotId && api) await api.dismissSnapshot(create.snapshotId).catch(() => {});
+      if (create?.snapshotId && api)
+        await api.dismissSnapshot(create.snapshotId).catch(() => {});
       setCreate(null);
     });
 
@@ -220,14 +277,21 @@ export function ApplicationsApp() {
   if (user === null)
     return (
       <Shell>
-        <section className="tracker-signin" aria-labelledby="tracker-signin-title">
+        <section
+          className="tracker-signin"
+          aria-labelledby="tracker-signin-title"
+        >
           <h2 id="tracker-signin-title">Sign in to track applications</h2>
           <p>
-            The tracker keeps the jobs you apply for, their stage, notes, contacts, reminders and a frozen copy of the
-            CV and letter you sent. It needs an account so this information is stored safely and only you can see it.
-            It is free on every plan.
+            The tracker keeps the jobs you apply for, their stage, notes,
+            contacts, reminders and a frozen copy of the CV and letter you sent.
+            It needs an account so this information is stored safely and only
+            you can see it. It is free on every plan.
           </p>
-          <Link className="button-link primary" href={`/profile?return=${encodeURIComponent(returnTo)}`}>
+          <Link
+            className="button-link primary"
+            href={`/profile?return=${encodeURIComponent(returnTo)}`}
+          >
             Sign in
           </Link>
         </section>
@@ -236,14 +300,17 @@ export function ApplicationsApp() {
 
   const list = apps ?? [];
   const due = list
-    .filter((app) => !CLOSED_STAGES.includes(app.stage) && dueState(app.nextActionAt, today))
+    .filter(
+      (app) =>
+        !CLOSED_STAGES.includes(app.stage) && dueState(app.nextActionAt, today),
+    )
     .sort((a, b) => (a.nextActionAt ?? "").localeCompare(b.nextActionAt ?? ""));
   return (
     <Shell>
       <div className="tracker-toolbar">
         <p className="tracker-muted">
-          {list.length} of 500 applications. Nothing is sent to employers or job boards: the app never applies or
-          contacts anyone for you.
+          {list.length} of 500 applications. Nothing is sent to employers or job
+          boards: the app never applies or contacts anyone for you.
         </p>
         <button
           type="button"
@@ -275,19 +342,31 @@ export function ApplicationsApp() {
           Due <span className="tracker-count">{due.length}</span>
         </h2>
         {due.length === 0 ? (
-          <p className="tracker-muted">Nothing is due today. Set a reminder date on an application to see it here.</p>
+          <p className="tracker-muted">
+            Nothing is due today. Set a reminder date on an application to see
+            it here.
+          </p>
         ) : (
           <ul>
             {due.map((app) => {
               const state = dueState(app.nextActionAt, today);
               return (
                 <li key={app.id}>
-                  <button type="button" className="due-item" onClick={() => setOpenId(app.id)}>
-                    <span className={state === "overdue" ? "due-badge overdue" : "due-badge"}>
+                  <button
+                    type="button"
+                    className="due-item"
+                    onClick={() => setOpenId(app.id)}
+                  >
+                    <span
+                      className={
+                        state === "overdue" ? "due-badge overdue" : "due-badge"
+                      }
+                    >
                       {state === "overdue" ? "Overdue" : "Due today"}
                     </span>
                     <span>
-                      {app.nextAction || "Next action"} · {app.role} at {app.company}
+                      {app.nextAction || "Next action"} · {app.role} at{" "}
+                      {app.company}
                     </span>
                   </button>
                 </li>
@@ -303,7 +382,8 @@ export function ApplicationsApp() {
         <section className="tracker-empty">
           <h2>No applications yet</h2>
           <p>
-            Add a job you are applying for, or export a CV from the editor and choose “Record this as an application”.
+            Add a job you are applying for, or export a CV from the editor and
+            choose “Record this as an application”.
           </p>
         </section>
       ) : (
@@ -311,9 +391,14 @@ export function ApplicationsApp() {
           const rows = list.filter((app) => group.stages.includes(app.stage));
           if (!rows.length) return null;
           return (
-            <section key={group.id} className="tracker-group" aria-labelledby={`group-${group.id}`}>
+            <section
+              key={group.id}
+              className="tracker-group"
+              aria-labelledby={`group-${group.id}`}
+            >
               <h2 id={`group-${group.id}`}>
-                {group.label} <span className="tracker-count">{rows.length}</span>
+                {group.label}{" "}
+                <span className="tracker-count">{rows.length}</span>
               </h2>
               <table className="tracker-table">
                 <thead>
@@ -340,14 +425,20 @@ export function ApplicationsApp() {
                             <strong>{app.company}</strong>
                             <span>{app.role}</span>
                           </button>
-                          {noReplyYet(app) && <span className="tracker-muted no-reply">No reply yet</span>}
+                          {noReplyYet(app) && (
+                            <span className="tracker-muted no-reply">
+                              No reply yet
+                            </span>
+                          )}
                         </td>
                         <td data-label="Stage">
                           <select
                             aria-label={`Stage for ${app.role} at ${app.company}`}
                             value={app.stage}
                             disabled={busy}
-                            onChange={(event) => void changeStage(app, event.target.value as Stage)}
+                            onChange={(event) =>
+                              void changeStage(app, event.target.value as Stage)
+                            }
                           >
                             {STAGES.map((stage) => (
                               <option key={stage} value={stage}>
@@ -356,13 +447,22 @@ export function ApplicationsApp() {
                             ))}
                           </select>
                         </td>
-                        <td data-label="Applied">{app.appliedAt ? date(app.appliedAt) : "—"}</td>
+                        <td data-label="Applied">
+                          {app.appliedAt ? date(app.appliedAt) : "—"}
+                        </td>
                         <td data-label="Next action">
                           {app.nextActionAt ? (
                             <>
-                              {app.nextAction || "Reminder"} · {date(app.nextActionAt)}
+                              {app.nextAction || "Reminder"} ·{" "}
+                              {date(app.nextActionAt)}
                               {state && (
-                                <span className={state === "overdue" ? "due-badge overdue" : "due-badge"}>
+                                <span
+                                  className={
+                                    state === "overdue"
+                                      ? "due-badge overdue"
+                                      : "due-badge"
+                                  }
+                                >
                                   {state === "overdue" ? "Overdue" : "Due"}
                                 </span>
                               )}
@@ -372,7 +472,9 @@ export function ApplicationsApp() {
                           )}
                         </td>
                         <td data-label="Sent">
-                          {app.sentCount === 1 ? "1 time" : `${app.sentCount} times`}
+                          {app.sentCount === 1
+                            ? "1 time"
+                            : `${app.sentCount} times`}
                         </td>
                       </tr>
                     );
@@ -385,7 +487,11 @@ export function ApplicationsApp() {
       )}
 
       {create && (
-        <TrackerDialog title={create.title} onClose={() => void cancelCreate()} wide>
+        <TrackerDialog
+          title={create.title}
+          onClose={() => void cancelCreate()}
+          wide
+        >
           {error && (
             <p className="alert" role="alert">
               {error}
@@ -408,14 +514,25 @@ export function ApplicationsApp() {
           footer={
             <>
               {sent.cvDocumentId && (
-                <button type="button" className="primary" disabled={busy || !sent.day} onClick={() => void confirmSent()}>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={busy || !sent.day}
+                  onClick={() => void confirmSent()}
+                >
                   Yes, I sent it
                 </button>
               )}
-              <button type="button" disabled={busy} onClick={() => {
-                setNotice(`${sent.app.role} at ${sent.app.company}: copy kept. Mark it as sent from the application when you send it.`);
-                setSent(null);
-              }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setNotice(
+                    `${sent.app.role} at ${sent.app.company}: copy kept. Mark it as sent from the application when you send it.`,
+                  );
+                  setSent(null);
+                }}
+              >
                 Not yet
               </button>
             </>
@@ -427,8 +544,9 @@ export function ApplicationsApp() {
             </p>
           )}
           <p>
-            “{sent.document.name}” is kept with {sent.app.role} at {sent.app.company}. Saving a copy is not the same
-            as sending it: confirm only once you have sent it.
+            “{sent.document.name}” is kept with {sent.app.role} at{" "}
+            {sent.app.company}. Saving a copy is not the same as sending it:
+            confirm only once you have sent it.
           </p>
           {sent.cvDocumentId ? (
             <label className="tracker-field">
@@ -437,11 +555,15 @@ export function ApplicationsApp() {
                 type="date"
                 value={sent.day}
                 max={localDay()}
-                onChange={(event) => setSent({ ...sent, day: event.target.value })}
+                onChange={(event) =>
+                  setSent({ ...sent, day: event.target.value })
+                }
               />
             </label>
           ) : (
-            <p className="tracker-muted">Attach the CV you sent to this application to mark it as sent.</p>
+            <p className="tracker-muted">
+              Attach the CV you sent to this application to mark it as sent.
+            </p>
           )}
         </TrackerDialog>
       )}
@@ -456,7 +578,12 @@ export function ApplicationsApp() {
             setNotice("Application deleted.");
           }}
           onMatch={(app) => {
-            stashHandoff({ kind: "match", company: app.company, role: app.role, post: app.jobPost ?? "" });
+            stashHandoff({
+              kind: "match",
+              company: app.company,
+              role: app.role,
+              post: app.jobPost ?? "",
+            });
             window.location.assign("/builder");
           }}
           onClose={() => {
@@ -485,7 +612,11 @@ function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/builder" className="header-nav-link">
             My CVs
           </Link>
-          <Link href="/applications" className="header-nav-link" aria-current="page">
+          <Link
+            href="/applications"
+            className="header-nav-link"
+            aria-current="page"
+          >
             Applications
           </Link>
           <Link href="/help#applications" className="header-nav-link">
