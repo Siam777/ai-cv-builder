@@ -12,6 +12,15 @@ import { createRepository } from "@/lib/repository";
 import type { AccountUser } from "@/lib/cloud-contract";
 import { ArrowLeft } from "lucide-react";
 
+/** After sign-in, return to the tracker when it sent the person here. */
+function returnTarget() {
+  if (typeof window === "undefined") return null;
+  const target = new URLSearchParams(window.location.search).get("return");
+  return target && /^\/applications(\?[A-Za-z0-9=&%_.-]*)?$/.test(target)
+    ? target
+    : null;
+}
+
 function requestedTab(): AccountTab {
   if (typeof window === "undefined") return "profile";
   const tab = new URLSearchParams(window.location.search).get("tab");
@@ -53,6 +62,9 @@ export default function ProfilePage() {
           <Link href="/builder" className="header-nav-link">
             My CVs
           </Link>
+          <Link href="/applications" className="header-nav-link">
+            Applications
+          </Link>
           <Link href="/pricing" className="header-nav-link">
             Pricing
           </Link>
@@ -79,6 +91,8 @@ export default function ProfilePage() {
             }}
             onAuthenticated={async (user) => {
               setCloudUser(user);
+              const target = returnTarget();
+              if (target) window.location.assign(target);
             }}
             onSignedOut={async () => {
               setCloudUser(null);
