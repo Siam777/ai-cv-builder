@@ -9,6 +9,8 @@ import { handle, HttpError, readJson, requireSameOrigin } from "./http";
 import { renderResumeHtml, renderResumePdf } from "./pdf-generator";
 import { checkRateLimit } from "./rate-limiter";
 import { letterDocument } from "../letter-layout";
+import { createDocument } from "../document";
+import { exportReceipt, getFrozenDocument } from "./applications";
 
 export function handleExport(request: Request, pdfOnly = false) {
   return handle(async () => {
@@ -23,10 +25,32 @@ export function handleExport(request: Request, pdfOnly = false) {
     const input = exportRequestSchema.parse(await readJson(request, 4_000_000));
     if (pdfOnly && (input.kind !== "resume" || input.format !== "pdf"))
       throw new HttpError(400, "PDF_REQUIRED", "Choose PDF for this endpoint.");
-    const doc =
-      input.source.storage === "account"
+    const frozen =
+      input.source.storage === "frozen"
+        ? await getFrozenDocument(
+            user.id,
+            input.source.applicationId,
+            input.source.documentId,
+          )
+        : null;
+    if (frozen && (frozen.kind === "cv") !== (input.kind === "resume"))
+      throw new HttpError(
+        400,
+        "EXPORT_KIND",
+        "Choose a CV export for a frozen CV and a letter export for a frozen letter.",
+      );
+    if (frozen?.content.kind === "cover_letter" && input.kind === "letter") {
+      // A frozen letter is exported exactly as it was kept.
+      input.text = frozen.content.text;
+      input.name = frozen.content.name;
+    }
+    const doc = frozen
+      ? (frozen.content.document ?? createDocument())
+      : input.source.storage === "account"
         ? await getResume(user.id, input.source.documentId)
-        : input.source.document;
+        : input.source.storage === "device"
+          ? input.source.document
+          : createDocument();
     if (
       input.source.storage === "account" &&
       doc.revision !== input.source.revision
@@ -91,6 +115,7 @@ export function handleExport(request: Request, pdfOnly = false) {
         "WORKSPACE_CHANGED",
         "The account changed. Sign in again before exporting.",
       );
+    const snapshotId = frozen ? null : await exportReceipt(user.id, input, doc);
     const name =
       (input.kind === "letter" ? input.name : doc.name)
         .replace(/[^\p{L}\p{N} _-]/gu, "")
@@ -106,6 +131,7 @@ export function handleExport(request: Request, pdfOnly = false) {
           "Cache-Control": "private, no-store",
           Vary: "Cookie",
           "X-Content-Type-Options": "nosniff",
+          ...(snapshotId ? { "X-Export-Snapshot": snapshotId } : {}),
         },
       },
     );

@@ -94,6 +94,8 @@ import {
 import type { ExportRequest, ExportSource } from "@/lib/export-contract";
 import { normalizePlanId, type PlanId } from "@/lib/billing-plans";
 import type { StartingDesign } from "@/lib/public-catalog";
+import { CLOSED_STAGES, localDay, type ApplicationSummary } from "@/lib/applications";
+import { stashHandoff, takeHandoff, trackerApi, type Handoff } from "@/lib/applications-client";
 import type { FocusTarget, SaveState } from "./editor/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
@@ -204,6 +206,12 @@ export function ResumeStudio({
     days: 0,
   });
   const [cloudUser, setCloudUser] = useState<AccountUser | null>(null);
+  // Application tracker: reminders due for the account menu badge, the
+  // "Record this as an application?" prompt after an export, and a job sent
+  // from an application to Match a job.
+  const [applicationsDue, setApplicationsDue] = useState(0);
+  const [recordPrompt, setRecordPrompt] = useState<{ snapshotId: string; owner: string; letter: boolean } | null>(null);
+  const [matchHandoff, setMatchHandoff] = useState<Extract<Handoff, { kind: "match" }> | null>(null);
   // Browser CVs never copied to the signed-in account (one-time banner).
   // CVs saved in this browser while signed in: all of them, and the ones that
   // can still be copied (own CVs never copied before).
@@ -749,6 +757,54 @@ export function ResumeStudio({
     staged,
   ]);
 
+  useEffect(() => {
+    const owner = sessionUser?.id;
+    if (!owner) {
+      setApplicationsDue(0);
+      return;
+    }
+    let active = true;
+    trackerApi(owner)
+      .list(localDay())
+      .then((list: ApplicationSummary[]) => {
+        if (active) setApplicationsDue(list.filter((app) => !CLOSED_STAGES.includes(app.stage)).length);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [sessionUser?.id]);
+  useEffect(() => {
+    const handoff = takeHandoff("match");
+    if (handoff) {
+      setMatchHandoff(handoff);
+      setNotice(
+        `Open the CV to compare with ${handoff.role} at ${handoff.company}. Match a job opens with the post filled in.`,
+      );
+    }
+  }, []);
+  // "Match this job" from an application opens Match a job on the open CV.
+  const matchShown = useRef(false);
+  useEffect(() => {
+    if (!matchHandoff || !doc || showLibrary || showStart) return;
+    if (!matchShown.current) {
+      matchShown.current = true;
+      setActivePanel("ai");
+    } else if (activePanel !== "ai") setMatchHandoff(null); // Used once.
+  }, [matchHandoff, doc, showLibrary, showStart, activePanel]);
+
+  /** Leaves the editor after saving pending edits. */
+  function leaveTo(href: string) {
+    void action(async () => {
+      window.location.assign(href);
+    });
+  }
+  function dismissRecordPrompt() {
+    const prompt = recordPrompt;
+    setRecordPrompt(null);
+    if (prompt) void trackerApi(prompt.owner).dismissSnapshot(prompt.snapshotId).catch(() => {});
+  }
+
   async function action(work: () => Promise<void>) {
     setBusy(true);
     setNotice("");
@@ -1203,7 +1259,7 @@ export function ResumeStudio({
       } else {
         if (
           !window.confirm(
-            "Send this CV snapshot to the server to prepare your export? This request does not save or change a CV in your account. Your current draft stays in the editor.",
+            "Send this CV snapshot to the server to prepare your export? This request does not save or change a CV in your account. A copy of what you export is kept in your account for up to 7 days so you can record it as an application; dismissing the prompt deletes it. Your current draft stays in the editor.",
           )
         ) {
           setPendingExport(null);
@@ -1233,6 +1289,13 @@ export function ResumeStudio({
         await navigator.clipboard.writeText(await artifact.blob.text());
       else downloadArtifact(artifact.blob, artifact.filename);
       setPendingExport(null);
+      if (recordPrompt && recordPrompt.snapshotId !== artifact.snapshotId)
+        void trackerApi(recordPrompt.owner).dismissSnapshot(recordPrompt.snapshotId).catch(() => {});
+      setRecordPrompt(
+        artifact.snapshotId
+          ? { snapshotId: artifact.snapshotId, owner: user.id, letter: Boolean(pending.letter) }
+          : null,
+      );
       setNotice(
         pending.format === "copy"
           ? "Cover letter copied."
@@ -1678,6 +1741,7 @@ export function ResumeStudio({
         onOpenPricing={() => setShowPricing(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
         isSubscriber={isSubscriber}
+        applicationsDue={applicationsDue}
         onNavigate={(href) => {
           void action(async () => {
             window.location.assign(href);
@@ -2016,6 +2080,26 @@ export function ResumeStudio({
             {notice}
           </p>
         )}
+        {recordPrompt && (
+          <div className="notice record-prompt no-print" role="region" aria-label="Record this export">
+            <p>
+              <strong>Record this as an application?</strong> The exact{" "}
+              {recordPrompt.letter ? "letter" : "CV"} you just exported is kept for 7 days so you can attach it to a
+              job you apply for.
+            </p>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => leaveTo(`/applications?snapshot=${encodeURIComponent(recordPrompt.snapshotId)}`)}
+            >
+              Record as an application
+            </button>
+            <button type="button" disabled={busy} onClick={dismissRecordPrompt}>
+              Not now
+            </button>
+          </div>
+        )}
         {reviewedVariantUndo?.variantId === doc?.id && !showLibrary && (
           <div className="notice no-print" role="status">
             Your original CV is kept. Undo removes this variant only if it has
@@ -2320,6 +2404,7 @@ export function ResumeStudio({
                     <FieldAiProvider value={fieldAiServices!}>
                     <AIPanel
                       key={`${cloudUser?.id ?? "local"}:${doc.id}`}
+                      initialTab={matchHandoff ? "job" : undefined}
                       doc={doc}
                       owner={cloudUser?.id ?? null}
                       availability={rewriteAvailability}
@@ -2360,6 +2445,11 @@ export function ResumeStudio({
                           }}
                           onApplyTailoredVariant={applyTailoredVariant}
                           onClose={() => setShowAI(false)}
+                          initialJob={matchHandoff ?? undefined}
+                          onSaveToApplications={(job) => {
+                            stashHandoff({ kind: "job", ...job, resumeId: cloudUser ? doc.id : undefined });
+                            leaveTo("/applications?from=job");
+                          }}
                         />
                       }
                       letterTab={
@@ -2387,6 +2477,14 @@ export function ResumeStudio({
                             };
                             setPendingExport(pending);
                             void performExport(pending);
+                          }}
+                          onAttachToApplication={(letter) => {
+                            stashHandoff({
+                              kind: "letter",
+                              ...letter,
+                              resumeId: cloudUser ? doc.id : undefined,
+                            });
+                            leaveTo("/applications?from=letter");
                           }}
                         />
                         )

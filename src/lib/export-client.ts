@@ -24,6 +24,8 @@ export async function requestExport(input: ExportRequest, owner: string) {
   return {
     blob: await response.blob(),
     filename: filename ? decodeURIComponent(filename) : "resume",
+    /** Export receipt kept for 7 days so the download can be recorded as an application. */
+    snapshotId: response.headers.get("X-Export-Snapshot"),
   };
 }
 

@@ -38,6 +38,10 @@ export interface JobTailorModalProps {
   canCreateCopy?: boolean;
   /** AI coaching per requirement (Pro). */
   canCoach?: boolean;
+  /** A job sent from the application tracker ("Match this job"). */
+  initialJob?: { company: string; role: string; post: string };
+  /** "Save this job to applications": hands the job to the tracker. */
+  onSaveToApplications?: (job: { company: string; role: string; post: string }) => void;
   onSeePlans?: () => void;
 }
 const statusLabels = {
@@ -58,12 +62,14 @@ export function JobTailorModal({
   canCreateCopy = true,
   canCoach = true,
   onSeePlans,
+  initialJob,
+  onSaveToApplications,
 }: JobTailorModalProps) {
   useBodyScrollLock(!embedded);
   const dialogRef = useModalFocus(onClose, !embedded);
-  const [jobTitle, setJobTitle] = useState(""),
-    [company, setCompany] = useState(""),
-    [jobDescription, setJobDescription] = useState("");
+  const [jobTitle, setJobTitle] = useState(initialJob?.role.slice(0, 200) ?? ""),
+    [company, setCompany] = useState(initialJob?.company.slice(0, 200) ?? ""),
+    [jobDescription, setJobDescription] = useState(initialJob?.post.slice(0, 20000) ?? "");
   const [seniority, setSeniority] = useState("Not specified"),
     [language, setLanguage] = useState<"english" | "other">("english");
   const [targetConfirmed, setTargetConfirmed] = useState(false),
@@ -298,6 +304,26 @@ export function JobTailorModal({
                 Use this target role, seniority and language
               </label>
               <AiJobMatch job={{ title: jobTitle, company, post: jobDescription }} />
+              {onSaveToApplications && (
+                <div className="save-job-row">
+                  <button
+                    type="button"
+                    disabled={!jobTitle.trim() || !company.trim()}
+                    onClick={() =>
+                      onSaveToApplications({
+                        company: company.trim().slice(0, 200),
+                        role: jobTitle.trim().slice(0, 200),
+                        post: jobDescription.slice(0, 30000),
+                      })
+                    }
+                  >
+                    Save this job to applications
+                  </button>
+                  {(!jobTitle.trim() || !company.trim()) && (
+                    <p className="helper-text">Add the job title and company to save this job.</p>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="tailor-results-stage">

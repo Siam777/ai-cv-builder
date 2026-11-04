@@ -2,6 +2,7 @@
 
 import type { MouseEvent } from "react";
 import {
+  BriefcaseBusiness,
   CircleHelp,
   CreditCard,
   FolderOpen,
@@ -34,6 +35,8 @@ export interface EditorHeaderProps {
   onSignOut?: () => void;
   isSubscriber?: boolean;
   onNavigate?: (href: string) => void;
+  /** Tracker reminders due today or overdue (signed in only). */
+  applicationsDue?: number;
 }
 
 export function EditorHeader({
@@ -53,6 +56,7 @@ export function EditorHeader({
   onSignOut,
   isSubscriber = false,
   onNavigate,
+  applicationsDue = 0,
 }: EditorHeaderProps) {
   function navigate(event: MouseEvent<HTMLAnchorElement>) {
     if (!onNavigate || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
@@ -71,6 +75,12 @@ export function EditorHeader({
     ...(onOpenLibrary
       ? [{ label: "My CVs", icon: <FolderOpen size={16} aria-hidden />, onSelect: onOpenLibrary }]
       : []),
+    {
+      label: "Applications",
+      hint: applicationsDue > 0 ? `${applicationsDue} due` : sessionUser ? "Track your job applications" : "Sign in to track applications",
+      icon: <BriefcaseBusiness size={16} aria-hidden />,
+      onSelect: go("/applications"),
+    },
     sessionUser
       ? { label: "Account settings", icon: <Settings size={16} aria-hidden />, onSelect: onOpenAccount }
       : { label: "Sign in", hint: "Back up your CVs", icon: <LogIn size={16} aria-hidden />, onSelect: onOpenAccount },
@@ -105,6 +115,9 @@ export function EditorHeader({
               My CVs
             </button>
           )}
+          <a href="/applications" onClick={navigate} className="header-nav-link">
+            Applications
+          </a>
           <a href="/templates" onClick={navigate} className="header-nav-link">
             Templates
           </a>
@@ -126,13 +139,20 @@ export function EditorHeader({
             </button>
           )}
           <Menu
-            ariaLabel="Account menu"
+            ariaLabel={
+              applicationsDue > 0
+                ? `Account menu, ${applicationsDue} application reminder${applicationsDue === 1 ? "" : "s"} due`
+                : "Account menu"
+            }
             className="account-menu"
             align="end"
             disabled={busy || !ready || showAccount}
             label={
-              <span className={initial ? "avatar" : "avatar signed-out"} aria-hidden="true">
-                {initial ?? <UserRound size={18} aria-hidden />}
+              <span className="account-menu-label" aria-hidden="true">
+                <span className={initial ? "avatar" : "avatar signed-out"}>
+                  {initial ?? <UserRound size={18} aria-hidden />}
+                </span>
+                {applicationsDue > 0 && <span className="menu-due-badge">{applicationsDue}</span>}
               </span>
             }
             header={

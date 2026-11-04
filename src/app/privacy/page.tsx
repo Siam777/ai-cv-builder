@@ -139,6 +139,37 @@ export default function Privacy() {
           export. Coaching does not change local coverage counts or verify
           qualifications.
         </p>
+        <h2>Application tracker</h2>
+        <p>
+          If you use <Link href="/applications">Applications</Link>, your
+          account stores the jobs you add (company, role, link, location, where
+          you found it, the job post you paste), their stages and dates, your
+          notes, reminders, the recruiter and other contacts you enter, frozen
+          copies of the CVs and cover letters you attach, and a record of when
+          you marked one as sent. All of it is included in account-data export
+          and deleted with your account; deleting an application deletes its
+          notes, contacts and frozen copies.
+        </p>
+        <p>
+          Contacts are personal data about other people. Only add what they
+          would expect you to keep. The app only stores what you enter: contacts
+          are never sent to AI, never messaged, and never imported from email or
+          LinkedIn.
+        </p>
+        <p>
+          When you export a CV or cover letter while signed in, a copy of
+          exactly what was exported is kept in your account for up to 7 days so
+          you can record it as an application. At most 20 unused copies are
+          kept (the oldest is removed first), choosing <strong>Not now</strong>{" "}
+          deletes the copy at once, and expired copies are deleted
+          automatically. JSON backups and account-data downloads keep no copy.
+          These copies are included in account-data export while they exist.
+        </p>
+        <p>
+          Nothing is sent to employers or job boards. The app never applies for
+          jobs or contacts anyone for you. Logs record only metadata such as the
+          stage and counts, never company names, notes or contacts.
+        </p>
         <h2>Export or delete account data</h2>
         <p>
           <Link href="/profile">Account settings</Link> offers an authenticated
