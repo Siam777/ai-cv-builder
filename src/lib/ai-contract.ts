@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { JOB_POST_MAX, JOB_POST_MESSAGE, charCount, type JobReadResult } from "./job-read";
 import { documentSchema, type ResumeDocument } from "./document";
 import type { TidyOperation } from "./import-tidy";
 import { bulletEvidence } from "./ai-proposals";
@@ -469,12 +470,33 @@ export const jobPostSchema = z.strictObject({
 });
 export type JobPost = z.infer<typeof jobPostSchema>;
 
+/**
+ * A requirement the person reviewed on an application (job capture §4.3).
+ * Given requirements are not extracted again: the model only cites evidence
+ * for each one, by ID, and the priority always comes from the request.
+ */
+export const givenRequirementSchema = z.strictObject({
+  id: z.string().min(1).max(100),
+  text: z.string().trim().min(1).max(300),
+  priority: z.enum(["required", "preferred"]),
+});
+export type GivenRequirement = z.infer<typeof givenRequirementSchema>;
+
 /** Match a job post with AI (Go and Pro). */
 export const jobMatchRequestSchema = z.strictObject({
   requestId: z.uuid(),
   documentId: z.string().min(1).max(100),
   revision: z.number().int().nonnegative(),
   job: jobPostSchema,
+  /** Reviewed requirements, at most 15, in the person's order. */
+  requirements: z
+    .array(givenRequirementSchema)
+    .min(1)
+    .max(15)
+    .refine((rows) => new Set(rows.map((row) => row.id)).size === rows.length, "Duplicate requirement ID")
+    .optional(),
+  /** True when the client cut a longer post to its first 12,000 characters. */
+  postTruncated: z.boolean().optional(),
 });
 export type JobMatchRequest = z.infer<typeof jobMatchRequestSchema>;
 export const jobMatchDraftSchema = z.strictObject({
@@ -483,6 +505,17 @@ export const jobMatchDraftSchema = z.strictObject({
       z.strictObject({
         text: z.string().max(200),
         priority: z.enum(["required", "preferred"]),
+        evidenceIds: z.array(z.string().max(100)).max(3),
+      }),
+    )
+    .max(15),
+});
+/** With given requirements: evidence per requirement ID, same IDs, same order. */
+export const jobMatchGivenDraftSchema = z.strictObject({
+  requirements: z
+    .array(
+      z.strictObject({
+        id: z.string().max(100),
         evidenceIds: z.array(z.string().max(100)).max(3),
       }),
     )
@@ -567,6 +600,48 @@ export interface TailorResult {
   }[];
   withheld: number;
 }
+
+/** Read a pasted job post with AI (job capture phase B). The CV is never part of this request. */
+export const jobReadRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  post: z
+    .string()
+    .trim()
+    .min(1, "Paste the job post first.")
+    .refine((post) => charCount(post) <= JOB_POST_MAX, JOB_POST_MESSAGE),
+  url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((url) => url === "" || /^https?:\/\/\S+$/i.test(url), "Use a link that starts with http:// or https://.")
+    .optional(),
+});
+export type JobReadRequest = z.infer<typeof jobReadRequestSchema>;
+const readFieldDraft = z.strictObject({ value: z.string().max(2000), quote: z.string().max(2000) });
+/** What the model returns: every field and requirement with the words it came from. */
+export const jobReadDraftSchema = z.strictObject({
+  fields: z.strictObject({
+    role: readFieldDraft,
+    company: readFieldDraft,
+    location: readFieldDraft,
+    workType: readFieldDraft,
+    employmentType: readFieldDraft,
+    salary: readFieldDraft,
+    deadline: readFieldDraft,
+    applyLink: readFieldDraft,
+  }),
+  requirements: z
+    .array(
+      z.strictObject({
+        text: z.string().max(600),
+        kind: z.enum(["must", "nice", "unstated"]),
+        quote: z.string().max(1000),
+      }),
+    )
+    .max(40),
+});
+export type JobReadDraft = z.infer<typeof jobReadDraftSchema>;
+export type JobReadResponse = JobReadResult & { requestId: string };
 
 const FILLER = new Set(["and", "the", "with", "for", "from", "into", "your", "you", "our", "are", "who", "will", "able"]);
 /**

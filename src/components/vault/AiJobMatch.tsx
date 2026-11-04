@@ -7,6 +7,7 @@ import { AiBlocked, AiConsent } from "../editor/AiGate";
 import { AiProgress } from "../editor/AiProgress";
 import { rewriteStatus } from "@/lib/ai-access";
 import type {
+  GivenRequirement,
   GapLineResult,
   JobMatchResult,
   TailorResult,
@@ -46,7 +47,8 @@ type Stage =
 export function AiJobMatch({
   job,
 }: {
-  job: { title: string; company: string; post: string };
+  /** requirements: the person's reviewed requirements from an application (first 15, in order). */
+  job: { title: string; company: string; post: string; requirements?: GivenRequirement[] };
 }) {
   const ai = useFieldAi();
   const [state, setState] = useState<Stage>({ stage: "idle" });
@@ -77,6 +79,8 @@ export function AiJobMatch({
     ...(job.company.trim() ? { company: job.company.trim().slice(0, 120) } : {}),
     post: job.post.trim().slice(0, 12000),
   };
+  const given = job.requirements?.slice(0, 15) ?? [];
+  const postTruncated = job.post.trim().length > 12000;
 
   function failed(error: unknown, next: "match" | "tailor") {
     if (error instanceof CloudRequestError && error.code === "AI_CONSENT_REQUIRED")
@@ -112,6 +116,7 @@ export function AiJobMatch({
             documentId: snapshot.id,
             revision: snapshot.revision,
             job: jobBody,
+            ...(given.length ? { requirements: given, postTruncated } : {}),
           }),
         },
         services.owner ?? undefined,
@@ -290,6 +295,12 @@ export function AiJobMatch({
         />
       ) : (
         <>
+          {given.length > 0 && (
+            <p className="field-ai-help" data-testid="given-requirements">
+              Uses the {given.length} requirement{given.length === 1 ? "" : "s"} you reviewed on your application,
+              with your priorities{postTruncated ? "; the post itself is sent shortened to 12,000 characters" : ""}.
+            </p>
+          )}
           <p className="field-ai-help">
             AI lists what the post asks for, quotes where your CV already shows
             it, and lists the gaps. Nothing is added unless you write it.
