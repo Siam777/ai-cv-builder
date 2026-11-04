@@ -973,6 +973,7 @@ test("npm run db:setup applies 008 once on an existing database and records its 
       false,
     );
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    // Windows keeps the libsql file handle briefly after close(): retry the cleanup.
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

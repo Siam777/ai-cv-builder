@@ -86,7 +86,9 @@ test("export → record as an application → stage → reminder due → frozen 
 
   // Then: "Did you send it?" creates the submission.
   const sent = page.getByRole("dialog", { name: "Did you send it?" });
-  await expect(sent).toBeVisible();
+  // Saving runs create → freeze → reload; the first call to each route compiles
+  // it on the e2e dev server, which can take more than 5 s under parallel load.
+  await expect(sent).toBeVisible({ timeout: 20_000 });
   await sent.getByRole("button", { name: "Yes, I sent it" }).click();
   await expect(sent).toBeHidden();
   await expect(
