@@ -213,7 +213,7 @@ test("Not now discards the export copy; Match a job saves the job to application
   await expect(form.getByLabel("Job post", { exact: true })).toHaveValue(
     "Requirements:\nSQL\nDashboards",
   );
-  await form.getByRole("button", { name: "Save application" }).click();
+  await form.getByRole("button", { name: "Save to applications" }).click();
   await expect(page.getByRole("region", { name: /^Saved/ })).toContainText(
     "Example Analytics",
   );
@@ -221,11 +221,11 @@ test("Not now discards the export copy; Match a job saves the job to application
   const detail = await api(page, owner.id, `/api/applications/${saved.id}`);
   expect(detail.jobPost).toBe("Requirements:\nSQL\nDashboards");
 
-  // "Match this job" opens the editor's Match a job tab with the post filled in.
+  // "Match my CV" opens the editor's Match a job tab with the post filled in.
   await page
     .getByRole("button", { name: "Open Data Analyst at Example Analytics" })
     .click();
-  await page.getByRole("button", { name: "Match this job" }).click();
+  await page.getByRole("button", { name: "Match my CV" }).click();
   await expect(page).toHaveURL(/\/builder/);
   await openFirstCv(page);
   await expect(page.getByLabel("Target Job Title")).toHaveValue("Data Analyst");
@@ -311,7 +311,7 @@ test("signed-out visitors get a sign-in prompt that returns to the tracker", asy
     .click();
   await expect(page).toHaveURL(/\/applications$/);
   await expect(
-    page.getByRole("button", { name: "Add application" }),
+    page.getByRole("button", { name: "Add a job" }),
   ).toBeVisible();
 });
 
@@ -319,9 +319,9 @@ test("the tracker is usable with the keyboard alone", async ({ page }) => {
   await page.goto("/builder");
   await authenticateForExport(page);
   await page.goto("/applications");
-  const add = page.getByRole("button", { name: "Add application" });
+  const add = page.getByRole("button", { name: "Add a job" });
   await expect(add).toBeVisible();
-  // Tab from the page start to Add application.
+  // Tab from the page start to Add a job.
   for (
     let i = 0;
     i < 20 && !(await add.evaluate((el) => el === document.activeElement));
@@ -330,16 +330,23 @@ test("the tracker is usable with the keyboard alone", async ({ page }) => {
     await page.keyboard.press("Tab");
   await expect(add).toBeFocused();
   await page.keyboard.press("Enter");
-  const form = page.getByRole("dialog", { name: "Add an application" });
+  const form = page.getByRole("dialog", { name: "Add a job" });
   await expect(form).toBeVisible();
   await expect(
-    form.getByRole("button", { name: "Close Add an application" }),
+    form.getByRole("button", { name: "Close Add a job" }),
   ).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(form.getByLabel("Company")).toBeFocused();
-  await page.keyboard.type("Keyboard Co");
+  await expect(form.getByLabel("Job post", { exact: true })).toBeFocused();
+  await page.keyboard.type("Support Engineer at Keyboard Co");
+  await page.keyboard.press("Tab"); // Link to the post
   await page.keyboard.press("Tab");
-  await page.keyboard.type("Support Engineer");
+  await expect(form.getByRole("button", { name: "Read the post" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  // Focus moves to the review; the next field is the role.
+  await page.keyboard.press("Tab");
+  await expect(form.getByLabel("Role", { exact: true })).toBeFocused();
+  await expect(form.getByLabel("Role", { exact: true })).toHaveValue("Support Engineer");
+  await expect(form.getByLabel("Company", { exact: true })).toHaveValue("Keyboard Co");
   await page.keyboard.press("Enter"); // Submits the form.
   await expect(form).toBeHidden();
   const open = page.getByRole("button", {

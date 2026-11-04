@@ -20,6 +20,7 @@ import {
 } from "@/lib/vault/job-evidence";
 import { Lock, X } from "lucide-react";
 import { lockedCopy } from "@/lib/ai-access";
+import type { GivenRequirement } from "@/lib/ai-contract";
 
 export interface JobTailorModalProps {
   doc: ResumeDocument;
@@ -39,7 +40,13 @@ export interface JobTailorModalProps {
   /** AI coaching per requirement (Pro). */
   canCoach?: boolean;
   /** A job sent from the application tracker ("Match this job"). */
-  initialJob?: { company: string; role: string; post: string };
+  initialJob?: {
+    company: string;
+    role: string;
+    post: string;
+    /** The application's reviewed requirements (first 15, with the person's priorities). */
+    requirements?: GivenRequirement[];
+  };
   /** "Save this job to applications": hands the job to the tracker. */
   onSaveToApplications?: (job: { company: string; role: string; post: string }) => void;
   onSeePlans?: () => void;
@@ -303,7 +310,15 @@ export function JobTailorModal({
                 />
                 Use this target role, seniority and language
               </label>
-              <AiJobMatch job={{ title: jobTitle, company, post: jobDescription }} />
+              <AiJobMatch
+                job={{
+                  title: jobTitle,
+                  company,
+                  // The full saved post, when it came from an application; the matcher shortens it with a note.
+                  post: initialJob && jobDescription === initialJob.post.slice(0, 20000) ? initialJob.post : jobDescription,
+                  requirements: initialJob && jobDescription === initialJob.post.slice(0, 20000) ? initialJob.requirements : undefined,
+                }}
+              />
               {onSaveToApplications && (
                 <div className="save-job-row">
                   <button

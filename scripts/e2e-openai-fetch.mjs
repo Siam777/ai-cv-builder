@@ -63,6 +63,39 @@ globalThis.fetch = async (input, init) => {
         reason: "Controlled synthetic rewrite verdict",
       };
       break;
+    case "cv_job_read": {
+      // Job capture phase B: the request must carry only the post and link.
+      if (Object.keys(data).sort().join(",") !== "post,url")
+        throw new Error("Job read received more than the post and link");
+      const has = (text) => data.post.includes(text);
+      reply = {
+        fields: {
+          role: has("Data Analyst at Northwind Traders")
+            ? { value: "Data Analyst", quote: "Data Analyst at Northwind Traders" }
+            : { value: "", quote: "" },
+          // A genuine quote with an invented company: the server drops it.
+          company: has("Data Analyst at Northwind Traders")
+            ? { value: "Contoso", quote: "Data Analyst at Northwind Traders" }
+            : { value: "", quote: "" },
+          location: { value: "", quote: "" },
+          workType: has("Hybrid") ? { value: "hybrid", quote: "Hybrid" } : { value: "", quote: "" },
+          employmentType: { value: "", quote: "" },
+          salary: { value: "", quote: "" },
+          deadline: { value: "", quote: "" },
+          applyLink: { value: "", quote: "" },
+        },
+        requirements: has("3+ years of SQL")
+          ? [
+              { text: "3+ years of SQL", kind: "nice", quote: "3+ years of SQL" },
+              { text: "Kubernetes", kind: "must", quote: "Kubernetes in production" },
+            ]
+          : [],
+      };
+      break;
+    }
+    case "cv_job_read_support":
+      reply = { results: data.items.map((item) => ({ index: item.index, supported: true, reason: "Controlled synthetic verdict" })) };
+      break;
     default:
       throw new Error("Unexpected synthetic provider schema");
   }

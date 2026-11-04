@@ -779,7 +779,9 @@ export function ResumeStudio({
     if (handoff) {
       setMatchHandoff(handoff);
       setNotice(
-        `Open the CV to compare with ${handoff.role} at ${handoff.company}. Match a job opens with the post filled in.`,
+        handoff.mode === "tailor"
+          ? `Tailor a copy for ${handoff.role} at ${handoff.company}: open the CV to start from. Match a job opens with the post${handoff.requirements?.length ? " and your reviewed requirements" : ""} filled in; the tailored copy is linked to the application.`
+          : `Open the CV to compare with ${handoff.role} at ${handoff.company}. Match a job opens with the post${handoff.requirements?.length ? " and your reviewed requirements" : ""} filled in.`,
       );
     }
   }, []);
@@ -1512,6 +1514,22 @@ export function ResumeStudio({
         "Reviewed ordering saved in an independent variant. Your original CV is kept.",
       );
       succeeded = true;
+      // "Tailor a copy" from an application: link the new copy to it (resume_id).
+      const link = matchHandoff;
+      if (link?.applicationId && cloudUser && link.mode === "tailor") {
+        try {
+          const api = trackerApi(cloudUser.id);
+          const app = await api.get(link.applicationId);
+          await api.update(app.id, { updatedAt: app.updatedAt, resumeId: tailored.id });
+          setNotice(
+            `Tailored copy saved and linked to ${app.role} at ${app.company}. Your original CV is kept.`,
+          );
+        } catch {
+          setNotice(
+            "Tailored copy saved. It could not be linked to the application; open the application to attach it.",
+          );
+        }
+      }
     });
     return succeeded;
   }

@@ -9,9 +9,14 @@ import {
   type ApplicationDetail,
   type ApplicationEvent,
   type Contact,
+  type Requirement,
+  type UpdateApplication,
 } from "@/lib/applications";
 import { accountRequest, CloudRequestError } from "@/lib/cloud-repository";
 import { trackerApi } from "@/lib/applications-client";
+import { EMPLOYMENT_TYPE_LABELS } from "@/lib/job-read";
+import { ordered } from "@/lib/job-draft";
+import { RequirementsEditor } from "./RequirementsEditor";
 import {
   ApplicationFieldset,
   fieldsToInput,
@@ -60,13 +65,16 @@ export function ApplicationDetailPanel({
   applicationId: string;
   onChanged: (app: ApplicationDetail) => void;
   onDeleted: (id: string) => void;
-  onMatch: (app: ApplicationDetail) => void;
+  /** Match my CV, or Tailor a copy linked to this application. */
+  onMatch: (app: ApplicationDetail, mode: "match" | "tailor") => void;
   onClose: () => void;
 }) {
   const api = trackerApi(owner);
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [fields, setFields] = useState<ApplicationFields | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [job, setJob] = useState({ employmentType: "", salaryText: "", deadlineAt: "" });
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [working, setWorking] = useState(false);
@@ -87,6 +95,12 @@ export function ApplicationDetailPanel({
     setApp(next);
     setFields(toFields(next));
     setContacts(next.contacts);
+    setJob({
+      employmentType: next.employmentType ?? "",
+      salaryText: next.salaryText ?? "",
+      deadlineAt: next.deadlineAt ?? "",
+    });
+    setRequirements(next.requirements);
     const cv = [...next.documents].reverse().find((doc) => doc.kind === "cv");
     setSentCv((value) =>
       value && next.documents.some((doc) => doc.id === value)
@@ -155,6 +169,10 @@ export function ApplicationDetailPanel({
         contacts: contacts
           .map((contact) => ({ ...contact, name: contact.name.trim() }))
           .filter((contact) => contact.name),
+        employmentType: (job.employmentType || null) as UpdateApplication["employmentType"],
+        salaryText: job.salaryText.trim() || null,
+        deadlineAt: job.deadlineAt || null,
+        requirements: ordered(requirements),
       });
       load(next);
       onChanged(next);
@@ -224,13 +242,14 @@ export function ApplicationDetailPanel({
                 Save changes
               </button>
               {app.jobPost && (
-                <button
-                  type="button"
-                  onClick={() => onMatch(app)}
-                  disabled={working}
-                >
-                  Match this job
-                </button>
+                <>
+                  <button type="button" onClick={() => onMatch(app, "match")} disabled={working}>
+                    Match my CV
+                  </button>
+                  <button type="button" onClick={() => onMatch(app, "tailor")} disabled={working}>
+                    Tailor a copy
+                  </button>
+                </>
               )}
               {confirmDelete ? (
                 <span
@@ -290,6 +309,55 @@ export function ApplicationDetailPanel({
                 idPrefix="detail"
                 disabled={working}
               />
+            </section>
+
+            <section aria-labelledby="detail-job">
+              <h3 id="detail-job">Job details and requirements</h3>
+              <div className="tracker-fields">
+                <label className="tracker-field">
+                  Employment type
+                  <select
+                    value={job.employmentType}
+                    disabled={working}
+                    onChange={(e) => setJob({ ...job, employmentType: e.target.value })}
+                  >
+                    <option value="">Not stated</option>
+                    {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="tracker-field">
+                  Salary as written
+                  <input
+                    value={job.salaryText}
+                    maxLength={200}
+                    disabled={working}
+                    onChange={(e) => setJob({ ...job, salaryText: e.target.value })}
+                  />
+                </label>
+                <label className="tracker-field">
+                  Deadline
+                  <input
+                    type="date"
+                    value={job.deadlineAt}
+                    disabled={working}
+                    onChange={(e) => setJob({ ...job, deadlineAt: e.target.value })}
+                  />
+                </label>
+              </div>
+              <RequirementsEditor
+                idPrefix="detail-requirements"
+                items={requirements}
+                disabled={working}
+                onChange={setRequirements}
+              />
+              <p className="tracker-muted">
+                Match my CV sends the requirements marked “Used for matching”, with your priorities. Save changes to
+                keep edits.
+              </p>
             </section>
 
             <section aria-labelledby="detail-contacts">

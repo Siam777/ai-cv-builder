@@ -21,6 +21,7 @@ import {
   stashHandoff,
   takeHandoff,
   trackerApi,
+  type Handoff,
 } from "@/lib/applications-client";
 import {
   ApplicationForm,
@@ -29,6 +30,9 @@ import {
   type ApplicationFields,
 } from "./ApplicationForm";
 import { ApplicationDetailPanel, sentAtFor } from "./ApplicationDetailPanel";
+import { AddJobForm, type AiAccess } from "./AddJobForm";
+import { draftToApplication, emptyDraft, matchRequirements, type JobDraft } from "@/lib/job-draft";
+import { emptyDraftFields } from "@/lib/job-draft";
 import { TrackerDialog } from "./TrackerDialog";
 
 type CreateState = {
@@ -67,6 +71,9 @@ export function ApplicationsApp() {
   const [sent, setSent] = useState<SentState | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [returnTo, setReturnTo] = useState("/applications");
+  const [aiConsent, setAiConsent] = useState(false);
+  // "Add a job" (job capture phase B); requestId is reused on retry.
+  const [addJob, setAddJob] = useState<{ title: string; draft: JobDraft; requestId: string } | null>(null);
   const started = useRef(false);
 
   const api = useMemo(() => (user ? trackerApi(user.id) : null), [user]);
@@ -81,9 +88,11 @@ export function ApplicationsApp() {
     setToday(localDay());
     setReturnTo(window.location.pathname + window.location.search);
     void accountRequest("/api/account")
-      .then((value) =>
-        setUser((value as { user?: AccountUser | null }).user ?? null),
-      )
+      .then((value) => {
+        const account = value as { user?: AccountUser | null; aiWritingHelp?: boolean };
+        setAiConsent(Boolean(account.aiWritingHelp));
+        setUser(account.user ?? null);
+      })
       .catch(() => setUser(null));
   }, []);
 
@@ -119,17 +128,7 @@ export function ApplicationsApp() {
         if (params.has("from"))
           window.history.replaceState(null, "", "/applications");
         if (handoff?.kind === "job")
-          setCreate({
-            title: "Save this job",
-            initial: {
-              ...emptyFields(),
-              company: handoff.company,
-              role: handoff.role,
-              jobPost: handoff.post,
-            },
-            requestId: crypto.randomUUID(),
-            freezeRequestId: crypto.randomUUID(),
-          });
+          setAddJob({ title: "Save this job", draft: draftFromHandoff(handoff), requestId: crypto.randomUUID() });
         else if (handoff?.kind === "letter")
           setCreate({
             title: "Attach this cover letter",
@@ -246,6 +245,15 @@ export function ApplicationsApp() {
       } else setNotice(`${app.role} at ${app.company} was saved.`);
     });
 
+  const saveJob = (draft: JobDraft) =>
+    work(async () => {
+      if (!addJob || !api) return;
+      const app = await api.create(draftToApplication(draft, addJob.requestId));
+      await refresh();
+      setAddJob(null);
+      setNotice(`${app.role} at ${app.company} was saved to Saved.`);
+    });
+
   const cancelCreate = () =>
     work(async () => {
       // Closing "Record this as an application?" discards the export receipt at once.
@@ -295,6 +303,24 @@ export function ApplicationsApp() {
             Sign in
           </Link>
         </section>
+        <section className="tracker-group guest-reader" aria-labelledby="guest-reader-title">
+          <h2 id="guest-reader-title">Try reading a job post</h2>
+          <p className="tracker-muted">
+            Paste a post to see its role, company and requirements. This runs in your browser and sends nothing. Sign
+            in to save it; what you reviewed is kept.
+          </p>
+          <AddJobForm
+            initial={emptyDraft()}
+            ai={{ kind: "guest" }}
+            busy={false}
+            saveLabel="Sign in to save"
+            onCancel={() => window.location.assign("/builder")}
+            onSave={(draft) => {
+              stashHandoff(draftHandoff(draft));
+              window.location.assign(`/profile?return=${encodeURIComponent("/applications?from=job")}`);
+            }}
+          />
+        </section>
       </Shell>
     );
 
@@ -316,19 +342,12 @@ export function ApplicationsApp() {
           type="button"
           className="primary"
           disabled={busy}
-          onClick={() =>
-            setCreate({
-              title: "Add an application",
-              initial: emptyFields(),
-              requestId: crypto.randomUUID(),
-              freezeRequestId: crypto.randomUUID(),
-            })
-          }
+          onClick={() => setAddJob({ title: "Add a job", draft: emptyDraft(), requestId: crypto.randomUUID() })}
         >
-          <Plus size={16} aria-hidden /> Add application
+          <Plus size={16} aria-hidden /> Add a job
         </button>
       </div>
-      {error && !create && !sent && (
+      {error && !create && !sent && !addJob && (
         <p className="alert" role="alert">
           {error}
         </p>
@@ -507,6 +526,23 @@ export function ApplicationsApp() {
           />
         </TrackerDialog>
       )}
+      {addJob && user && (
+        <TrackerDialog title={addJob.title} onClose={() => setAddJob(null)} wide>
+          {error && (
+            <p className="alert" role="alert">
+              {error}
+            </p>
+          )}
+          <AddJobForm
+            initial={addJob.draft}
+            ai={aiAccess(user, aiConsent)}
+            busy={busy}
+            saveLabel="Save to applications"
+            onSave={(draft) => void saveJob(draft)}
+            onCancel={() => setAddJob(null)}
+          />
+        </TrackerDialog>
+      )}
       {sent && (
         <TrackerDialog
           title="Did you send it?"
@@ -577,14 +613,19 @@ export function ApplicationsApp() {
             setOpenId(null);
             setNotice("Application deleted.");
           }}
-          onMatch={(app) => {
+          onMatch={(app, mode) => {
+            const requirements = matchRequirements(app.requirements);
             stashHandoff({
               kind: "match",
               company: app.company,
               role: app.role,
               post: app.jobPost ?? "",
+              applicationId: app.id,
+              mode,
+              ...(requirements.length ? { requirements } : {}),
+              ...(app.resumeId ? { resumeId: app.resumeId } : {}),
             });
-            window.location.assign("/builder");
+            window.location.assign(app.resumeId ? `/builder?cv=${encodeURIComponent(app.resumeId)}` : "/builder");
           }}
           onClose={() => {
             setOpenId(null);
@@ -635,4 +676,33 @@ function Shell({ children }: { children: React.ReactNode }) {
       </main>
     </div>
   );
+}
+
+function aiAccess(user: AccountUser, consent: boolean): AiAccess {
+  return consent ? { kind: "ready", owner: user.id } : { kind: "no-consent" };
+}
+/** A job from the editor (Save this job) or a guest's reviewed draft, back in the form. */
+function draftFromHandoff(handoff: Extract<Handoff, { kind: "job" }>): JobDraft {
+  const draft = emptyDraft({ post: handoff.post, url: handoff.url ?? "" });
+  const fields = { ...emptyDraftFields(), ...(handoff.fields ?? {}) };
+  if (!fields.role) fields.role = handoff.role;
+  if (!fields.company) fields.company = handoff.company;
+  return { ...draft, fields, requirements: handoff.requirements ?? [] };
+}
+function draftHandoff(draft: JobDraft): Handoff {
+  return {
+    kind: "job",
+    company: draft.fields.company.slice(0, 200),
+    role: draft.fields.role.slice(0, 200),
+    post: draft.post,
+    url: draft.url.slice(0, 2000),
+    fields: Object.fromEntries(Object.entries(draft.fields).map(([key, value]) => [key, value.slice(0, 2000)])),
+    requirements: draft.requirements.slice(0, 40).map((r) => ({
+      id: r.id.slice(0, 100),
+      text: r.text.slice(0, 300),
+      kind: r.kind,
+      quote: r.quote.slice(0, 300),
+      paraphrased: r.paraphrased,
+    })),
+  };
 }

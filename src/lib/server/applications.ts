@@ -9,6 +9,7 @@ import type { ExportRequest } from "../export-contract";
 import {
   APPLICATION_LIMITS,
   contactsSchema,
+  requirementsSchema,
   createApplicationSchema,
   freezeDocumentSchema,
   frozenContentSchema,
@@ -226,7 +227,7 @@ export async function createApplication(owner: string, raw: CreateApplication) {
       );
     const at = now();
     await tx.execute({
-      sql: "INSERT INTO applications(owner_id,id,company,role,job_url,location,source,stage,stage_changed_at,applied_at,next_action_at,next_action,notes,job_post,contacts,resume_id,request_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      sql: "INSERT INTO applications(owner_id,id,company,role,job_url,location,source,stage,stage_changed_at,applied_at,next_action_at,next_action,notes,job_post,contacts,resume_id,request_hash,created_at,updated_at,employment_type,salary_text,deadline_at,requirements,captured_via) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       args: [
         owner,
         input.requestId,
@@ -247,6 +248,11 @@ export async function createApplication(owner: string, raw: CreateApplication) {
         fingerprint,
         at,
         at,
+        input.employmentType ?? null,
+        blank(input.salaryText) ?? null,
+        input.deadlineAt ?? null,
+        JSON.stringify(input.requirements),
+        input.capturedVia,
       ],
     });
     await insertEvent(tx, owner, input.requestId, {
@@ -281,7 +287,7 @@ async function detail(
 ): Promise<ApplicationDetail> {
   const row = (
     await client.execute({
-      sql: `SELECT ${SUMMARY_COLUMNS},a.notes,a.job_post,a.contacts FROM applications a WHERE a.owner_id=? AND a.id=?`,
+      sql: `SELECT ${SUMMARY_COLUMNS},a.notes,a.job_post,a.contacts,a.employment_type,a.salary_text,a.deadline_at,a.requirements,a.captured_via FROM applications a WHERE a.owner_id=? AND a.id=?`,
       args: [owner, id],
     })
   ).rows[0];
@@ -317,6 +323,11 @@ async function detail(
     ...summary(row),
     notes: String(row.notes),
     jobPost: text(row.job_post),
+    employmentType: text(row.employment_type),
+    salaryText: text(row.salary_text),
+    deadlineAt: text(row.deadline_at),
+    requirements: requirementsSchema.parse(JSON.parse(String(row.requirements))),
+    capturedVia: String(row.captured_via) as ApplicationDetail["capturedVia"],
     contacts: contactsSchema.parse(JSON.parse(String(row.contacts))),
     events,
     documents,
@@ -397,6 +408,13 @@ export async function updateApplication(
       input.contacts === undefined ? undefined : JSON.stringify(input.contacts),
     );
     set("resume_id", input.resumeId);
+    set("employment_type", input.employmentType);
+    set("salary_text", blank(input.salaryText));
+    set("deadline_at", input.deadlineAt);
+    set(
+      "requirements",
+      input.requirements === undefined ? undefined : JSON.stringify(input.requirements),
+    );
     const from = String(row.stage) as Stage;
     if (input.stage && input.stage !== from) {
       stageChanged = true;

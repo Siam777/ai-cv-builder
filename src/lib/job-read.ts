@@ -18,7 +18,8 @@ export const MATCH_REQUIREMENT_MAX = 15;
 export const MATCH_POST_MAX = 12000;
 
 export const charCount = (text: string) => [...text].length;
-export const sliceChars = (text: string, max: number) => [...text].slice(0, max).join("");
+export const sliceChars = (text: string, max: number) =>
+  [...text].slice(0, max).join("");
 
 export const JOB_FIELDS = [
   "role",
@@ -42,7 +43,13 @@ export const JOB_FIELD_LABELS: Record<JobField, string> = {
   applyLink: "Apply link",
 };
 /** Fields copied from the post: the value must be the quote or a part of it. */
-export const COPIED_FIELDS = ["role", "company", "location", "salary", "applyLink"] as const;
+export const COPIED_FIELDS = [
+  "role",
+  "company",
+  "location",
+  "salary",
+  "applyLink",
+] as const;
 export const FIELD_MAX: Record<JobField, number> = {
   role: 200,
   company: 200,
@@ -56,13 +63,42 @@ export const FIELD_MAX: Record<JobField, number> = {
 
 /** The fixed tables: a value is kept only when one of its source words is in the quote. */
 export const WORK_TYPES: Record<string, string[]> = {
-  "on-site": ["on-site", "onsite", "on site", "in-office", "in office", "office-based", "office based"],
+  "on-site": [
+    "on-site",
+    "onsite",
+    "on site",
+    "in-office",
+    "in office",
+    "office-based",
+    "office based",
+  ],
   hybrid: ["hybrid"],
-  remote: ["remote", "work from home", "working from home", "fully remote", "remote-first", "remote first"],
+  remote: [
+    "remote",
+    "work from home",
+    "working from home",
+    "fully remote",
+    "remote-first",
+    "remote first",
+  ],
 };
 export const EMPLOYMENT_TYPES: Record<string, string[]> = {
-  "full-time": ["full-time", "full time", "fulltime", "vollzeit", "tiempo completo", "temps plein"],
-  "part-time": ["part-time", "part time", "parttime", "teilzeit", "medio tiempo", "temps partiel"],
+  "full-time": [
+    "full-time",
+    "full time",
+    "fulltime",
+    "vollzeit",
+    "tiempo completo",
+    "temps plein",
+  ],
+  "part-time": [
+    "part-time",
+    "part time",
+    "parttime",
+    "teilzeit",
+    "medio tiempo",
+    "temps partiel",
+  ],
   contract: ["contract", "contractor", "fixed-term", "fixed term", "befristet"],
   temporary: ["temporary", "temp role", "seasonal"],
   internship: ["internship", "intern", "praktikum", "prácticas", "stage"],
@@ -129,16 +165,24 @@ export function copiedFrom(value: string, quote: string) {
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const hasWord = (text: string, word: string) =>
-  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(word)}($|[^\\p{L}\\p{N}])`, "iu").test(text);
+  new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escape(word)}($|[^\\p{L}\\p{N}])`,
+    "iu",
+  ).test(text);
 
 /** The canonical key for a work or employment type value, or null when it is not in the table. */
 export function tableKey(table: Record<string, string[]>, value: string) {
   const v = loose(value);
-  for (const [key, words] of Object.entries(table)) if (v === key || words.includes(v)) return key;
+  for (const [key, words] of Object.entries(table))
+    if (v === key || words.includes(v)) return key;
   return null;
 }
 /** Check 2 for typed fields: a known value whose source word appears in the quote. */
-export function typedFrom(table: Record<string, string[]>, value: string, quote: string) {
+export function typedFrom(
+  table: Record<string, string[]>,
+  value: string,
+  quote: string,
+) {
   const key = tableKey(table, value);
   if (!key) return null;
   return [key, ...table[key]].some((word) => hasWord(quote, word)) ? key : null;
@@ -151,14 +195,41 @@ export function findInTable(table: Record<string, string[]>, text: string) {
 }
 
 const MONTHS: Record<string, number> = {
-  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
-  jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
-  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
 };
-const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const MONTH =
+  "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 function isoDate(year: number, month: number, day: number) {
   const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  )
+    return null;
   return date.toISOString().slice(0, 10);
 }
 /**
@@ -168,11 +239,23 @@ function isoDate(year: number, month: number, day: number) {
  */
 export function datesIn(text: string) {
   const found: string[] = [];
-  const add = (value: string | null) => value && !found.includes(value) && found.push(value);
-  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) add(isoDate(+m[1], +m[2], +m[3]));
-  for (const m of text.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH}\\.?,?\\s+(\\d{4})\\b`, "gi")))
+  const add = (value: string | null) =>
+    value && !found.includes(value) && found.push(value);
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g))
+    add(isoDate(+m[1], +m[2], +m[3]));
+  for (const m of text.matchAll(
+    new RegExp(
+      `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH}\\.?,?\\s+(\\d{4})\\b`,
+      "gi",
+    ),
+  ))
     add(isoDate(+m[3], MONTHS[m[2].toLowerCase()], +m[1]));
-  for (const m of text.matchAll(new RegExp(`\\b${MONTH}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`, "gi")))
+  for (const m of text.matchAll(
+    new RegExp(
+      `\\b${MONTH}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`,
+      "gi",
+    ),
+  ))
     add(isoDate(+m[3], MONTHS[m[1].toLowerCase()], +m[2]));
   return found;
 }
@@ -189,7 +272,12 @@ export function dateFrom(value: string, quote: string) {
  * Validates one field read from a post (checks 1 and 2). Returns the value
  * to show (canonical for typed fields), or null when it must be withheld.
  */
-export function checkField(field: JobField, value: string, quote: string, post: string): ReadField | null {
+export function checkField(
+  field: JobField,
+  value: string,
+  quote: string,
+  post: string,
+): ReadField | null {
   const v = collapse(value);
   const q = collapse(quote);
   if (!v || !quoteInPost(q, post)) return null;
@@ -204,7 +292,8 @@ export function checkField(field: JobField, value: string, quote: string, post: 
 }
 
 // Must or nice comes from rules, never from the model (review finding 1).
-const MUST_MARKERS = /\b(required|requirement|must|essential|mandatory|minimum|erforderlich|obligatorio|requis|exigé)\b/i;
+const MUST_MARKERS =
+  /\b(required|requirement|must|essential|mandatory|minimum|erforderlich|obligatorio|requis|exigé)\b/i;
 const NICE_MARKERS =
   /\b(preferred|preferably|ideally|a plus|is a plus|nice to have|nice-to-have|bonus|desirable|advantage|advantageous|wünschenswert|von vorteil|deseable|valorable|un atout|souhaité)\b/i;
 const MUST_HEADING =
@@ -228,8 +317,18 @@ export function headingKind(line: string): "must" | "nice" | "other" | null {
   if (MUST_HEADING.test(text)) return "must";
   if (!/:\s*$/.test(t)) return null;
   // A labelled heading such as "More requirements:" or "Preferred qualifications for this role:".
-  if (/\b(nice[- ]to[- ]haves?|preferred|bonus|desirable|wünschenswert|deseable)\b/i.test(text)) return "nice";
-  if (/\b(requirements?|qualifications|must[- ]haves?|anforderungen|requisitos|exigences)\b/i.test(text)) return "must";
+  if (
+    /\b(nice[- ]to[- ]haves?|preferred|bonus|desirable|wünschenswert|deseable)\b/i.test(
+      text,
+    )
+  )
+    return "nice";
+  if (
+    /\b(requirements?|qualifications|must[- ]haves?|anforderungen|requisitos|exigences)\b/i.test(
+      text,
+    )
+  )
+    return "must";
   return "other";
 }
 /** must or nice from marker words in the quote, when exactly one kind is named. */
@@ -244,13 +343,20 @@ function quoteLine(lines: string[], quote: string) {
   for (let i = 0; i < lines.length; i++)
     for (let k = 1; k <= 12 && i + k <= lines.length; k++)
       if (collapse(lines.slice(i, i + k).join(" ")).includes(needle)) {
-        if (k === 1 || !collapse(lines.slice(i + 1, i + k).join(" ")).includes(needle)) return i;
+        if (
+          k === 1 ||
+          !collapse(lines.slice(i + 1, i + k).join(" ")).includes(needle)
+        )
+          return i;
         break;
       }
   return -1;
 }
 /** The heading the quote sits under, read upward from its line. */
-export function headingFor(quote: string, post: string): "must" | "nice" | null {
+export function headingFor(
+  quote: string,
+  post: string,
+): "must" | "nice" | null {
   const lines = post.split(/\r?\n/);
   const at = quoteLine(lines, quote);
   if (at < 0) return null;

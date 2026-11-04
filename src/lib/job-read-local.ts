@@ -25,7 +25,8 @@ import {
 const BULLET = /^\s*([-*•·▪◦–—>]|\d+[.)])\s+/;
 const LABEL =
   /^\s*(job title|title|position|role|company|employer|location|salary|pay|compensation|deadline|closing date|apply by|puesto|empresa|ubicación|salario|stelle|unternehmen|standort|gehalt|poste|entreprise|lieu|salaire)\s*:\s*(.+)$/i;
-const NOT_COMPANY = /^(us|the (role|job|team|position|company)|this (role|job|position)|you|the opportunity|our team)\b/i;
+const NOT_COMPANY =
+  /^(us|the (role|job|team|position|company)|this (role|job|position)|you|the opportunity|our team)\b/i;
 const CURRENCY = String.raw`(?:[$£€¥₹৳]|USD|EUR|GBP|CAD|AUD|INR|BDT|JPY|CHF)`;
 const AMOUNT = String.raw`\d[\d,.]*\s?[kKmM]?`;
 const PERIOD = String.raw`(?:\s*(?:per|\/|a|an|al|pro|par)\s*(?:year|yr|annum|month|mo|hour|hr|day|año|mes|jahr|monat|an|mois))?`;
@@ -35,7 +36,8 @@ const SALARY = new RegExp(
     String.raw`|${AMOUNT}\s?${CURRENCY}${PERIOD}`,
   "i",
 );
-const DEADLINE_CUE = /\b(apply by|deadline|closing date|applications close|closes on|close on|apply before|bewerbungsschluss|fecha límite|date limite)\b/i;
+const DEADLINE_CUE =
+  /\b(apply by|deadline|closing date|applications close|closes on|close on|apply before|bewerbungsschluss|fecha límite|date limite)\b/i;
 
 export function readJobPostLocally(post: string, url?: string): JobReadResult {
   const lines = post.split(/\r?\n/);
@@ -52,9 +54,12 @@ export function readJobPostLocally(post: string, url?: string): JobReadResult {
     if (!m) continue;
     const label = m[1].toLowerCase();
     const value = collapse(m[2]);
-    if (/title|position|role|puesto|stelle|poste/.test(label)) put("role", value, line);
-    else if (/company|employer|empresa|unternehmen|entreprise/.test(label)) put("company", value, line);
-    else if (/location|ubicación|standort|lieu/.test(label)) put("location", value, line);
+    if (/title|position|role|puesto|stelle|poste/.test(label))
+      put("role", value, line);
+    else if (/company|employer|empresa|unternehmen|entreprise/.test(label))
+      put("company", value, line);
+    else if (/location|ubicación|standort|lieu/.test(label))
+      put("location", value, line);
     else if (/salary|pay|compensation|salario|gehalt|salaire/.test(label))
       put("salary", value.match(SALARY)?.[0] ?? value, line);
     else {
@@ -66,11 +71,18 @@ export function readJobPostLocally(post: string, url?: string): JobReadResult {
   // Title from the first line, and a company after "at" on it.
   const first = lines.find((line) => line.trim().length > 0) ?? "";
   if (first && !headingKind(first) && collapse(first).length <= 160) {
-    const at = first.match(/^(.+?)\s+(?:at|@)\s+([^,.\n(|–—-]{2,80}?)\s*(?:[,.(|–—-].*)?$/);
+    const at = first.match(
+      /^(.+?)\s+(?:at|@)\s+([^,.\n(|–—-]{2,80}?)\s*(?:[,.(|–—-].*)?$/,
+    );
     if (at) {
       put("role", at[1], first);
       if (!NOT_COMPANY.test(at[2].trim())) put("company", at[2], first);
-    } else put("role", first.replace(/^\s*(job title|title|position|role)\s*:\s*/i, ""), first);
+    } else
+      put(
+        "role",
+        first.replace(/^\s*(job title|title|position|role)\s*:\s*/i, ""),
+        first,
+      );
   }
   // "About Northwind" heading, or "Northwind is hiring", or "at Northwind" in the text.
   for (const line of lines) {
@@ -80,16 +92,23 @@ export function readJobPostLocally(post: string, url?: string): JobReadResult {
   }
   for (const line of lines) {
     if (fields.company) break;
-    const hiring = line.match(/^\s*([A-Z][\w&.'’ -]{1,60}?)\s+(?:is hiring|is looking for|are hiring|are looking for)\b/);
+    const hiring = line.match(
+      /^\s*([A-Z][\w&.'’ -]{1,60}?)\s+(?:is hiring|is looking for|are hiring|are looking for)\b/,
+    );
     if (hiring && !NOT_COMPANY.test(hiring[1])) put("company", hiring[1], line);
-    const join = line.match(/\b(?:join|at)\s+([A-Z][\w&'’-]*(?:\s+[A-Z][\w&'’-]*){0,3})/);
-    if (!fields.company && join && !NOT_COMPANY.test(join[1])) put("company", join[1], line);
+    const join = line.match(
+      /\b(?:join|at)\s+([A-Z][\w&'’-]*(?:\s+[A-Z][\w&'’-]*){0,3})/,
+    );
+    if (!fields.company && join && !NOT_COMPANY.test(join[1]))
+      put("company", join[1], line);
   }
 
   // Location from "based in", work and employment type words, salary, deadline.
   for (const line of lines) {
     if (!fields.location) {
-      const based = line.match(/\b(?:based in|located in|office in)\s+([A-Z][\p{L}' -]{1,40}?(?:,\s*[A-Z][\p{L}' -]{1,30})?)(?=[.;\n]|$|\s+(?:with|and|or)\b)/u);
+      const based = line.match(
+        /\b(?:based in|located in|office in)\s+([A-Z][\p{L}' -]{1,40}?(?:,\s*[A-Z][\p{L}' -]{1,30})?)(?=[.;\n]|$|\s+(?:with|and|or)\b)/u,
+      );
       if (based) put("location", based[1], line);
     }
     if (!fields.workType) {
@@ -112,7 +131,8 @@ export function readJobPostLocally(post: string, url?: string): JobReadResult {
   const link = url?.trim() || post.match(/https?:\/\/[^\s<>"')]+/)?.[0];
   if (link) {
     if (url?.trim()) {
-      if (/^https?:\/\/\S+$/i.test(url.trim())) fields.applyLink = { value: url.trim(), quote: url.trim() };
+      if (/^https?:\/\/\S+$/i.test(url.trim()))
+        fields.applyLink = { value: url.trim(), quote: url.trim() };
     } else put("applyLink", link, link);
   }
 
