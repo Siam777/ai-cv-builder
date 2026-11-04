@@ -126,6 +126,50 @@ export default function Help() {
           <strong>not</strong> checked: a gap is not a contradiction, and you
           should not feel you have to hide one.
         </p>
+        <h2 id="applications">Track your applications</h2>
+        <p>
+          <Link href="/applications">Applications</Link> keeps every job you
+          apply for: its stage, dates, notes, the people you are in touch with,
+          a reminder for your next step and a frozen copy of the CV and cover
+          letter you sent. It needs an account and is free on every plan, up to
+          500 applications.
+        </p>
+        <ul>
+          <li>
+            After you export a CV or letter, choose{" "}
+            <strong>Record this as an application</strong>. The exact copy you
+            downloaded is attached, even if you edit your CV before you finish
+            the form. The app then asks <strong>Did you send it?</strong>: a
+            saved copy is only marked as sent when you confirm it.
+          </li>
+          <li>
+            The copy you sent is kept as it was. If you change your CV later,
+            this copy does not change. Downloading it again renders it from the
+            kept copy, which can look slightly different if a design changes
+            later. A photo is left out of a frozen copy only when it would make
+            the copy larger than 512 KB, and the copy says so.
+          </li>
+          <li>
+            Reminders appear under <strong>Due</strong> at the top of the list
+            and as a count on the account menu. There are no email reminders
+            yet.
+          </li>
+          <li>
+            <strong>Save this job to applications</strong> in Match a job and{" "}
+            <strong>Attach to an application</strong> in the cover letter tool
+            bring the job or letter across. <strong>Match this job</strong> on an
+            application opens Match a job with the post filled in.
+          </li>
+          <li>
+            Applications that have been &ldquo;Applied&rdquo; for 21 days with no
+            change show &ldquo;No reply yet&rdquo;. Up to 5 frozen copies can be
+            kept per application.
+          </li>
+        </ul>
+        <p>
+          The app never applies for jobs or contacts anyone for you, and
+          nothing is sent to employers or job boards.
+        </p>
         <h2>About</h2>
         <p>AI CV Builder is developed by Elfasys Solution.</p>
       </article>

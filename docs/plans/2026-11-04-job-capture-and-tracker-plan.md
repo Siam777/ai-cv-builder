@@ -29,6 +29,8 @@ Recommended order: A → B → C → D (bookmarklet) → D (extension). E only i
 
 ## 3. Phase A — tracker
 
+**Status 2026-11-04:** phase A is implemented locally (PLAN.md §42); the columns below exist in migration 008 but their features (phases B–D and step 4b) are not built. Phases B–E remain planned.
+
 Implement [2026-10-17-application-tracker-plan.md](2026-10-17-application-tracker-plan.md) unchanged, with these additions to the migration so later phases need no second migration:
 
 ```sql

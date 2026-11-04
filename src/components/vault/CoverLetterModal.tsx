@@ -28,6 +28,13 @@ export interface CoverLetterModalProps {
     text: string,
     name: string,
   ) => void;
+  /** Keep this letter, as edited, with an application in the tracker. */
+  onAttachToApplication?: (letter: {
+    text: string;
+    name: string;
+    company: string;
+    role: string;
+  }) => void;
 }
 
 export function CoverLetterModal({
@@ -36,6 +43,7 @@ export function CoverLetterModal({
   onClose,
   embedded = false,
   onExport,
+  onAttachToApplication,
 }: CoverLetterModalProps) {
   useBodyScrollLock(!embedded);
   const dialogRef = useModalFocus(onClose, !embedded);
@@ -393,6 +401,22 @@ export function CoverLetterModal({
               >
                 Download .md
               </button>
+              {onAttachToApplication && (
+                <button
+                  type="button"
+                  disabled={busy || !(editedText || letter?.fullText)}
+                  onClick={() =>
+                    onAttachToApplication({
+                      text: (editedText || letter?.fullText || "").slice(0, 20000),
+                      name: ((company || "Target-Company") + "-Cover-Letter").slice(0, 200),
+                      company: company.slice(0, 200),
+                      role: jobTitle.slice(0, 200),
+                    })
+                  }
+                >
+                  Attach to an application
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setLetter(null)}

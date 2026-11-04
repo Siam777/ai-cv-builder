@@ -1,6 +1,8 @@
 # Step 2 — Application tracker (basic): implementation plan
 
-Date: 2026-10-17. Scope source: FEATURE-PLAN.md "Career workflow roadmap", step 2. Background: [2026-10-17-career-platform-analysis.md](2026-10-17-career-platform-analysis.md). Starts after Gate 0 (it can run alongside step 1, since they touch different files). Nothing here is implemented.
+Date: 2026-10-17. Scope source: FEATURE-PLAN.md "Career workflow roadmap", step 2. Background: [2026-10-17-career-platform-analysis.md](2026-10-17-career-platform-analysis.md). Starts after Gate 0 (it can run alongside step 1, since they touch different files).
+
+**Status 2026-11-04:** implemented locally as phase A of the job capture plan, ahead of Gate 0 at the owner's request; see PLAN.md §42 for what was delivered and the deviations. Gate 0 and live checks remain open.
 
 **Extended 2026-11-04:** [2026-11-04-job-capture-and-tracker-plan.md](2026-11-04-job-capture-and-tracker-plan.md) makes this plan its phase A, adds job-capture columns to migration 008, and adds AI job reading, referrals and follow-ups, and saving jobs from the browser. Its decision that the app captures jobs rather than searching for them, and its AI phases, replace "There is no AI in this step" below for those later phases.
 
