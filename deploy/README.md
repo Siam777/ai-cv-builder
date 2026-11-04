@@ -42,7 +42,7 @@ nano /opt/elfasys/config/ai-cv-builder/production.env
 Ensure you provide:
 - `BETTER_AUTH_SECRET` (generate with `openssl rand -hex 32`)
 - `OPENAI_API_KEY`
-- `TURSO_DATABASE_URL` & `TURSO_AUTH_TOKEN` (or local file sqlite path `file:/app/data/cv-builder.db`)
+- `TURSO_DATABASE_URL` & `TURSO_AUTH_TOKEN` (`libsql://...` URL; production refuses a local file database). The container applies pending migrations (`scripts/setup-db.mjs`) on every start, before the server starts; if one fails the container exits and the deploy health check fails, so check `docker compose -p cv-production logs web`.
 - `RESEND_API_KEY`
 - `STRIPE_*` keys
 
