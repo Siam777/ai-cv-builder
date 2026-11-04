@@ -48,7 +48,10 @@ USER nextjs
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3000/api/healthz || exit 1
 
-CMD ["node", "server.js"]
+# Apply pending migrations (scripts/setup-db.mjs: checked, idempotent, refuses
+# an edited applied migration) before starting. If they fail, the server does
+# not start, so it never runs against an older schema.
+CMD ["sh", "-c", "node scripts/setup-db.mjs && exec node server.js"]

@@ -1458,5 +1458,7 @@ Still open:
 
 - [ ] Gate 0 and all live and production checks; migration 008 has not been applied to Turso.
 - [ ] Schedule `npm run db:retention` on the deployed host; verify concurrent writes against remote Turso.
+- [x] Migrations on deploy (2026-11-04, after the tracker reached `master`): the deploy workflow never ran `db:setup`, so 008 would have been missing in production. `/applications` and account-data export would fail; exports were unaffected because the receipt write fails quietly. The Docker image now runs `node scripts/setup-db.mjs && exec node server.js`, so pending migrations apply before the server starts and a failed migration stops the start. Checked locally from the standalone layout (all eight applied, a rerun is a no-op, production without Turso is refused). Not yet verified on the live host.
+- [x] Test fixes (2026-11-04): the 008 migration test now retries its temp-folder cleanup (Windows `EBUSY`); the tracker e2e waits up to 20 s for "Did you send it?" because the first calls compile routes on the e2e dev server under parallel load.
 - [ ] A screen-reader pass of the list, Due strip and detail panel, and a human review of the phone layout; Linux visual baselines (or a review of the Windows ones) including the new header link.
 - [ ] Later, as planned: email reminders (opt-in, unsubscribe, a scheduler), a board view, CSV import/export, outcome insights, version-pinned templates or stored files for exact re-renders, and job capture phases B–E.
