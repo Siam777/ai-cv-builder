@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { accountRequest } from "./cloud-repository";
+import { givenRequirementSchema } from "./ai-contract";
 import {
   APPLICATION_LIMITS,
   type ApplicationDetail,
@@ -93,13 +94,29 @@ export function trackerApi(owner: string) {
  */
 const HANDOFF_KEY = "cv-application-handoff";
 const short = (max: number) => z.string().max(max);
+const post = z.string().refine((text) => [...text].length <= APPLICATION_LIMITS.jobPost);
 export const handoffSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("job"),
     company: short(APPLICATION_LIMITS.company),
     role: short(APPLICATION_LIMITS.role),
-    post: short(APPLICATION_LIMITS.jobPost),
+    post: post,
     resumeId: z.string().max(100).optional(),
+    url: z.string().max(2000).optional(),
+    /** A reviewed draft from the Add a job form (a guest signing in to save it). */
+    fields: z.record(z.string(), z.string().max(2000)).optional(),
+    requirements: z
+      .array(
+        z.strictObject({
+          id: z.string().max(100),
+          text: z.string().max(300),
+          kind: z.enum(["must", "nice", "unstated"]),
+          quote: z.string().max(300),
+          paraphrased: z.boolean(),
+        }),
+      )
+      .max(40)
+      .optional(),
   }),
   z.strictObject({
     kind: z.literal("letter"),
@@ -114,7 +131,13 @@ export const handoffSchema = z.discriminatedUnion("kind", [
     kind: z.literal("match"),
     company: short(APPLICATION_LIMITS.company),
     role: short(APPLICATION_LIMITS.role),
-    post: short(APPLICATION_LIMITS.jobPost),
+    post: post,
+    /** The reviewed requirements to match (first 15, with the person's priorities). */
+    requirements: z.array(givenRequirementSchema).max(15).optional(),
+    applicationId: z.string().max(100).optional(),
+    resumeId: z.string().max(100).optional(),
+    /** "tailor" opens the same tool for a tailored copy linked to the application. */
+    mode: z.enum(["match", "tailor"]).optional(),
   }),
 ]);
 export type Handoff = z.infer<typeof handoffSchema>;

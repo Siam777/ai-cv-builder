@@ -29,7 +29,7 @@ Recommended order: A → B → C → D (bookmarklet) → D (extension). E only i
 
 ## 3. Phase A — tracker
 
-**Status 2026-11-04:** phase A is implemented locally (PLAN.md §42); the columns below exist in migration 008 but their features (phases B–D and step 4b) are not built. Phases B–E remain planned.
+**Status 2026-11-04:** phase A is implemented locally (PLAN.md §42), and phase B (add a job, read by AI, §4) is implemented locally (PLAN.md §43); its live `--suite=job-read` evaluation, required before release, has not been run. The columns below exist in migration 008; `requirements`, `employment_type`, `salary_text`, `deadline_at` and `captured_via` are now used, while `referral_contact_id` and `switch_from`/`switch_to` (phase C and step 4b) are not. Phases C–E remain planned.
 
 Implement [2026-10-17-application-tracker-plan.md](2026-10-17-application-tracker-plan.md) unchanged, with these additions to the migration so later phases need no second migration:
 

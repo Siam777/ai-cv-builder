@@ -105,7 +105,7 @@ export const contactsSchema = z
   .array(contactSchema)
   .max(APPLICATION_LIMITS.contacts);
 
-/** Phase B stores reviewed requirements; phase A only creates the column. */
+/** Reviewed requirements from a job post (job capture §3): must or nice, each with the words it came from. */
 export const requirementSchema = z.strictObject({
   id,
   text: z.string().min(1).max(300),
@@ -113,6 +113,8 @@ export const requirementSchema = z.strictObject({
   quote: z.string().max(300),
 });
 export const requirementsSchema = z.array(requirementSchema).max(40);
+export type Requirement = z.infer<typeof requirementSchema>;
+const EMPLOYMENT_TYPE_KEYS = ["full-time", "part-time", "contract", "temporary", "internship", "freelance", "permanent"] as const;
 
 const fields = {
   company: z
@@ -129,10 +131,20 @@ const fields = {
   nextActionAt: day.nullable().optional(),
   nextAction: optionalText(APPLICATION_LIMITS.nextAction),
   notes: z.string().max(APPLICATION_LIMITS.notes),
-  jobPost: z.string().max(APPLICATION_LIMITS.jobPost).nullable().optional(),
+  // Counted in characters, as the job post box and Read with AI count them.
+  jobPost: z
+    .string()
+    .refine((post) => [...post].length <= APPLICATION_LIMITS.jobPost, "The job post can be at most 30,000 characters.")
+    .nullable()
+    .optional(),
   contacts: contactsSchema,
   resumeId: id.nullable().optional(),
+  employmentType: z.enum(EMPLOYMENT_TYPE_KEYS).nullable().optional(),
+  salaryText: optionalText(200),
+  deadlineAt: day.nullable().optional(),
+  requirements: requirementsSchema,
 };
+export const CAPTURED_VIA = ["manual", "paste", "bookmarklet", "extension", "suggested"] as const;
 
 export const createApplicationSchema = z.strictObject({
   requestId: z.string().uuid(),
@@ -140,6 +152,9 @@ export const createApplicationSchema = z.strictObject({
   stage: fields.stage.default("saved"),
   notes: fields.notes.default(""),
   contacts: fields.contacts.default([]),
+  requirements: fields.requirements.default([]),
+  /** How the job arrived; metadata only, never shown to employers. */
+  capturedVia: z.enum(CAPTURED_VIA).default("manual"),
 });
 export type CreateApplication = z.input<typeof createApplicationSchema>;
 
@@ -158,6 +173,10 @@ export const updateApplicationSchema = z.strictObject({
   jobPost: fields.jobPost,
   contacts: fields.contacts.optional(),
   resumeId: fields.resumeId,
+  employmentType: fields.employmentType,
+  salaryText: fields.salaryText,
+  deadlineAt: fields.deadlineAt,
+  requirements: fields.requirements.optional(),
 });
 export type UpdateApplication = z.input<typeof updateApplicationSchema>;
 
@@ -278,6 +297,11 @@ export interface Submission {
 export interface ApplicationDetail extends ApplicationSummary {
   notes: string;
   jobPost: string | null;
+  employmentType: string | null;
+  salaryText: string | null;
+  deadlineAt: string | null;
+  requirements: Requirement[];
+  capturedVia: (typeof CAPTURED_VIA)[number];
   contacts: Contact[];
   events: ApplicationEvent[];
   documents: DocumentSummary[];

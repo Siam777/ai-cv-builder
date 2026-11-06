@@ -26,6 +26,9 @@ import {
   type JobMatchRequest,
   type JobMatchResult,
   jobMatchRequestSchema,
+  jobReadRequestSchema,
+  type JobReadRequest,
+  type JobReadResponse,
   type GapLineRequest,
   type GapLineResult,
   gapLineRequestSchema,
@@ -66,6 +69,9 @@ import {
   INTERVIEW_PROMPT_VERSION,
   generateJobMatch,
   JOB_MATCH_PROMPT_VERSION,
+  JOB_MATCH_GIVEN_PROMPT_VERSION,
+  generateJobRead,
+  JOB_READ_PROMPT_VERSION,
   generateGapLine,
   GAP_LINE_PROMPT_VERSION,
   generateTailoring,
@@ -976,7 +982,8 @@ export async function requestJobMatch(
   generator: (
     doc: Awaited<ReturnType<typeof getResume>>,
     job: JobMatchRequest["job"],
-  ) => ReturnType<typeof generateJobMatch> = generateJobMatch,
+    given: { requirements?: JobMatchRequest["requirements"]; postTruncated?: boolean },
+  ) => ReturnType<typeof generateJobMatch> = (doc, job, given) => generateJobMatch(doc, job, fetch, given),
 ): Promise<JobMatchResult> {
   input = jobMatchRequestSchema.parse(input);
   const { plan, doc } = await preparePlanned(
@@ -991,8 +998,8 @@ export async function requestJobMatch(
     plan,
     doc,
     "ai_job_match",
-    JOB_MATCH_PROMPT_VERSION,
-    () => generator(doc, input.job),
+    input.requirements ? JOB_MATCH_GIVEN_PROMPT_VERSION : JOB_MATCH_PROMPT_VERSION,
+    () => generator(doc, input.job, { requirements: input.requirements, postTruncated: input.postTruncated }),
     (r) => ({
       requirementCount: r.requirements.length,
       shownCount: r.requirements.filter((x) => x.status === "shown").length,
@@ -1139,4 +1146,65 @@ export async function requestAsk(
     (r) => ({ actionCount: r.actions.length, withheld: r.withheld ? 1 : 0 }),
   );
   return { requestId: input.requestId, ...result };
+}
+
+/**
+ * Read a pasted job post with AI (job capture phase B): one counted request
+ * on every plan, inside its daily limit. Only the post and its optional link
+ * are sent, never the CV. Consent, provider and the daily limit are checked
+ * before any provider call. Logs are metadata only, never the post.
+ */
+export async function requestJobRead(
+  owner: string,
+  raw: JobReadRequest,
+  generator: (input: JobReadRequest) => ReturnType<typeof generateJobRead> = (input) => generateJobRead(input),
+): Promise<JobReadResponse> {
+  const parsed = jobReadRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    // Too long a post is explained in characters, not as a size error.
+    throw new HttpError(
+      400,
+      issue?.path[0] === "post" ? "JOB_POST_INVALID" : "INVALID_INPUT",
+      issue?.path[0] === "post" || issue?.path[0] === "url" ? issue.message : "Check the submitted fields. Nothing was read.",
+    );
+  }
+  const input = parsed.data;
+  const { plan } = await getUserSubscription(owner);
+  await requireAiConsent(owner);
+  if (!openAIConfigured())
+    throw new HttpError(503, "AI_NOT_CONFIGURED", "OpenAI is not configured on this installation yet. Read the post works without AI.");
+  await reserveDailyRequest(owner, plan.aiRequestsPerDay, plan.name);
+  const started = Date.now();
+  try {
+    const result = await generator(input);
+    logOperation({
+      level: "info",
+      event: "ai_job_read",
+      ownerId: owner,
+      durationMs: Date.now() - started,
+      statusCode: 200,
+      metadata: {
+        model: openAIModel(),
+        promptVersion: JOB_READ_PROMPT_VERSION,
+        fieldCount: Object.keys(result.fields).length,
+        requirementCount: result.requirements.length,
+        mustCount: result.requirements.filter((r) => r.kind === "must").length,
+        niceCount: result.requirements.filter((r) => r.kind === "nice").length,
+        withheld: result.withheld,
+        postChars: [...input.post].length,
+      },
+    });
+    return { requestId: input.requestId, ...result };
+  } catch (error) {
+    logOperation({
+      level: "warn",
+      event: "ai_job_read_failed",
+      ownerId: owner,
+      durationMs: Date.now() - started,
+      statusCode: error instanceof HttpError ? error.status : 500,
+      errorCode: error instanceof HttpError ? error.code : "INTERNAL_ERROR",
+    });
+    throw error;
+  }
 }

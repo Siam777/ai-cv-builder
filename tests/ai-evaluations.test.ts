@@ -980,3 +980,76 @@ test("Phase E evaluation: Ask the AI cases pass good replies and flag bad ones",
     assert.ok(e.checkAsk(row, doc, bad[row.id] as never).length > 0, `${row.id} should flag a bad reply`);
   }
 });
+
+test("Job read evaluation: 12+ cases, adversarial replies are dropped or corrected offline, and --suite=job-read parses", async () => {
+  const j = await import("../scripts/lib/job-read-evaluation");
+  const { parseEvalArgs } = await import("../scripts/lib/eval-args");
+  const provider = await import("../src/lib/server/openai-provider");
+  const { JOB_POST_MAX, charCount } = await import("../src/lib/job-read");
+  process.env.OPENAI_API_KEY = "synthetic-eval-key";
+  const ids = j.JOB_READ_CASES.map((row) => row.id);
+  assert.ok(ids.length >= 16);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of [
+    "jr-clean", "jr-no-company", "jr-salary-usd", "jr-salary-eur", "jr-salary-gbp", "jr-non-english",
+    "jr-agency", "jr-injection", "jr-very-long", "jr-mostly-benefits", "jr-duplicates", "jr-nonsense",
+  ])
+    assert.ok(ids.includes(id), id);
+  for (const row of j.JOB_READ_CASES) {
+    assert.ok(charCount(row.post) <= JOB_POST_MAX, row.id);
+    assert.ok(row.rationale.length > 10, row.id);
+  }
+  assert.ok(charCount(j.JOB_READ_CASES.find((row) => row.id === "jr-very-long")!.post) > 20000);
+
+  // A faithful reply to the clean case passes; a reply that keeps benefits or invents a value fails.
+  const clean = j.JOB_READ_CASES.find((row) => row.id === "jr-clean")!;
+  const good = await provider.generateJobRead(
+    { post: clean.post, url: clean.url },
+    scripted({
+      fields: {
+        role: { value: "Senior Data Analyst", quote: "Senior Data Analyst at Northwind Traders" },
+        company: { value: "Northwind Traders", quote: "Senior Data Analyst at Northwind Traders" },
+        location: { value: "Berlin, Germany", quote: "Location: Berlin, Germany" },
+        workType: { value: "hybrid", quote: "Hybrid, full-time." },
+        employmentType: { value: "full-time", quote: "Hybrid, full-time." },
+        salary: { value: "€62,000 – €74,000 per year", quote: "Salary: €62,000 – €74,000 per year." },
+        deadline: { value: "2027-01-15", quote: "Apply by 15 January 2027." },
+        applyLink: { value: "https://jobs.example.test/northwind/analyst", quote: "https://jobs.example.test/northwind/analyst" },
+      },
+      requirements: ["4+ years of SQL in a production analytics team", "Building dashboards in Tableau or Power BI", "Fluent English", "dbt experience", "German at B2 level"].map(
+        (quote) => ({ text: quote, kind: "must", quote }),
+      ),
+    }).transport,
+  );
+  assert.deepEqual(j.checkJobRead(clean, good), []);
+  assert.ok(j.checkJobRead(clean, { ...good, requirements: [...good.requirements, { id: "x", text: "30 days of holiday", kind: "must", quote: "30 days of holiday", paraphrased: false }] }).length > 0);
+  assert.ok(j.checkJobRead(clean, { ...good, fields: { ...good.fields, company: { value: "Globex", quote: "Globex" } } }).length > 0);
+
+  // Adversarial replies: a genuine quote with a wrong value is dropped or corrected by the server checks.
+  assert.deepEqual(
+    j.ADVERSARIAL_REPLIES.map((row) => row.id).sort(),
+    ["invented-company", "invented-requirement", "wrong-date", "wrong-label", "wrong-salary"],
+  );
+  for (const adversarial of j.ADVERSARIAL_REPLIES) {
+    const row = j.JOB_READ_CASES.find((item) => item.id === adversarial.caseId)!;
+    const result = await provider.generateJobRead({ post: row.post }, scripted(adversarial.reply).transport);
+    for (const [field, value] of Object.entries(adversarial.expect))
+      assert.equal(result.fields[field as keyof typeof result.fields]?.value ?? "", value, `${adversarial.id}: ${field}`);
+    if (adversarial.absent) assert.equal(JSON.stringify(result).includes(adversarial.absent), false, adversarial.id);
+    for (const [words, kind] of adversarial.kinds ?? [])
+      assert.equal(result.requirements.find((r) => r.text.includes(words))?.kind, kind, `${adversarial.id}: ${words}`);
+    if (adversarial.id === "invented-requirement")
+      // Corrected: the post's own words replace the invented text.
+      assert.deepEqual(result.requirements.map((r) => r.text), ["4+ years of SQL in a production analytics team"]);
+    else if (adversarial.id !== "wrong-label") assert.ok(result.withheld > 0, `${adversarial.id} counts in withheld`);
+  }
+
+  // The suite name is accepted before any paid call; unknown names are refused.
+  assert.deepEqual(parseEvalArgs(["--suite=job-read"]).suites, ["job-read"]);
+  assert.deepEqual(parseEvalArgs(["--suite=ask,job-read", "--save"]), { suites: ["ask", "job-read"], save: true });
+  assert.ok(parseEvalArgs([]).suites.includes("job-read"));
+  assert.throws(() => parseEvalArgs(["--suite=job-reads"]), /Unknown suite/);
+  assert.throws(() => parseEvalArgs(["--live"]), /--suite=/);
+  assert.match(await readFile("scripts/eval-openai.ts", "utf8"), /JOB_READ_PROMPT_VERSION,\n\s+JOB_MATCH_GIVEN_PROMPT_VERSION,/);
+  assert.equal(provider.JOB_READ_PROMPT_VERSION, "job-read-v1");
+});

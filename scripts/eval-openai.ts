@@ -27,6 +27,9 @@ import {
   IMPORT_TIDY_PROMPT_VERSION,
   generateAsk,
   ASK_PROMPT_VERSION,
+  generateJobRead,
+  JOB_READ_PROMPT_VERSION,
+  JOB_MATCH_GIVEN_PROMPT_VERSION,
 } from "../src/lib/server/openai-provider";
 import {
   checkStarters,
@@ -74,23 +77,16 @@ import {
   TIDY_CASES,
 } from "./lib/phase-d-evaluation";
 import { ASK_CASES, checkAsk, PHASE_E_HARNESS_VERSION, type AskOutput } from "./lib/phase-e-evaluation";
+import { parseEvalArgs } from "./lib/eval-args";
+import { checkJobRead, JOB_READ_CASES, JOB_READ_HARNESS_VERSION, rawAsResult } from "./lib/job-read-evaluation";
+import type { JobReadDraft } from "../src/lib/ai-contract";
 import { createDocument as sampleDocument } from "../src/lib/document";
 import type { ImportTidyDraft } from "../src/lib/import-tidy";
-
-const SUITES = ["rewrite", "entry", "starters", "skills", "interview", "match", "improve", "letter", "tidy", "ask"] as const;
-type Suite = (typeof SUITES)[number];
 
 async function main() {
   loadEnvConfig(process.cwd());
   const args = process.argv.slice(2);
-  const suiteArg = args.find((arg) => arg.startsWith("--suite="));
-  if (args.some((arg) => arg !== "--save" && arg !== suiteArg))
-    throw new Error(
-      "Use --suite=rewrite,entry,starters,skills,interview,match,improve,letter,tidy,ask (default: all) and optionally --save.",
-    );
-  const suites = (suiteArg?.split("=")[1].split(",") ?? [...SUITES]) as Suite[];
-  if (!suites.length || suites.some((suite) => !SUITES.includes(suite)))
-    throw new Error(`Unknown suite. Choose from ${SUITES.join(", ")}.`);
+  const { suites } = parseEvalArgs(args);
   if (!openAIConfigured())
     throw new Error(
       "Set OPENAI_API_KEY privately in .env.local before running live evaluations.",
@@ -99,9 +95,10 @@ async function main() {
   tokenPrices();
   // Explicitly invoked, synthetic-only evaluation. At most 8 (rewrite) + 14 (entry)
   // + 6 (starters) + 12 (skills) + 6 (interview) + 24 (match) + 12 (improve)
-  // + 6 (letter) + 3 (tidy) + 6 (ask) = 97 paid API calls, with no retries.
+  // + 6 (letter) + 3 (tidy) + 6 (ask) + 32 (job-read: 16 cases, at most 2 calls) = 129
+  // paid API calls, with no retries.
   console.log(
-    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}, ${ASK_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
+    `Live synthetic evaluation: ${PROMPT_VERSION}, ${ENTRY_PROMPT_VERSION}, ${STARTERS_PROMPT_VERSION}, ${SKILLS_PROMPT_VERSION}, ${INTERVIEW_PROMPT_VERSION}, ${JOB_MATCH_PROMPT_VERSION}, ${GAP_LINE_PROMPT_VERSION}, ${TAILOR_PROMPT_VERSION}, ${COVER_LETTER_PROMPT_VERSION}, ${IMPORT_TIDY_PROMPT_VERSION}, ${ASK_PROMPT_VERSION}, ${JOB_READ_PROMPT_VERSION}; model=${openAIModel()}; suites=${suites.join(",")}`,
   );
   let failures = suites.includes("rewrite") ? await rewriteSuite() : 0;
   const entry = suites.includes("entry") ? await entrySuite() : null;
@@ -113,6 +110,7 @@ async function main() {
   const letter = suites.includes("letter") ? await letterSuite() : null;
   const tidy = suites.includes("tidy") ? await tidySuite() : null;
   const ask = suites.includes("ask") ? await askSuite() : null;
+  const jobRead = suites.includes("job-read") ? await jobReadSuite() : null;
   failures +=
     (entry?.failures ?? 0) +
     (starters?.failures ?? 0) +
@@ -122,7 +120,8 @@ async function main() {
     (improve?.failures ?? 0) +
     (letter?.failures ?? 0) +
     (tidy?.failures ?? 0) +
-    (ask?.failures ?? 0);
+    (ask?.failures ?? 0) +
+    (jobRead?.failures ?? 0);
   const phaseB = Boolean(skills || interview);
   const phaseC = Boolean(match || improve);
   const phaseD = Boolean(letter || tidy);
@@ -135,6 +134,7 @@ async function main() {
       ...(phaseC ? [PHASE_C_HARNESS_VERSION] : []),
       ...(phaseD ? [PHASE_D_HARNESS_VERSION] : []),
       ...(phaseE ? [PHASE_E_HARNESS_VERSION] : []),
+      ...(jobRead ? [JOB_READ_HARNESS_VERSION] : []),
     ],
     model: openAIModel(),
     promptVersions: [
@@ -149,6 +149,8 @@ async function main() {
       COVER_LETTER_PROMPT_VERSION,
       IMPORT_TIDY_PROMPT_VERSION,
       ASK_PROMPT_VERSION,
+      JOB_READ_PROMPT_VERSION,
+      JOB_MATCH_GIVEN_PROMPT_VERSION,
     ],
     ranAt: new Date().toISOString(),
     prices: { ...tokenPrices(), unit: "USD per million tokens" },
@@ -164,11 +166,19 @@ async function main() {
     coverLetter: letter && costSummary(letter.usages),
     importTidy: tidy && costSummary(tidy.usages),
     ask: ask && costSummary(ask.usages),
+    jobRead: jobRead && costSummary(jobRead.usages),
     failures,
   };
   console.log(JSON.stringify(report, null, 2));
-  if (args.includes("--save") && (phaseA || phaseB || phaseC || phaseD || phaseE)) {
-    const phase = `phase-${[phaseA && "a", phaseB && "b", phaseC && "c", phaseD && "d", phaseE && "e"].filter(Boolean).join("-")}`;
+  if (args.includes("--save") && (phaseA || phaseB || phaseC || phaseD || phaseE || jobRead)) {
+    const phase = [
+      phaseA || phaseB || phaseC || phaseD || phaseE
+        ? `phase-${[phaseA && "a", phaseB && "b", phaseC && "c", phaseD && "d", phaseE && "e"].filter(Boolean).join("-")}`
+        : "",
+      jobRead ? "job-read" : "",
+    ]
+      .filter(Boolean)
+      .join("-");
     const file = `docs/plans/evaluations/${report.ranAt.slice(0, 10)}-${phase}-live.json`;
     await mkdir("docs/plans/evaluations", { recursive: true });
     await writeFile(
@@ -186,6 +196,7 @@ async function main() {
             ...(letter?.rows ?? []),
             ...(tidy?.rows ?? []),
             ...(ask?.rows ?? []),
+            ...(jobRead?.rows ?? []),
           ],
         },
         null,
@@ -601,6 +612,31 @@ async function tidySuite() {
 }
 
 // Ask the AI: at most two paid calls per case (answer, one batch support check).
+// Read with AI (job-read-v1): at most 2 paid calls per case (read, one batched paraphrase check).
+// Only the fictional post and link are sent; no CV is involved.
+async function jobReadSuite() {
+  let failures = 0;
+  const rows: unknown[] = [];
+  const usages: Usage[] = [];
+  for (const row of JOB_READ_CASES) {
+    const usage = emptyUsage();
+    usages.push(usage);
+    const result = await runCase("job-read", row.id, usage, async (transport, first) => {
+      const read = await generateJobRead({ post: row.post, url: row.url }, transport);
+      const raw = first.output as JobReadDraft | undefined;
+      return {
+        problems: checkJobRead(row, read),
+        rawProblems: raw ? checkJobRead(row, rawAsResult(raw)) : ["raw output unreadable"],
+        output: read,
+      };
+    });
+    if (result.failed) failures++;
+    rows.push(result.line);
+    console.log(JSON.stringify(result.line));
+  }
+  return { failures, rows, usages };
+}
+
 async function askSuite() {
   let failures = 0;
   const rows: unknown[] = [];

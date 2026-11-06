@@ -139,11 +139,22 @@ export default function Privacy() {
           export. Coaching does not change local coverage counts or verify
           qualifications.
         </p>
+        <h2>Reading a job post</h2>
+        <p>
+          <strong>Read the post</strong> runs in your browser and sends
+          nothing. <strong>Read with AI</strong>, after you turn on AI writing
+          help, sends the job post and its link (if you give one) to OpenAI and
+          counts as one AI request; your CV, contacts and notes are never part
+          of that request. The result comes back to your form and is stored
+          only if you save the application. The server logs only metadata such
+          as timings and the number of fields found, never the post. The post
+          is treated as data: instructions written inside it are ignored.
+        </p>
         <h2>Application tracker</h2>
         <p>
           If you use <Link href="/applications">Applications</Link>, your
           account stores the jobs you add (company, role, link, location, where
-          you found it, the job post you paste), their stages and dates, your
+          you found it, the job post you paste, the requirements you review, the salary as written, employment type and deadline), their stages and dates, your
           notes, reminders, the recruiter and other contacts you enter, frozen
           copies of the CVs and cover letters you attach, and a record of when
           you marked one as sent. All of it is included in account-data export

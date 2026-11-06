@@ -126,6 +126,44 @@ export default function Help() {
           <strong>not</strong> checked: a gap is not a contradiction, and you
           should not feel you have to hide one.
         </p>
+        <h2 id="add-a-job">Add a job from a post</h2>
+        <p>
+          On <Link href="/applications">Applications</Link>, choose{" "}
+          <strong>Add a job</strong> and paste the job post (up to 30,000
+          characters) and, if you like, its link.
+        </p>
+        <ul>
+          <li>
+            <strong>Read the post</strong> is free and runs in your browser:
+            nothing is sent anywhere. It reads the title, the company, the
+            location, the salary as written, work and employment type, a
+            deadline, and the lists under headings such as
+            &ldquo;Requirements&rdquo; and &ldquo;Nice to have&rdquo;. It works
+            without an account.
+          </li>
+          <li>
+            <strong>Read with AI</strong> uses 1 of your daily AI requests on
+            any plan (Free 5, Go 50, Pro 200) and needs AI writing help turned
+            on. It sends only the post and the link to OpenAI, never your CV.
+            Every value it finds shows the words of the post it came from; a
+            value the post does not support is left out, and the form says how
+            many were.
+          </li>
+          <li>
+            Must have and nice to have come from the post&apos;s headings and
+            words such as &ldquo;required&rdquo; or &ldquo;a plus&rdquo;, never
+            from the AI&apos;s opinion. When the post does not say, the item is
+            listed under <strong>Not stated</strong> and you choose.
+          </li>
+          <li>
+            Reorder, move or remove requirements before saving. The first 15
+            (must haves first) are used when you choose{" "}
+            <strong>Match my CV</strong> on the application, with your
+            priorities; the rest stay on the application.{" "}
+            <strong>Tailor a copy</strong> starts the tailoring tool and links
+            the tailored copy to the application.
+          </li>
+        </ul>
         <h2 id="applications">Track your applications</h2>
         <p>
           <Link href="/applications">Applications</Link> keeps every job you
